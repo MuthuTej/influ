@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "61884125308",
+    "project_id": "connect-409d0",
+    "storage_bucket": "connect-409d0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:61884125308:android:5cf9c391a871baf56639f9",
+        "android_client_info": {
+          "package_name": "com.connect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWwlqLaMtnA1GK0vAsKyOzpq3km4KZTF4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:61884125308:android:1e80cfce9f1a89ba6639f9",
+        "android_client_info": {
+          "package_name": "np.com.bimalkafle.firebaseauthdemoapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWwlqLaMtnA1GK0vAsKyOzpq3km4KZTF4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
