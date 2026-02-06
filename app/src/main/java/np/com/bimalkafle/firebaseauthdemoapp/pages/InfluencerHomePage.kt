@@ -14,16 +14,14 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 
 @Composable
-fun InfluencerHomePage(
-    modifier: Modifier = Modifier,
-    navController: NavController,
-    authViewModel: AuthViewModel
-) {
+fun InfluencerHomePage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
     val authState = authViewModel.authState.observeAsState()
 
     LaunchedEffect(authState.value) {
         if (authState.value is AuthState.Unauthenticated) {
-            navController.navigate("login")
+            navController.navigate("login") {
+                popUpTo("influencer_home") { inclusive = true }
+            }
         }
     }
 
@@ -32,14 +30,18 @@ fun InfluencerHomePage(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Influencer Home Page", fontSize = 32.sp)
+        Text(text = "Influencer Dashboard", fontSize = 32.sp)
+        
         Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "Welcome, Influencer!", fontSize = 20.sp)
+        
+        Text(text = "Welcome, Influencer!", style = MaterialTheme.typography.bodyLarge)
+
         Spacer(modifier = Modifier.height(32.dp))
+
         Button(onClick = {
             authViewModel.signout()
         }) {
-            Text(text = "Sign out")
+            Text(text = "Sign Out")
         }
     }
 }

@@ -1,73 +1,76 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import np.com.bimalkafle.firebaseauthdemoapp.AuthState
+import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.AuthState
+import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
 
 @Composable
-fun SignupPage(
-    modifier: Modifier = Modifier,
-    navController: NavController,
-    authViewModel: AuthViewModel
-) {
+fun SignupPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
-    val roles = listOf("BRAND", "INFLUENCER")
-    var selectedRole by remember { mutableStateOf(roles[0]) }
+    var role by remember { mutableStateOf("BRAND") } // Default role
 
     val authState = authViewModel.authState.observeAsState()
     val context = LocalContext.current
+    val prefsManager = PrefsManager(context)
 
     LaunchedEffect(authState.value) {
         when (val state = authState.value) {
             is AuthState.Authenticated -> {
-                if (state.role == "BRAND") {
-                    navController.navigate("brand_home") {
-                        popUpTo("signup") { inclusive = true }
-                    }
-                } else if (state.role == "INFLUENCER") {
-                    navController.navigate("influencer_home") {
-                        popUpTo("signup") { inclusive = true }
+                val uid = FirebaseAuth.getInstance().currentUser?.uid
+                if (uid != null) {
+                    // Start fresh -> Profile NOT completed -> Registration
+                    // Even if by some persistent state it was true, we might want to check
+                    // But for Signup, we can assume we want to go to registration usually.
+                    // Strictly following logic: Check Prefs.
+                    if (prefsManager.isProfileCompleted(uid)) {
+                         val route = if (state.role.equals("BRAND", ignoreCase = true)) "brand_home" else "influencer_home"
+                         navController.navigate(route) {
+                            popUpTo("signup") { inclusive = true }
+                         }
+                    } else {
+                        val route = if (state.role.equals("BRAND", ignoreCase = true)) "brand_registration" else "influencer_registration"
+                        navController.navigate(route) {
+                            popUpTo("signup") { inclusive = true }
+                        }
                     }
                 }
             }
-            is AuthState.Error -> Toast.makeText(
-                context,
-                state.message, Toast.LENGTH_SHORT
-            ).show()
-
-            else -> Unit
+            is AuthState.Error -> {
+                Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
+            }
+            else -> {}
         }
     }
 
     Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
+        modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Signup Page", fontSize = 32.sp)
+        Text(text = "Signup Page", fontSize = 32.sp, fontWeight = FontWeight.Bold)
 
         Spacer(modifier = Modifier.height(16.dp))
-
+        
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text(text = "Full Name") },
-            modifier = Modifier.fillMaxWidth()
+            label = { Text(text = "Full Name") }
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -75,8 +78,7 @@ fun SignupPage(
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text(text = "Email") },
-            modifier = Modifier.fillMaxWidth()
+            label = { Text(text = "Email") }
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -84,57 +86,42 @@ fun SignupPage(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text(text = "Password") },
-            modifier = Modifier.fillMaxWidth()
+            label = { Text(text = "Password") }
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(text = "Select Role", fontSize = 18.sp)
         
-        Row(Modifier.selectableGroup()) {
-            roles.forEach { role ->
-                Row(
-                    Modifier.fillMaxWidth(0.5f)
-                        .height(56.dp)
-                        .selectable(
-                            selected = (role == selectedRole),
-                            onClick = { selectedRole = role },
-                            role = Role.RadioButton
-                        )
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = (role == selectedRole),
-                        onClick = null // null recommended for accessibility with screen readers
-                    )
-                    Text(
-                        text = role.replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(start = 16.dp)
-                    )
-                }
-            }
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Simple Role Selection
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RadioButton(
+                selected = role == "BRAND",
+                onClick = { role = "BRAND" }
+            )
+            Text("Brand")
+            Spacer(modifier = Modifier.width(16.dp))
+            RadioButton(
+                selected = role == "INFLUENCER",
+                onClick = { role = "INFLUENCER" }
+            )
+            Text("Influencer")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = {
-                authViewModel.signup(email, password, name, selectedRole)
-            }, 
-            enabled = authState.value != AuthState.Loading,
-            modifier = Modifier.fillMaxWidth()
+                authViewModel.signup(email, password, name, role)
+            },
+            enabled = authState.value != AuthState.Loading
         ) {
-            Text(text = "Create account")
+            Text(text = "Signup")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        TextButton(onClick = {
-            navController.navigate("login")
-        }) {
+        TextButton(onClick = { navController.navigate("login") }) {
             Text(text = "Already have an account, Login")
         }
     }

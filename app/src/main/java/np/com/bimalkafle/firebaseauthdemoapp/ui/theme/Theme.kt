@@ -35,7 +35,7 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun FirebaseAuthDemoAppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false, // Force Light Theme by default
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
@@ -43,10 +43,11 @@ fun FirebaseAuthDemoAppTheme(
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            // Force dynamic light color scheme even if system is dark
+            dynamicLightColorScheme(context) 
         }
 
-        darkTheme -> DarkColorScheme
+        darkTheme -> DarkColorScheme // This branch is effectively unreachable with default false, but kept for completeness if manually overridden
         else -> LightColorScheme
     }
 
