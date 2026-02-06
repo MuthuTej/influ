@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
             FirebaseAuthDemoAppTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     MyAppNavigation(
-                        modifier = Modifier.padding(innerPadding),
+                        modifier = Modifier, // Remove padding to allow content to draw behind system bars
                         authViewModel = authViewModel,
                         splashViewModel = splashViewModel
                     )
