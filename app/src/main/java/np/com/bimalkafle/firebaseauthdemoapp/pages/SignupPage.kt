@@ -1,15 +1,29 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -24,6 +38,7 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
     var password by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("BRAND") } // Default role
+    var passwordVisible by remember { mutableStateOf(false) }
 
     val authState = authViewModel.authState.observeAsState()
     val context = LocalContext.current
@@ -34,10 +49,6 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
             is AuthState.Authenticated -> {
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
                 if (uid != null) {
-                    // Start fresh -> Profile NOT completed -> Registration
-                    // Even if by some persistent state it was true, we might want to check
-                    // But for Signup, we can assume we want to go to registration usually.
-                    // Strictly following logic: Check Prefs.
                     if (prefsManager.isProfileCompleted(uid)) {
                          val route = if (state.role.equals("BRAND", ignoreCase = true)) "brand_home" else "influencer_home"
                          navController.navigate(route) {
@@ -58,71 +69,214 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
         }
     }
 
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+    val gradientBg = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF37B6E9),
+            Color(0xFF4B4CED)
+        )
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(gradientBg)
+            .imePadding()
     ) {
-        Text(text = "Signup Page", fontSize = 32.sp, fontWeight = FontWeight.Bold)
-
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text(text = "Full Name") }
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text(text = "Email") }
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text(text = "Password") }
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Simple Role Selection
-        Row(
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
-            RadioButton(
-                selected = role == "BRAND",
-                onClick = { role = "BRAND" }
-            )
-            Text("Brand")
-            Spacer(modifier = Modifier.width(16.dp))
-            RadioButton(
-                selected = role == "INFLUENCER",
-                onClick = { role = "INFLUENCER" }
-            )
-            Text("Influencer")
-        }
+            // Header Section
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 60.dp, bottom = 40.dp)
+            ) {
+                Text(
+                    text = "Create Account",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
 
-        Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-        Button(
-            onClick = {
-                authViewModel.signup(email, password, name, role)
-            },
-            enabled = authState.value != AuthState.Loading
-        ) {
-            Text(text = "Signup")
-        }
+                Text(
+                    text = "Sign up to get started",
+                    fontSize = 16.sp,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            // White Card Section
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Full Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
 
-        TextButton(onClick = { navController.navigate("login") }) {
-            Text(text = "Already have an account, Login")
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = { Text("Email") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                    contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                                )
+                            }
+                        }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Text(
+                        text = "I am a:",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.DarkGray
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Role Selection
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { role = "BRAND" }
+                                .padding(vertical = 8.dp)
+                        ) {
+                            RadioButton(
+                                selected = role == "BRAND",
+                                onClick = { role = "BRAND" }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Brand")
+                        }
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { role = "INFLUENCER" }
+                                .padding(vertical = 8.dp)
+                        ) {
+                            RadioButton(
+                                selected = role == "INFLUENCER",
+                                onClick = { role = "INFLUENCER" }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Influencer")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // Signup Button
+                    Button(
+                        onClick = {
+                            authViewModel.signup(email, password, name, role)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent
+                        ),
+                        contentPadding = PaddingValues(),
+                        enabled = authState.value != AuthState.Loading,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                         Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    brush = if (authState.value != AuthState.Loading) {
+                                        Brush.horizontalGradient(listOf(Color(0xFF37B6E9), Color(0xFF4B4CED)))
+                                    } else {
+                                        Brush.horizontalGradient(listOf(Color.Gray, Color.Gray))
+                                    },
+                                    shape = RoundedCornerShape(12.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                           if (authState.value == AuthState.Loading) {
+                               CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                           } else {
+                               Text(
+                                   text = "SIGN UP",
+                                   color = Color.White,
+                                   fontSize = 18.sp,
+                                   fontWeight = FontWeight.Bold
+                               )
+                           }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Login Link
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = buildAnnotatedString {
+                                append("Already have an account? ")
+                                withStyle(
+                                    style = SpanStyle(
+                                        color = Color(0xFF4B4CED),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                ) {
+                                    append("Log In")
+                                }
+                            },
+                            fontSize = 14.sp,
+                            modifier = Modifier.clickable { navController.navigate("login") }
+                        )
+                    }
+                }
+            }
         }
     }
 }
