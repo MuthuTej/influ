@@ -1,10 +1,8 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -12,10 +10,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
-import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashState
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
 
@@ -64,6 +61,11 @@ fun SplashScreen(
         }
     }
 
+    SplashScreenContent()
+}
+
+@Composable
+private fun SplashScreenContent() {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -72,5 +74,13 @@ fun SplashScreen(
     ) {
         // You would typically use a Logo here. For now using a loader.
         CircularProgressIndicator()
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SplashScreenPreview() {
+    FirebaseAuthDemoAppTheme {
+        SplashScreenContent()
     }
 }

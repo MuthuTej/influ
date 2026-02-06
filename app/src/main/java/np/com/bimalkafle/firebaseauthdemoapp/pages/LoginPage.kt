@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -34,10 +35,6 @@ import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
 
 @Composable
 fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-
     val authState = authViewModel.authState.observeAsState()
     val context = LocalContext.current
     val prefsManager = PrefsManager(context)
@@ -68,6 +65,29 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             else -> {}
         }
     }
+
+    LoginPageContent(
+        authState = authState.value,
+        onLoginClicked = { email, password ->
+            authViewModel.login(email, password)
+        },
+        onSignUpClicked = {
+            navController.navigate("signup")
+        },
+        modifier = modifier
+    )
+}
+
+@Composable
+fun LoginPageContent(
+    authState: AuthState?,
+    onLoginClicked: (String, String) -> Unit,
+    onSignUpClicked: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
 
     val gradientBg = Brush.verticalGradient(
         colors = listOf(
@@ -156,7 +176,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
                     // Login Button with Gradient
                     Button(
-                        onClick = { authViewModel.login(email, password) },
+                        onClick = { onLoginClicked(email, password) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp),
@@ -164,14 +184,14 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                             containerColor = Color.Transparent
                         ),
                         contentPadding = PaddingValues(),
-                        enabled = authState.value != AuthState.Loading,
+                        enabled = authState != AuthState.Loading,
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
-                                    brush = if (authState.value != AuthState.Loading) {
+                                    brush = if (authState != AuthState.Loading) {
                                         Brush.horizontalGradient(listOf(Color(0xFF37B6E9), Color(0xFF4B4CED)))
                                     } else {
                                         Brush.horizontalGradient(listOf(Color.Gray, Color.Gray)) // Disabled state visual
@@ -180,7 +200,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                           if (authState.value == AuthState.Loading) {
+                           if (authState == AuthState.Loading) {
                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                            } else {
                                Text(
@@ -213,11 +233,21 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                                 }
                             },
                             fontSize = 14.sp,
-                            modifier = Modifier.clickable { navController.navigate("signup") }
+                            modifier = Modifier.clickable { onSignUpClicked() }
                         )
                     }
                 }
             }
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoginPagePreview() {
+    LoginPageContent(
+        authState = null,
+        onLoginClicked = { _, _ -> },
+        onSignUpClicked = {}
+    )
 }

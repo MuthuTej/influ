@@ -30,7 +30,7 @@ fun MyAppNavigation(
             SignupPage(modifier, navController, authViewModel)
         }
         composable("brand_registration") {
-            BrandRegistrationScreen(navController)
+            BrandRegistrationScreen(onBack = { navController.popBackStack() }, onNext = { navController.navigate("brand_home") })
         }
         composable("influencer_registration") {
             InfluencerRegistrationScreen(navController)

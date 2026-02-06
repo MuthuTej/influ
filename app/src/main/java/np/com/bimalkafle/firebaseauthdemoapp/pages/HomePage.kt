@@ -10,10 +10,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 
 @Composable
 fun HomePage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
@@ -38,6 +40,14 @@ fun HomePage(modifier: Modifier = Modifier, navController: NavController, authVi
         }
     }
 
+    HomePageContent(modifier = modifier) {
+        authViewModel.signout()
+    }
+
+}
+
+@Composable
+fun HomePageContent(modifier: Modifier = Modifier, onSignOut: () -> Unit) {
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -45,11 +55,16 @@ fun HomePage(modifier: Modifier = Modifier, navController: NavController, authVi
     ) {
         Text(text = "Home Page", fontSize = 32.sp)
 
-        TextButton(onClick = {
-            authViewModel.signout()
-        }) {
+        TextButton(onClick = onSignOut) {
             Text(text = "Sign out")
         }
     }
+}
 
+@Preview(showBackground = true)
+@Composable
+fun HomePagePreview() {
+    FirebaseAuthDemoAppTheme {
+        HomePageContent(onSignOut = {})
+    }
 }

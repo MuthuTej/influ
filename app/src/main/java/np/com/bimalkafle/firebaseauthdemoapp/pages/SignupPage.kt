@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -50,10 +51,10 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
                 if (uid != null) {
                     if (prefsManager.isProfileCompleted(uid)) {
-                         val route = if (state.role.equals("BRAND", ignoreCase = true)) "brand_home" else "influencer_home"
-                         navController.navigate(route) {
+                        val route = if (state.role.equals("BRAND", ignoreCase = true)) "brand_home" else "influencer_home"
+                        navController.navigate(route) {
                             popUpTo("signup") { inclusive = true }
-                         }
+                        }
                     } else {
                         val route = if (state.role.equals("BRAND", ignoreCase = true)) "brand_registration" else "influencer_registration"
                         navController.navigate(route) {
@@ -69,6 +70,41 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
         }
     }
 
+    SignupPageContent(
+        modifier = modifier,
+        email = email,
+        onEmailChange = { email = it },
+        password = password,
+        onPasswordChange = { password = it },
+        name = name,
+        onNameChange = { name = it },
+        role = role,
+        onRoleChange = { role = it },
+        passwordVisible = passwordVisible,
+        onPasswordVisibilityChange = { passwordVisible = !passwordVisible },
+        authState = authState.value,
+        onSignupClick = { authViewModel.signup(email, password, name, role) },
+        onLoginClick = { navController.navigate("login") }
+    )
+}
+
+@Composable
+fun SignupPageContent(
+    modifier: Modifier = Modifier,
+    email: String,
+    onEmailChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    name: String,
+    onNameChange: (String) -> Unit,
+    role: String,
+    onRoleChange: (String) -> Unit,
+    passwordVisible: Boolean,
+    onPasswordVisibilityChange: () -> Unit,
+    authState: AuthState?,
+    onSignupClick: () -> Unit,
+    onLoginClick: () -> Unit
+) {
     val gradientBg = Brush.verticalGradient(
         colors = listOf(
             Color(0xFF37B6E9),
@@ -124,7 +160,7 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                 ) {
                     OutlinedTextField(
                         value = name,
-                        onValueChange = { name = it },
+                        onValueChange = onNameChange,
                         label = { Text("Full Name") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -135,7 +171,7 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
 
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = onEmailChange,
                         label = { Text("Email") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -146,14 +182,14 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
 
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = onPasswordChange,
                         label = { Text("Password") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            IconButton(onClick = onPasswordVisibilityChange) {
                                 Icon(
                                     imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                                     contentDescription = if (passwordVisible) "Hide password" else "Show password"
@@ -161,16 +197,16 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                             }
                         }
                     )
-                    
+
                     Spacer(modifier = Modifier.height(24.dp))
-                    
+
                     Text(
                         text = "I am a:",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.DarkGray
                     )
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Role Selection
@@ -182,27 +218,27 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .weight(1f)
-                                .clickable { role = "BRAND" }
+                                .clickable { onRoleChange("BRAND") }
                                 .padding(vertical = 8.dp)
                         ) {
                             RadioButton(
                                 selected = role == "BRAND",
-                                onClick = { role = "BRAND" }
+                                onClick = { onRoleChange("BRAND") }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Brand")
                         }
-                        
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .weight(1f)
-                                .clickable { role = "INFLUENCER" }
+                                .clickable { onRoleChange("INFLUENCER") }
                                 .padding(vertical = 8.dp)
                         ) {
                             RadioButton(
                                 selected = role == "INFLUENCER",
-                                onClick = { role = "INFLUENCER" }
+                                onClick = { onRoleChange("INFLUENCER") }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Influencer")
@@ -213,9 +249,7 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
 
                     // Signup Button
                     Button(
-                        onClick = {
-                            authViewModel.signup(email, password, name, role)
-                        },
+                        onClick = onSignupClick,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp),
@@ -223,14 +257,14 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                             containerColor = Color.Transparent
                         ),
                         contentPadding = PaddingValues(),
-                        enabled = authState.value != AuthState.Loading,
+                        enabled = authState != AuthState.Loading,
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                         Box(
+                        Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
-                                    brush = if (authState.value != AuthState.Loading) {
+                                    brush = if (authState != AuthState.Loading) {
                                         Brush.horizontalGradient(listOf(Color(0xFF37B6E9), Color(0xFF4B4CED)))
                                     } else {
                                         Brush.horizontalGradient(listOf(Color.Gray, Color.Gray))
@@ -239,16 +273,16 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                           if (authState.value == AuthState.Loading) {
-                               CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                           } else {
-                               Text(
-                                   text = "SIGN UP",
-                                   color = Color.White,
-                                   fontSize = 18.sp,
-                                   fontWeight = FontWeight.Bold
-                               )
-                           }
+                            if (authState == AuthState.Loading) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                            } else {
+                                Text(
+                                    text = "SIGN UP",
+                                    color = Color.White,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
 
@@ -272,11 +306,37 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                                 }
                             },
                             fontSize = 14.sp,
-                            modifier = Modifier.clickable { navController.navigate("login") }
+                            modifier = Modifier.clickable(onClick = onLoginClick)
                         )
                     }
                 }
             }
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SignupPagePreview() {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var role by remember { mutableStateOf("BRAND") }
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    SignupPageContent(
+        email = email,
+        onEmailChange = { email = it },
+        password = password,
+        onPasswordChange = { password = it },
+        name = name,
+        onNameChange = { name = it },
+        role = role,
+        onRoleChange = { role = it },
+        passwordVisible = passwordVisible,
+        onPasswordVisibilityChange = { passwordVisible = !passwordVisible },
+        authState = null,
+        onSignupClick = {},
+        onLoginClick = {}
+    )
 }

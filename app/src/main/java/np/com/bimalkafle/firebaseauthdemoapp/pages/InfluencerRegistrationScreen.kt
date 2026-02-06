@@ -13,10 +13,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
+import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
 
 @Composable
@@ -29,6 +31,37 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     val prefsManager = PrefsManager(context)
     val auth = FirebaseAuth.getInstance()
     
+    InfluencerRegistrationScreenContent(
+        handle = handle,
+        niche = niche,
+        followersCount = followersCount,
+        onHandleChange = { handle = it },
+        onNicheChange = { niche = it },
+        onFollowersCountChange = { followersCount = it },
+        onCompleteProfileClick = {
+            val uid = auth.currentUser?.uid
+            if (uid != null) {
+                // In a real app, you would send this data to the backend here.
+                // For this task, we assume local success and save state.
+                prefsManager.saveProfileCompleted(uid, true)
+                navController.navigate("influencer_home") {
+                    popUpTo("influencer_registration") { inclusive = true }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+fun InfluencerRegistrationScreenContent(
+    handle: String,
+    niche: String,
+    followersCount: String,
+    onHandleChange: (String) -> Unit,
+    onNicheChange: (String) -> Unit,
+    onFollowersCountChange: (String) -> Unit,
+    onCompleteProfileClick: () -> Unit
+) {
     val gradientBg = Brush.verticalGradient(
         colors = listOf(
             Color(0xFF37B6E9),
@@ -84,7 +117,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 ) {
                     OutlinedTextField(
                         value = handle,
-                        onValueChange = { handle = it },
+                        onValueChange = onHandleChange,
                         label = { Text("Social Media Handle") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -95,7 +128,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
 
                     OutlinedTextField(
                         value = niche,
-                        onValueChange = { niche = it },
+                        onValueChange = onNicheChange,
                         label = { Text("Niche (e.g. Travel, Tech)") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -106,7 +139,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
 
                     OutlinedTextField(
                         value = followersCount,
-                        onValueChange = { followersCount = it },
+                        onValueChange = onFollowersCountChange,
                         label = { Text("Appx. Follower Count") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -116,17 +149,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                     Spacer(modifier = Modifier.height(32.dp))
 
                     Button(
-                        onClick = {
-                            val uid = auth.currentUser?.uid
-                            if (uid != null) {
-                                // In a real app, you would send this data to the backend here.
-                                // For this task, we assume local success and save state.
-                                prefsManager.saveProfileCompleted(uid, true)
-                                navController.navigate("influencer_home") {
-                                    popUpTo("influencer_registration") { inclusive = true }
-                                }
-                            }
-                        },
+                        onClick = onCompleteProfileClick,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp),
@@ -161,5 +184,21 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun InfluencerRegistrationScreenPreview() {
+    FirebaseAuthDemoAppTheme {
+        InfluencerRegistrationScreenContent(
+            handle = "my_handle",
+            niche = "tech",
+            followersCount = "100k",
+            onHandleChange = {},
+            onNicheChange = {},
+            onFollowersCountChange = {},
+            onCompleteProfileClick = {}
+        )
     }
 }
