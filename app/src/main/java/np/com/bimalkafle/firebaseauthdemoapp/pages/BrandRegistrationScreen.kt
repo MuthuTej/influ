@@ -138,7 +138,8 @@ fun BrandRegistrationScreen(
                 onValueChange = { brandName = it },
                 label = { Text("Brand Name") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -154,7 +155,8 @@ fun BrandRegistrationScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
                 )
                 ExposedDropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }) {
                     DropdownMenuItem(text = { Text("E-commerce") }, onClick = { brandCategory = "E-commerce"; categoryExpanded = false })
@@ -182,7 +184,8 @@ fun BrandRegistrationScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
                 )
                 ExposedDropdownMenu(expanded = subCategoryExpanded, onDismissRequest = { subCategoryExpanded = false }) {
                     subCategoryOptions.forEach { option ->
@@ -200,7 +203,8 @@ fun BrandRegistrationScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -216,7 +220,8 @@ fun BrandRegistrationScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
                 )
                 ExposedDropdownMenu(expanded = objectiveExpanded, onDismissRequest = { objectiveExpanded = false }) {
                     DropdownMenuItem(text = { Text("Brand Awareness") }, onClick = { campaignObjective = "Brand Awareness"; objectiveExpanded = false })
@@ -252,14 +257,16 @@ fun BrandRegistrationScreen(
                     onValueChange = { ageMin = it },
                     label = { Text("Min Age") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
                 )
                 OutlinedTextField(
                     value = ageMax,
                     onValueChange = { ageMax = it },
                     label = { Text("Max Age") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -274,7 +281,8 @@ fun BrandRegistrationScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
                 )
                 ExposedDropdownMenu(expanded = genderExpanded, onDismissRequest = { genderExpanded = false }) {
                     DropdownMenuItem(text = { Text("Any") }, onClick = { gender = "Any"; genderExpanded = false })
@@ -290,7 +298,8 @@ fun BrandRegistrationScreen(
                 onValueChange = { profileUrl = it },
                 label = { Text("Profile URL (Website)") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
             )
 
             Spacer(modifier = Modifier.height(32.dp))

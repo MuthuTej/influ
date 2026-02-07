@@ -1,14 +1,30 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,21 +42,14 @@ import androidx.compose.ui.unit.sp
 import np.com.bimalkafle.firebaseauthdemoapp.R
 
 @Composable
-fun BrandDetailsScreen(
-    onBack: () -> Unit,
-    onCreateCampaign: () -> Unit,
-    onGoToHome: () -> Unit
-) {
+fun CampaignDetailsPage(onBack: () -> Unit = {}, onSearchInfluencer: () -> Unit = {}) {
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
     val headerHeight = screenHeight * 0.4f
     val formPaddingTop = headerHeight - 40.dp
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         // Header
         Box(
             modifier = Modifier
@@ -51,10 +60,10 @@ fun BrandDetailsScreen(
             Image(
                 painter = painterResource(id = R.drawable.vector),
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
                     .alpha(0.2f),
                 contentScale = ContentScale.Crop
-
             )
             IconButton(onClick = onBack, modifier = Modifier.padding(16.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
@@ -66,7 +75,7 @@ fun BrandDetailsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.splash1), // Placeholder
+                    painter = painterResource(id = R.drawable.brand_profile),
                     contentDescription = "Brand Logo",
                     modifier = Modifier
                         .size(80.dp)
@@ -81,65 +90,60 @@ fun BrandDetailsScreen(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Your brand has been registered, create your campaign",
+                    text = "Your Campaign has been created successfully",
                     color = Color.White.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+                // Stepper can be added here
             }
         }
 
-        // Content
+        // Form Content
         Column(
             modifier = Modifier
                 .padding(top = formPaddingTop)
-                // This outer padding creates the margin around the white card
                 .padding(horizontal = 24.dp)
                 .fillMaxSize()
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color.White)
-                // This inner padding is for the content (image, buttons) inside the card
-                .padding(16.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(
-                painter = painterResource(id = R.drawable.splash1),
-                contentDescription = null,
-                modifier = Modifier.height(screenHeight * 0.2f)
+                painter = painterResource(id = R.drawable.brand2),
+                contentDescription = "Rocket Launch",
+                modifier = Modifier.size(150.dp)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Brand Details
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFE8EAF6))
+                    .background(Color(0xFFF5F5F5))
                     .padding(16.dp)
             ) {
-                DetailRow(label = "Brand Name", value = "Myntra")
-                DetailRow(label = "Category", value = "E-commerce")
-                DetailRow(label = "Objective", value = "Brand Awareness")
+                CampaignDetailRow("Brand Name", "Myntra")
+                Divider(color = Color.LightGray)
+                CampaignDetailRow("Category", "Ecommerce")
+                Divider(color = Color.LightGray)
+                CampaignDetailRow("Budget Range", "50K - 2L")
+                Divider(color = Color.LightGray)
+                CampaignDetailRow("Duration", "Jan 14 - Feb 14")
+                Divider(color = Color.LightGray)
+                CampaignDetailRow("Age group", "18-60")
+                Divider(color = Color.LightGray)
+                CampaignDetailRow("Platform", "Insta, YT")
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            OutlinedButton(
-                onClick = onGoToHome,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color(0xFF4B4CED)),
-            ) {
-                Text("GO TO HOME SCREEN", color = Color(0xFF4B4CED), fontWeight = FontWeight.Bold)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = onCreateCampaign,
+                onClick = onSearchInfluencer,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -153,7 +157,7 @@ fun BrandDetailsScreen(
                         .background(Color(0xFFFF8383)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("CREATE CAMPAIGN", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("SEARCH INFLUENCER", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -161,20 +165,20 @@ fun BrandDetailsScreen(
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+fun CampaignDetailRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, fontWeight = FontWeight.SemiBold)
-        Text(text = value)
+        Text(label, fontWeight = FontWeight.SemiBold)
+        Text(value, color = Color.Gray)
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun BrandDetailsScreenPreview() {
-    BrandDetailsScreen(onBack = {}, onCreateCampaign = {}, onGoToHome = {})
+fun CampaignDetailsPagePreview() {
+    CampaignDetailsPage()
 }

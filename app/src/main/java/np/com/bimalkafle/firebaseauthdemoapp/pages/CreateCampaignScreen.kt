@@ -30,6 +30,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -77,7 +78,9 @@ fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
             Image(
                 painter = painterResource(id = R.drawable.vector),
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.2f),
                 contentScale = ContentScale.Crop
             )
             IconButton(onClick = onBack, modifier = Modifier.padding(16.dp)) {
@@ -90,7 +93,7 @@ fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.splash1),
+                    painter = painterResource(id = R.drawable.brand_profile),
                     contentDescription = "Brand Logo",
                     modifier = Modifier
                         .size(80.dp)
@@ -160,7 +163,7 @@ fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color(0xFFF5F5F5),
                     unfocusedContainerColor = Color(0xFFF5F5F5),
-                    focusedBorderColor = Color(0xFF4B4CED),
+                    focusedBorderColor = Color(0xFFFF8383),
                     unfocusedBorderColor = Color.Transparent
                 )
             )
