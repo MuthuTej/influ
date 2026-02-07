@@ -68,11 +68,20 @@ fun MyAppNavigation(
                 onApproachBrands = { navController.navigate("influencer_home") }
             )
         }
+        composable("influencer_create_proposal") {
+            InfluencerCreateProposal(
+                onBack = { navController.popBackStack() },
+                onCreateProposal = { navController.navigate("proposals") } // You can change this to navigate to the home screen
+            )
+        }
         composable("brand_home") {
             BrandHomePage(modifier, navController, authViewModel)
         }
         composable("influencer_home") {
             InfluencerHomePage(modifier, navController, authViewModel)
+        }
+        composable("proposals") {
+            ProposalPage(onBack = { navController.popBackStack() })
         }
     })
 }
