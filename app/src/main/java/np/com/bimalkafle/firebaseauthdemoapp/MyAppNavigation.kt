@@ -62,6 +62,12 @@ fun MyAppNavigation(
         composable("influencer_registration") {
             InfluencerRegistrationScreen(navController)
         }
+        composable("influencer_detail") {
+            InfluencerDetailScreen(
+                onBack = { navController.popBackStack() },
+                onApproachBrands = { navController.navigate("influencer_home") }
+            )
+        }
         composable("brand_home") {
             BrandHomePage(modifier, navController, authViewModel)
         }

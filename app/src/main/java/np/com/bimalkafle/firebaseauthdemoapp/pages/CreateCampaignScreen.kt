@@ -32,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -53,7 +52,7 @@ import java.util.Locale
 fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
     var campaignName by remember { mutableStateOf("") }
     var campaignBrief by remember { mutableStateOf("") }
-    val platforms = listOf("Youtube", "Instagram", "Facebook", "Twitter", "Spotify", "Discord")
+    val platforms = listOf("Youtube", "Instagram", "Facebook", "Twitter")
     var selectedPlatforms by remember { mutableStateOf(setOf<String>()) }
 
     var showDatePicker by remember { mutableStateOf(false) }
@@ -131,40 +130,30 @@ fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
                 .padding(24.dp) // Adds padding inside the card
                 .verticalScroll(rememberScrollState())
         ) {
-            Text("Name of the Campaign", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = campaignName,
                 onValueChange = { campaignName = it },
-                placeholder = { Text("Enter campaign name...") },
+                label = { Text("Name of the Campaign") },
                 modifier = Modifier
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF5F5F5),
-                    unfocusedContainerColor = Color(0xFFF5F5F5),
-                    focusedBorderColor = Color(0xFFFF8383),
-                    unfocusedBorderColor = Color.Transparent
+                    focusedBorderColor = Color(0xFFFF8383)
                 )
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Campaign Brief", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = campaignBrief,
                 onValueChange = { campaignBrief = it },
-                placeholder = { Text("Short description...") },
+                label = { Text("Campaign Brief") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF5F5F5),
-                    unfocusedContainerColor = Color(0xFFF5F5F5),
-                    focusedBorderColor = Color(0xFFFF8383),
-                    unfocusedBorderColor = Color.Transparent
+                    focusedBorderColor = Color(0xFFFF8383)
                 )
             )
 
@@ -260,8 +249,6 @@ fun PlatformChip(name: String, isSelected: Boolean, onSelected: () -> Unit) {
         "Instagram" -> painterResource(id = R.drawable.ic_instagram)
         "Facebook" -> painterResource(id = R.drawable.ic_facebook)
         "Twitter" -> painterResource(id = R.drawable.ic_twitter)
-        "Spotify" -> painterResource(id = R.drawable.ic_spotify)
-        "Discord" -> painterResource(id = R.drawable.ic_discord)
         else -> painterResource(id = R.drawable.splash1)
     }
     FilterChip(
