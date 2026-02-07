@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,8 +11,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
+import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashState
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
@@ -61,19 +65,25 @@ fun SplashScreen(
         }
     }
 
-    SplashScreenContent()
+    SplashScreenContent(showLogo = true)
 }
 
 @Composable
-private fun SplashScreenContent() {
+private fun SplashScreenContent(showLogo: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
-        // You would typically use a Logo here. For now using a loader.
-        CircularProgressIndicator()
+        if (showLogo) {
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "App Logo"
+            )
+        } else {
+            CircularProgressIndicator(color = Color(0xFFFF4081))
+        }
     }
 }
 
@@ -81,6 +91,6 @@ private fun SplashScreenContent() {
 @Composable
 fun SplashScreenPreview() {
     FirebaseAuthDemoAppTheme {
-        SplashScreenContent()
+        SplashScreenContent(showLogo = true)
     }
 }

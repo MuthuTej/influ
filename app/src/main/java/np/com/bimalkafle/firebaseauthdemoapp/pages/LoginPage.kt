@@ -113,6 +113,7 @@ fun LoginPageContent(
                     .fillMaxWidth()
                     .padding(top = 60.dp, bottom = 40.dp)
             ) {
+                
                 Text(
                     text = "Log In",
                     fontSize = 32.sp,

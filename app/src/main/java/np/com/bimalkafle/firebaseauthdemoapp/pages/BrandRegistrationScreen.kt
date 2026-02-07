@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -24,6 +26,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
+import np.com.bimalkafle.firebaseauthdemoapp.network.BrandRepository
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -31,10 +36,10 @@ fun BrandRegistrationScreen(
     onBack: () -> Unit,
     onNext: () -> Unit
 ) {
-    var brandName by remember { mutableStateOf("Myntra") }
+    var brandName by remember { mutableStateOf("") }
     var brandCategory by remember { mutableStateOf("E-commerce") }
     var subCategory by remember { mutableStateOf("Fashion") }
-    var description by remember { mutableStateOf("Short description ...") }
+    var description by remember { mutableStateOf("") }
     var campaignObjective by remember { mutableStateOf("Brand Awareness") }
     val platformOptions = listOf("Instagram", "YouTube", "TikTok", "Twitter", "Facebook")
     val selectedPlatforms = remember { mutableStateListOf<String>() }
@@ -47,9 +52,19 @@ fun BrandRegistrationScreen(
     val screenHeight = configuration.screenHeightDp.dp
 
     val headerHeight = screenHeight * 0.4f
-    val formPaddingTop = headerHeight - 40.dp
+    val formPaddingTop = headerHeight - 80.dp
+    val coroutineScope = rememberCoroutineScope()
 
+    var isLoading by remember { mutableStateOf(false) }
 
+    val isFormValid by derivedStateOf {
+        brandName.isNotBlank() &&
+        description.isNotBlank() &&
+        selectedPlatforms.isNotEmpty() &&
+        ageMin.toIntOrNull() != null &&
+        ageMax.toIntOrNull() != null &&
+        ageMin.toIntOrNull()!! <= ageMax.toIntOrNull()!!
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -65,9 +80,13 @@ fun BrandRegistrationScreen(
             Image(
                 painter = painterResource(id = R.drawable.vector),
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize()
+                    .alpha(0.2f),
                 contentScale = ContentScale.Crop
+
             )
+            Spacer(modifier = Modifier.height(6.dp))
+
             IconButton(onClick = onBack, modifier = Modifier.padding(16.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
@@ -75,12 +94,13 @@ fun BrandRegistrationScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 50.dp),
+                    .padding(top = 60.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.splash1), // Placeholder
+                    painter = painterResource(id = R.drawable.brand_profile), // Placeholder
                     contentDescription = "Brand Logo",
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(80.dp)
                         .clip(CircleShape)
@@ -276,7 +296,47 @@ fun BrandRegistrationScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = onNext,
+                onClick = {
+                    if (isLoading) return@Button
+                    isLoading = true
+                    FirebaseAuth.getInstance().currentUser
+                        ?.getIdToken(true)
+                        ?.addOnSuccessListener { result ->
+
+                            val firebaseToken = result.token ?: return@addOnSuccessListener
+                            Log.d("BRAND_DEBUG", "Token received: ${firebaseToken.take(20)}...")
+                            Log.d("BRAND_DEBUG", "Sending data -> name=$brandName, category=$brandCategory, subCategory=$subCategory")
+
+                            coroutineScope.launch {
+                                Log.d("BRAND_DEBUG", "Calling setupBrandProfile mutation...")
+                                val success = BrandRepository.setupBrandProfile(
+                                    token = firebaseToken,
+                                    name = brandName,
+                                    brandCategory = brandCategory,
+                                    subCategory = subCategory,
+                                    about = description,
+                                    primaryObjective = campaignObjective,
+                                    preferredPlatforms = selectedPlatforms,
+                                    ageMin = ageMin.toIntOrNull(),
+                                    ageMax = ageMax.toIntOrNull(),
+                                    gender = gender,
+                                    profileUrl = profileUrl
+                                )
+                                Log.d("BRAND_DEBUG", "Mutation result: $success")
+                                isLoading = false
+
+                                if (success) {
+                                    Log.d("BRAND_DEBUG", "Brand profile created successfully")
+                                    onNext()
+                                }
+                            }
+                        }
+                        ?.addOnFailureListener { e ->
+                            isLoading = false
+                            Log.e("BRAND_DEBUG", "Failed to get Firebase token", e)
+                        }
+                },
+                enabled = isFormValid && !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -292,7 +352,15 @@ fun BrandRegistrationScreen(
                         .background(Color(0xFFFF8383)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    } else {
+                        Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
