@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import android.annotation.SuppressLint
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -29,7 +31,8 @@ import np.com.bimalkafle.firebaseauthdemoapp.R
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.network.BrandRepository
-
+import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
+@SuppressLint("UnrememberedMutableState")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun BrandRegistrationScreen(
@@ -54,16 +57,17 @@ fun BrandRegistrationScreen(
     val headerHeight = screenHeight * 0.4f
     val formPaddingTop = headerHeight - 80.dp
     val coroutineScope = rememberCoroutineScope()
-
+    val context = LocalContext.current
+    val prefsManager = PrefsManager(context)
     var isLoading by remember { mutableStateOf(false) }
 
-    val isFormValid by derivedStateOf {
+    val isFormValid by androidx.compose.runtime.derivedStateOf {
         brandName.isNotBlank() &&
-        description.isNotBlank() &&
-        selectedPlatforms.isNotEmpty() &&
-        ageMin.toIntOrNull() != null &&
-        ageMax.toIntOrNull() != null &&
-        ageMin.toIntOrNull()!! <= ageMax.toIntOrNull()!!
+                description.isNotBlank() &&
+                selectedPlatforms.isNotEmpty() &&
+                ageMin.toIntOrNull() != null &&
+                ageMax.toIntOrNull() != null &&
+                ageMin.toIntOrNull()!! <= ageMax.toIntOrNull()!!
     }
     Box(
         modifier = Modifier
@@ -315,6 +319,7 @@ fun BrandRegistrationScreen(
                             val firebaseToken = result.token ?: return@addOnSuccessListener
                             Log.d("BRAND_DEBUG", "Token received: ${firebaseToken.take(20)}...")
                             Log.d("BRAND_DEBUG", "Sending data -> name=$brandName, category=$brandCategory, subCategory=$subCategory")
+                            Log.d("UID" , result.toString())
 
                             coroutineScope.launch {
                                 Log.d("BRAND_DEBUG", "Calling setupBrandProfile mutation...")
@@ -336,6 +341,10 @@ fun BrandRegistrationScreen(
 
                                 if (success) {
                                     Log.d("BRAND_DEBUG", "Brand profile created successfully")
+                                    val uid = FirebaseAuth.getInstance().currentUser?.uid
+                                    if (uid != null) {
+                                        prefsManager.saveProfileCompleted(uid, true)
+                                    }
                                     onNext()
                                 }
                             }
@@ -351,14 +360,20 @@ fun BrandRegistrationScreen(
                     .height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent
+                    containerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent
                 ),
                 contentPadding = PaddingValues()
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFFF8383)),
+                        .background(
+                            if (isFormValid && !isLoading)
+                                Color(0xFFFF8383)
+                            else
+                                Color.Gray
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isLoading) {
