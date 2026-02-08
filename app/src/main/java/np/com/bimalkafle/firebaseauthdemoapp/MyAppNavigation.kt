@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import np.com.bimalkafle.firebaseauthdemoapp.pages.*
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -16,7 +17,8 @@ fun MyAppNavigation(
     modifier: Modifier = Modifier, 
     authViewModel: AuthViewModel,
     splashViewModel: SplashViewModel,
-    brandViewModel: BrandViewModel
+    brandViewModel: BrandViewModel,
+    influencerViewModel: InfluencerViewModel
 ) {
     val navController = rememberNavController()
 
@@ -75,8 +77,9 @@ fun MyAppNavigation(
         composable("influencer_detail") {
             InfluencerDetailScreen(
                 onBack = { navController.popBackStack() },
-                onApproachBrands = { navController.navigate("influencer_home") }
-            )
+                onApproachBrands = { navController.navigate("influencer_home") },
+                influencerViewModel = influencerViewModel
+          )
         }
         composable("influencer_create_proposal") {
             InfluencerCreateProposal(

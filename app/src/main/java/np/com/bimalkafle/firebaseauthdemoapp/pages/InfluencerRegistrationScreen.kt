@@ -44,6 +44,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
+import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
+import org.json.JSONArray
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -51,6 +58,11 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     var name by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val auth = FirebaseAuth.getInstance()
 
     val deliverables = listOf("Reels/Shorts", "Story", "Post", "Video")
     val selectedDeliverables = remember { mutableStateListOf<String>() }
@@ -319,10 +331,101 @@ fun InfluencerRegistrationScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { navController.navigate("influencer_detail") },
+                onClick = {
+                    if (name.isEmpty() || location.isEmpty() || bio.isEmpty() || selectedCategories.isEmpty() || selectedPlatforms.isEmpty() || pricing.isEmpty()) {
+                        Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
+                    isLoading = true
+                    coroutineScope.launch {
+                        try {
+                            val user = auth.currentUser
+                            if (user == null) {
+                                Toast.makeText(context, "User not authenticated", Toast.LENGTH_SHORT).show()
+                                isLoading = false
+                                return@launch
+                            }
+
+                            user.getIdToken(true).addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    val token = task.result?.token
+                                    if (token != null) {
+                                        coroutineScope.launch {
+                                            val input = JSONObject().apply {
+                                                put("name", name)
+                                                put("bio", bio)
+                                                put("location", location)
+                                                put("availability", "Available") // Default as discussed
+                                                put("logoUrl", "")
+                                                
+                                                val categoriesJson = JSONArray()
+                                                selectedCategories.forEach { cat ->
+                                                    categoriesJson.put(JSONObject().apply {
+                                                        put("category", cat)
+                                                        put("subCategory", "General") // Default
+                                                    })
+                                                }
+                                                put("categories", categoriesJson)
+
+                                                val platformsJson = JSONArray()
+                                                selectedPlatforms.forEach { plat ->
+                                                    platformsJson.put(JSONObject().apply {
+                                                        put("platform", plat)
+                                                        put("profileUrl", profileUrls[plat] ?: "")
+                                                        put("followers", 0) // Default
+                                                        put("avgViews", 0) // Default
+                                                        put("engagement", 0.0) // Default
+                                                        put("formats", JSONArray())
+                                                    })
+                                                }
+                                                put("platforms", platformsJson)
+
+                                                val pricingJson = JSONArray()
+                                                pricing.forEach { (plat, deliverableMap) ->
+                                                    deliverableMap.forEach { (deliverable, price) ->
+                                                        pricingJson.put(JSONObject().apply {
+                                                            put("platform", plat)
+                                                            put("deliverable", deliverable)
+                                                            put("price", price.toIntOrNull() ?: 0)
+                                                            put("currency", "INR") // Default
+                                                        })
+                                                    }
+                                                }
+                                                put("pricing", pricingJson)
+                                                
+                                                put("strengths", JSONArray())
+                                                put("audienceInsights", JSONObject.NULL)
+                                            }
+
+                                            val result = BackendRepository.setupInfluencerProfile(input, token)
+                                            isLoading = false
+                                            result.onSuccess {
+                                                Toast.makeText(context, "Profile setup successful!", Toast.LENGTH_SHORT).show()
+                                                navController.navigate("influencer_detail")
+                                            }.onFailure {
+                                                Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    } else {
+                                        isLoading = false
+                                        Toast.makeText(context, "Failed to get auth token", Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    isLoading = false
+                                    Toast.makeText(context, "Token error: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            isLoading = false
+                            Toast.makeText(context, "Unexpected error: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
+                enabled = !isLoading,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                 contentPadding = PaddingValues()
@@ -330,10 +433,14 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFFF8383)),
+                        .background(if (isLoading) Color.Gray else Color(0xFFFF8383)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

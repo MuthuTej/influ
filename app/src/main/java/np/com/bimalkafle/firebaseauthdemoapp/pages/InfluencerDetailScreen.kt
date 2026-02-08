@@ -19,13 +19,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Divider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -39,10 +37,30 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 
 @Composable
-fun InfluencerDetailScreen(onBack: () -> Unit = {}, onApproachBrands: () -> Unit = {}) {
+fun InfluencerDetailScreen(
+    onBack: () -> Unit = {},
+    onApproachBrands: () -> Unit = {},
+    influencerViewModel: InfluencerViewModel
+) {
+    val influencerProfile by influencerViewModel.influencerProfile.observeAsState()
+    val isLoading by influencerViewModel.loading.observeAsState(initial = false)
+    val error by influencerViewModel.error.observeAsState()
+
+    LaunchedEffect(Unit) {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+            val token = result.token
+            if (token != null) {
+                influencerViewModel.fetchInfluencerDetails(token)
+            }
+        }
+    }
+
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
@@ -74,29 +92,40 @@ fun InfluencerDetailScreen(onBack: () -> Unit = {}, onApproachBrands: () -> Unit
                     .padding(top = 48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.brand_profile),
-                    contentDescription = "Influencer Profile",
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                )
+                if (!influencerProfile?.logoUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = influencerProfile?.logoUrl,
+                        contentDescription = "Influencer Profile",
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color.White),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.brand_profile),
+                        contentDescription = "Influencer Profile",
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    )
+                }
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "You're all set",
+                    text = influencerProfile?.name ?: "You're all set",
                     color = Color.White,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Your Creator profile is live",
+                    text = if (influencerProfile != null) "Your Creator profile is live" else "Loading...",
                     color = Color.White.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                // Stepper can be added here
             }
         }
 
@@ -112,59 +141,94 @@ fun InfluencerDetailScreen(onBack: () -> Unit = {}, onApproachBrands: () -> Unit
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.brand2),
-                contentDescription = "Rocket Launch",
-                modifier = Modifier.size(150.dp)
-            )
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color(0xFFFF8383))
+                }
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.brand2),
+                    contentDescription = "Rocket Launch",
+                    modifier = Modifier.size(150.dp)
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF5F5F5))
-                    .padding(16.dp)
-            ) {
-                CampaignDetailRow("Creator Name", "Myntra")
-                Divider(color = Color.LightGray)
-                CampaignDetailRow("Category", "Tech | Gaming | Fitness | Sports")
-                Divider(color = Color.LightGray)
-                CampaignDetailRow("Budget Range", "50K - 2L")
-                Divider(color = Color.LightGray)
-                CampaignDetailRow("Availability", "Available")
-                Divider(color = Color.LightGray)
-                CampaignDetailRow("Platform", "Insta, YT")
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = onApproachBrands,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = PaddingValues()
-            ) {
-                Box(
+                Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFFFF8383)),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFF5F5F5))
+                        .padding(16.dp)
                 ) {
-                    Text("APPROACH BRANDS", color = Color.White, fontWeight = FontWeight.Bold)
+                    InfluencerDetailRow("Creator Name", influencerProfile?.name ?: "N/A")
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
+                    
+                    val categories = influencerProfile?.categories?.joinToString(" | ") { it.category }
+                    InfluencerDetailRow("Category", categories ?: "N/A")
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
+                    
+                    val location = influencerProfile?.location ?: "N/A"
+                    InfluencerDetailRow("Location", location)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
+                    
+                    val availability = influencerProfile?.availability ?: "N/A"
+                    InfluencerDetailRow("Availability", availability)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
+                    
+                    val platforms = influencerProfile?.platforms?.joinToString(", ") { it.platform }
+                    InfluencerDetailRow("Platform", platforms ?: "N/A")
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Button(
+                    onClick = onApproachBrands,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    contentPadding = PaddingValues()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFFFF8383)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("APPROACH BRANDS", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
     }
 }
 
-
-@Preview(showBackground = true)
 @Composable
-fun InfluencerDetailScreenPreview() {
-    InfluencerDetailScreen()
+private fun InfluencerDetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.Gray,
+            fontSize = 14.sp
+        )
+        Text(
+            text = value,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            fontSize = 14.sp,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f).padding(start = 16.dp)
+        )
+    }
 }
+
+

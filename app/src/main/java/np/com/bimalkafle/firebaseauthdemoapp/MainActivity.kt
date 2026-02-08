@@ -13,6 +13,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModelFactory
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,6 +22,7 @@ class MainActivity : ComponentActivity() {
         val authViewModel : AuthViewModel by viewModels()
         val splashViewModel: SplashViewModel by viewModels { SplashViewModelFactory(this) }
         val brandViewModel: BrandViewModel by viewModels()
+        val influencerViewModel: InfluencerViewModel by viewModels()
         
         setContent {
             FirebaseAuthDemoAppTheme {
@@ -29,7 +31,8 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier, // Remove padding to allow content to draw behind system bars
                         authViewModel = authViewModel,
                         splashViewModel = splashViewModel,
-                        brandViewModel = brandViewModel
+                        brandViewModel = brandViewModel,
+                        influencerViewModel = influencerViewModel
                     )
                 }
             }
