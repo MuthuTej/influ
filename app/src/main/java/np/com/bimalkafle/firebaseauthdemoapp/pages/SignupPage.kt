@@ -1,6 +1,7 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import android.widget.Toast
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -28,6 +30,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -74,22 +77,44 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
         }
     }
 
-    SignupPageContent(
-        modifier = modifier,
-        name = name,
-        onNameChange = { name = it },
-        email = email,
-        onEmailChange = { email = it },
-        password = password,
-        onPasswordChange = { password = it },
-        confirmPassword = confirmPassword,
-        onConfirmPasswordChange = { confirmPassword = it },
-        role = role,
-        onRoleChange = { role = it },
-        authState = authState.value,
-        onSignupClick = { authViewModel.signup(email, password, name, role) },
-        onLoginClick = { navController.navigate("login") }
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val imeDp = with(density) { imeBottom.toDp() }
+
+    val offset by animateDpAsState(
+        targetValue = if (imeDp > 0.dp) (-imeDp * 0.35f) else 0.dp,
+        label = "keyboard-offset"
     )
+    val topPadding by animateDpAsState(
+        targetValue = if (imeDp > 0.dp) 150.dp else 100.dp,
+        label = "text-padding-offset"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .offset(y = offset)
+            .verticalScroll(rememberScrollState())
+            .imePadding()
+    ) {
+        SignupPageContent(
+            modifier = Modifier,
+            name = name,
+            onNameChange = { name = it },
+            email = email,
+            onEmailChange = { email = it },
+            password = password,
+            onPasswordChange = { password = it },
+            confirmPassword = confirmPassword,
+            onConfirmPasswordChange = { confirmPassword = it },
+            role = role,
+            onRoleChange = { role = it },
+            authState = authState.value,
+            onSignupClick = { authViewModel.signup(email, password, name, role) },
+            onLoginClick = { navController.navigate("login") },
+            headerTopPadding = topPadding
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -108,7 +133,8 @@ fun SignupPageContent(
     onRoleChange: (String) -> Unit,
     authState: AuthState?,
     onSignupClick: () -> Unit,
-    onLoginClick: () -> Unit
+    onLoginClick: () -> Unit,
+    headerTopPadding: Dp
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
@@ -135,15 +161,14 @@ fun SignupPageContent(
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
-                modifier = Modifier.padding(start = 32.dp, top = 100.dp)
+                modifier = Modifier.padding(start = 32.dp, top = headerTopPadding)
             )
         }
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp)
-                .verticalScroll(rememberScrollState()),
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -293,6 +318,7 @@ fun SignupPagePreview() {
         onRoleChange = {},
         authState = null,
         onSignupClick = {},
-        onLoginClick = {}
+        onLoginClick = {},
+        headerTopPadding = 100.dp
     )
 }

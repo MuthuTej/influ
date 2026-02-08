@@ -11,14 +11,15 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
+        android.supportsRtl="true"
         android:theme="@style/Theme.FirebaseAuthDemoApp"
         tools:targetApi="31">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.FirebaseAuthDemoApp">
+            android:theme="@style/Theme.FirebaseAuthDemoApp"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
