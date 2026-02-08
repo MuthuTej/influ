@@ -54,7 +54,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
-import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 
@@ -63,8 +62,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 fun CreateCampaignScreen2(
     onBack: () -> Unit = {}, 
     onNext: () -> Unit = {},
-    campaignViewModel: CampaignViewModel = CampaignViewModel(),
-    authViewModel: AuthViewModel = AuthViewModel()
+    campaignViewModel: CampaignViewModel = CampaignViewModel()
 ) {
     val locations = listOf("India", "USA", "Sri Lanka", "Maldives", "UK")
     

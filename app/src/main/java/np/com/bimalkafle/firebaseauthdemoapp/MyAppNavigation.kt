@@ -68,8 +68,7 @@ fun MyAppNavigation(
                 onNext = { 
                     navController.navigate("campaign_details")
                 },
-                campaignViewModel = campaignViewModel,
-                authViewModel = authViewModel
+                campaignViewModel = campaignViewModel
             )
         }
         composable("campaign_details") {
@@ -120,6 +119,9 @@ fun MyAppNavigation(
         }
         composable("discover") {
             DiscoverBrandsScreen(navController)
+        }
+        composable("campaign_analytics") {
+            CampaignAnalyticsPage(navController)
         }
     })
 }

@@ -2,6 +2,7 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -152,7 +153,7 @@ fun InfluencerHomePageContent(
                     }
                     Spacer(modifier = Modifier.height(16.dp)) // Spacer after the button
 
-                    ActiveCampaignsSection(sampleCampaigns)
+                    ActiveCampaignsSection(sampleCampaigns, navController)
                     TopPicksSection()
                 }
             }
@@ -292,7 +293,7 @@ fun StatChip(label: String, value: String) {
 }
 
 @Composable
-fun ActiveCampaignsSection(campaigns: List<Campaign>) {
+fun ActiveCampaignsSection(campaigns: List<Campaign>, navController: NavController) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Active campaigns", fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -319,19 +320,21 @@ fun ActiveCampaignsSection(campaigns: List<Campaign>) {
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(campaigns) { campaign ->
-                CampaignCard(campaign = campaign)
+                CampaignCard(campaign = campaign, navController = navController)
             }
         }
     }
 }
 
 @Composable
-fun CampaignCard(campaign: Campaign) {
+fun CampaignCard(campaign: Campaign, navController: NavController) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.widthIn(max = 280.dp) // Maintain a max width
+        modifier = Modifier
+            .widthIn(max = 280.dp)
+            .clickable { navController.navigate("campaign_analytics") } // Maintain a max width
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
