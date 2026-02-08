@@ -75,7 +75,8 @@ fun MyAppNavigation(
         composable("campaign_details") {
             CampaignDetailsPage(
                 onBack = { navController.popBackStack() },
-                onSearchInfluencer = { navController.navigate("brand_home") } // You can change this to navigate to the influencer search screen
+                onSearchInfluencer = { navController.navigate("brand_home") },
+                campaignViewModel = campaignViewModel
             )
         }
         composable("influencer_registration") {

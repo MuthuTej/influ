@@ -37,7 +37,30 @@ data class CampaignDetail(
     val description: String,
     val objective: String,
     val status: String,
-    val createdAt: String
+    val createdAt: String,
+    val budgetMin: Int?,
+    val budgetMax: Int?,
+    val startDate: String?,
+    val endDate: String?,
+    val targetAudience: CampaignAudienceResponse?,
+    val brand: BrandResponse?
+)
+
+data class CampaignAudienceResponse(
+    val ageMin: Int?,
+    val ageMax: Int?,
+    val gender: String?,
+    val locations: List<String>?
+)
+
+data class BrandResponse(
+    val name: String?,
+    val about: String?,
+    val logoUrl: String?,
+    val primaryObjective: String?,
+    val brandCategory: BrandCategory?,
+    val preferredPlatforms: List<CampaignPlatformInput>?,
+    val targetAudience: CampaignAudienceResponse?
 )
 
 data class GraphQLError(
