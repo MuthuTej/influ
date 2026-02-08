@@ -418,7 +418,7 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
             val configuration = LocalConfiguration.current
             val screenHeight = configuration.screenHeightDp.dp
             val maxSectionHeight = screenHeight * 0.20f
-            val singleCardHeight = 150.dp
+            val singleCardHeight = 140.dp
 
             val finalHeight = if (maxSectionHeight > singleCardHeight) {
                 maxSectionHeight

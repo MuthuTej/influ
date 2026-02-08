@@ -136,8 +136,10 @@ class BrandViewModel : ViewModel() {
     private fun parseInfluencers(jsonArray: JSONArray): List<InfluencerProfile> {
         val list = mutableListOf<InfluencerProfile>()
         for (i in 0 until jsonArray.length()) {
-            val obj = jsonArray.getJSONObject(i)
-            list.add(parseInfluencerProfile(obj))
+            val obj = jsonArray.optJSONObject(i)
+            if (obj != null) {
+                list.add(parseInfluencerProfile(obj))
+            }
         }
         return list
     }
@@ -147,8 +149,10 @@ class BrandViewModel : ViewModel() {
         val categories = mutableListOf<Category>()
         if (categoriesArray != null) {
             for (i in 0 until categoriesArray.length()) {
-                val cObj = categoriesArray.getJSONObject(i)
-                categories.add(Category(cObj.optString("category"), cObj.optString("subCategory")))
+                val cObj = categoriesArray.optJSONObject(i)
+                if (cObj != null) {
+                    categories.add(Category(cObj.optString("category"), cObj.optString("subCategory")))
+                }
             }
         }
 
@@ -156,18 +160,20 @@ class BrandViewModel : ViewModel() {
         val platforms = mutableListOf<Platform>()
         if (platformsArray != null) {
             for (i in 0 until platformsArray.length()) {
-                val pObj = platformsArray.getJSONObject(i)
-                platforms.add(
-                    Platform(
-                        platform = pObj.optString("platform"),
-                        profileUrl = pObj.optString("profileUrl"),
-                        followers = pObj.optInt("followers", 0),
-                        avgViews = pObj.optInt("avgViews", 0),
-                        engagement = pObj.optDouble("engagement", 0.0).toFloat(),
-                        formats = null,
-                        connected = pObj.optBoolean("connected")
+                val pObj = platformsArray.optJSONObject(i)
+                if (pObj != null) {
+                    platforms.add(
+                        Platform(
+                            platform = pObj.optString("platform"),
+                            profileUrl = pObj.optString("profileUrl"),
+                            followers = pObj.optInt("followers", 0),
+                            avgViews = pObj.optInt("avgViews", 0),
+                            engagement = pObj.optDouble("engagement", 0.0).toFloat(),
+                            formats = null,
+                            connected = pObj.optBoolean("connected")
+                        )
                     )
-                )
+                }
             }
         }
 
@@ -175,15 +181,17 @@ class BrandViewModel : ViewModel() {
         val pricing = mutableListOf<PricingInfo>()
         if (pricingArray != null) {
             for (i in 0 until pricingArray.length()) {
-                val pObj = pricingArray.getJSONObject(i)
-                pricing.add(
-                    PricingInfo(
-                        platform = pObj.optString("platform"),
-                        deliverable = pObj.optString("deliverable"),
-                        price = pObj.optInt("price"),
-                        currency = pObj.optString("currency")
+                val pObj = pricingArray.optJSONObject(i)
+                if (pObj != null) {
+                    pricing.add(
+                        PricingInfo(
+                            platform = pObj.optString("platform"),
+                            deliverable = pObj.optString("deliverable"),
+                            price = pObj.optInt("price"),
+                            currency = pObj.optString("currency")
+                        )
                     )
-                )
+                }
             }
         }
 
@@ -201,8 +209,10 @@ class BrandViewModel : ViewModel() {
             val topLocations = mutableListOf<LocationInsight>()
             if (topLocationsArray != null) {
                 for (i in 0 until topLocationsArray.length()) {
-                    val lObj = topLocationsArray.getJSONObject(i)
-                    topLocations.add(LocationInsight(lObj.optString("city"), lObj.optString("country"), lObj.optDouble("percentage").toFloat()))
+                    val lObj = topLocationsArray.optJSONObject(i)
+                    if (lObj != null) {
+                        topLocations.add(LocationInsight(lObj.optString("city"), lObj.optString("country"), lObj.optDouble("percentage").toFloat()))
+                    }
                 }
             }
 
@@ -215,8 +225,10 @@ class BrandViewModel : ViewModel() {
             val ageGroups = mutableListOf<AgeGroupInsight>()
             if (ageGroupsArray != null) {
                 for (i in 0 until ageGroupsArray.length()) {
-                    val aObj = ageGroupsArray.getJSONObject(i)
-                    ageGroups.add(AgeGroupInsight(aObj.optString("range"), aObj.optDouble("percentage").toFloat()))
+                    val aObj = ageGroupsArray.optJSONObject(i)
+                    if (aObj != null) {
+                        ageGroups.add(AgeGroupInsight(aObj.optString("range"), aObj.optDouble("percentage").toFloat()))
+                    }
                 }
             }
 
@@ -395,54 +407,57 @@ class BrandViewModel : ViewModel() {
     private fun parseCollaborations(jsonArray: JSONArray): List<Collaboration> {
         val list = mutableListOf<Collaboration>()
         for (i in 0 until jsonArray.length()) {
-            val obj = jsonArray.getJSONObject(i)
-            
-            val campaignObj = obj.getJSONObject("campaign")
-            val campaign = Campaign(
-                id = campaignObj.getString("id"),
-                title = campaignObj.getString("title")
-            )
+            val obj = jsonArray.optJSONObject(i) ?: continue
+
+            val campaignObj = obj.optJSONObject("campaign")
+            val campaign = if (campaignObj != null) {
+                Campaign(
+                    id = campaignObj.optString("id"),
+                    title = campaignObj.optString("title")
+                )
+            } else {
+                Campaign("unknown", "Unknown Campaign")
+            }
 
             val influencerObj = obj.optJSONObject("influencer")
             val influencer = if (influencerObj != null) {
                  Influencer(
-                    name = influencerObj.getString("name"),
+                    name = influencerObj.optString("name", "Unknown"),
                     bio = influencerObj.optString("bio"),
                     logoUrl = influencerObj.optString("logoUrl"),
                     updatedAt = influencerObj.optString("updatedAt")
                 )
             } else {
-                // Fallback or skip
                  Influencer("Unknown", null, null, null)
             }
-
 
             val pricingList = mutableListOf<Pricing>()
             val pricingArray = obj.optJSONArray("pricing")
             if (pricingArray != null) {
                 for (j in 0 until pricingArray.length()) {
-                    val pObj = pricingArray.getJSONObject(j)
-                    pricingList.add(
-                        Pricing(
-                            currency = pObj.getString("currency"),
-                            deliverable = pObj.getString("deliverable"),
-                            platform = pObj.getString("platform"),
-                            price = pObj.getInt("price")
+                    val pObj = pricingArray.optJSONObject(j)
+                    if (pObj != null) {
+                        pricingList.add(
+                            Pricing(
+                                currency = pObj.optString("currency"),
+                                deliverable = pObj.optString("deliverable"),
+                                platform = pObj.optString("platform"),
+                                price = pObj.optInt("price")
+                            )
                         )
-                    )
+                    }
                 }
             }
 
-
             list.add(
                 Collaboration(
-                    id = obj.getString("id"),
-                    status = obj.getString("status"),
+                    id = obj.optString("id"),
+                    status = obj.optString("status"),
                     message = obj.optString("message"),
-                    createdAt = obj.getString("createdAt"),
+                    createdAt = obj.optString("createdAt"),
                     campaign = campaign,
                     pricing = pricingList,
-                    initiatedBy = obj.getString("initiatedBy"),
+                    initiatedBy = obj.optString("initiatedBy"),
                     influencer = influencer
                 )
             )
