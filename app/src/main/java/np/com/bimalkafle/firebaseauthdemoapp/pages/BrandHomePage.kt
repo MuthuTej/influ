@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -125,7 +126,15 @@ fun BrandHomePage(
 
                 }
                 items(influencers) { influencer ->
-                    BrandCardBrand(influencer = influencer, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp) , navController)
+                    BrandCardBrand(
+                        influencer = influencer, 
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        onCardClick = {
+                            navController.navigate("brand_influencer_detail/${influencer.id}")
+                        }
+                    )
                 }
                 item {
                     Spacer(modifier = Modifier.height(40.dp))
@@ -658,210 +667,194 @@ fun TopPicksSectionBrand() {
 }
 
 @Composable
-fun BrandCardBrand(influencer: InfluencerProfile, modifier: Modifier = Modifier, navController: NavController) {
+fun BrandCardBrand(
+    influencer: InfluencerProfile, 
+    modifier: Modifier = Modifier, 
+    onCardClick: () -> Unit
+) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = modifier.padding(vertical = 4.dp)
+        modifier = modifier
+            .padding(vertical = 4.dp)
+            .clickable { onCardClick() }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Top Section: Profile info
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top
-            ) {
+        Box(modifier = Modifier.padding(16.dp)) {
+            // "Available" tag in top right
+            if (influencer.availability == true) {
                 Surface(
-                    shape = CircleShape,
-                    color = brandThemeColor.copy(alpha = 0.1f),
-                    modifier = Modifier.size(64.dp)
+                    color = Color(0xFF4CAF50),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.align(Alignment.TopEnd)
                 ) {
-                    if (!influencer.logoUrl.isNullOrEmpty()) {
-                        AsyncImage(
-                            model = influencer.logoUrl,
-                            contentDescription = influencer.name,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = influencer.name.firstOrNull()?.uppercase() ?: "?",
-                                color = brandThemeColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 24.sp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = influencer.name,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = Color(0xFF1A1A1A)
-                    )
-                    Text(
-                        text = influencer.location ?: "Location N/A",
-                        fontSize = 14.sp,
-                        color = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = influencer.bio ?: "No bio available.",
-                        fontSize = 13.sp,
-                        color = Color.DarkGray,
-                        lineHeight = 18.sp,
-                        maxLines = 3
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    val categoriesText = influencer.categories?.joinToString(" • ") { it.category } ?: ""
-                    Text(
-                        text = categoriesText,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = brandThemeColor
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Stats Section
-            val mainPlatform = influencer.platforms?.firstOrNull { it.platform == "INSTAGRAM" } 
-                ?: influencer.platforms?.firstOrNull()
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                if (mainPlatform != null) {
-                    StatIconText(
-                        iconRes = if (mainPlatform.platform == "YOUTUBE") R.drawable.ic_youtube else R.drawable.ic_instagram,
-                        text = "${formatCount(mainPlatform.followers ?: 0)} Followers",
-                        iconTint = if (mainPlatform.platform == "YOUTUBE") Color.Red else Color(0xFFE4405F)
-                    )
-                    
-                    StatIconText(
-                        iconRes = R.drawable.vector, // Use a generic icon if specific one missing
-                        text = "Avg Views: ${formatCount(mainPlatform.avgViews ?: 0)}",
-                        iconTint = Color(0xFF1E3A8A)
-                    )
-                }
-            }
-
-            // Strengths Section
-            if (!influencer.strengths.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Strengths", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF4B5563))
-                    Text(" | ", color = Color.LightGray)
-                    Text(
-                        text = influencer.strengths.joinToString(" | "),
-                        fontSize = 12.sp,
-                        color = Color.Gray,
-                        maxLines = 1
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Pricing Section
-            if (!influencer.pricing.isNullOrEmpty()) {
-                Text(
-                    text = "Pricing",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = Color(0xFF1A1A1A)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                influencer.pricing.take(2).forEach { pricing ->
                     Row(
-                        modifier = Modifier.padding(vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_instagram),
+                            Icons.Default.Check,
                             contentDescription = null,
-                            tint = Color(0xFFE4405F),
-                            modifier = Modifier.size(16.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "${pricing.deliverable}: ",
-                            fontSize = 13.sp,
-                            color = Color.DarkGray
-                        )
-                        Text(
-                            text = "₹${String.format("%,d", pricing.price)} ${pricing.currency}",
-                            fontSize = 13.sp,
+                            text = "Available",
+                            color = Color.White,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                            fontSize = 10.sp
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Bottom Section: Available and View Profile
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                if (influencer.availability == true) {
+            Column {
+                // Top Section: Profile info
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
                     Surface(
-                        color = Color(0xFF4CAF50),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = CircleShape,
+                        color = brandThemeColor.copy(alpha = 0.1f),
+                        modifier = Modifier.size(64.dp)
                     ) {
+                        if (!influencer.logoUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = influencer.logoUrl,
+                                contentDescription = influencer.name,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = influencer.name.firstOrNull()?.uppercase() ?: "?",
+                                    color = brandThemeColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 24.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = influencer.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = Color(0xFF1A1A1A)
+                        )
+                        Text(
+                            text = influencer.location ?: "Location N/A",
+                            fontSize = 14.sp,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = influencer.bio ?: "No bio available.",
+                            fontSize = 13.sp,
+                            color = Color.DarkGray,
+                            lineHeight = 18.sp,
+                            maxLines = 3
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        val categoriesText = influencer.categories?.joinToString(" • ") { it.category } ?: ""
+                        Text(
+                            text = categoriesText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = brandThemeColor
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Stats Section
+                val mainPlatform = influencer.platforms?.firstOrNull { it.platform == "INSTAGRAM" } 
+                    ?: influencer.platforms?.firstOrNull()
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    if (mainPlatform != null) {
+                        StatIconText(
+                            iconRes = if (mainPlatform.platform == "YOUTUBE") R.drawable.ic_youtube else R.drawable.ic_instagram,
+                            text = "${formatCount(mainPlatform.followers ?: 0)} Followers",
+                            iconTint = if (mainPlatform.platform == "YOUTUBE") Color.Red else Color(0xFFE4405F)
+                        )
+                        
+                        StatIconText(
+                            iconRes = R.drawable.vector, 
+                            text = "Avg Views: ${formatCount(mainPlatform.avgViews ?: 0)}",
+                            iconTint = Color(0xFF1E3A8A)
+                        )
+                    }
+                }
+
+                // Strengths Section
+                if (!influencer.strengths.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Strengths", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF4B5563))
+                        Text(" | ", color = Color.LightGray)
+                        Text(
+                            text = influencer.strengths.joinToString(" | "),
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Pricing Section
+                if (!influencer.pricing.isNullOrEmpty()) {
+                    Text(
+                        text = "Pricing",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color(0xFF1A1A1A)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    influencer.pricing.take(2).forEach { pricing ->
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                Icons.Default.Check,
+                                painter = painterResource(id = R.drawable.ic_instagram),
                                 contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(14.dp)
+                                tint = Color(0xFFE4405F),
+                                modifier = Modifier.size(16.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Available",
-                                color = Color.White,
+                                text = "${pricing.deliverable}: ",
+                                fontSize = 13.sp,
+                                color = Color.DarkGray
+                            )
+                            Text(
+                                text = "₹${String.format("%,d", pricing.price)} ${pricing.currency}",
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                color = Color.Black
                             )
                         }
                     }
-                } else {
-                    Spacer(modifier = Modifier.width(1.dp))
-                }
-
-                Button(
-                    onClick = { 
-                        // Logic to navigate to detail, potentially setting the shared state
-                        navController.navigate("influencer_detail")
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 0.dp),
-                    modifier = Modifier.height(40.dp)
-                ) {
-                    Text(
-                        text = "View Profile",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
                 }
             }
         }

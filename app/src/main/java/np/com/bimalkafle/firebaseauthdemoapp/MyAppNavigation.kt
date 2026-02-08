@@ -98,6 +98,14 @@ fun MyAppNavigation(
         composable("brand_home") {
             BrandHomePage(modifier, navController, authViewModel, brandViewModel)
         }
+        composable("brand_influencer_detail/{influencerId}") { backStackEntry ->
+            val influencerId = backStackEntry.arguments?.getString("influencerId") ?: ""
+            BrandInfluencerDetailScreen(
+                influencerId = influencerId,
+                onBack = { navController.popBackStack() },
+                influencerViewModel = influencerViewModel
+            )
+        }
         composable("influencer_home") {
             InfluencerHomePage(modifier, navController, authViewModel)
         }

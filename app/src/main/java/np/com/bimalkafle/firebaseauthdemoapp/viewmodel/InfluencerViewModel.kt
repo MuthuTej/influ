@@ -104,6 +104,101 @@ class InfluencerViewModel : ViewModel() {
         }
     }
 
+    fun fetchInfluencerById(id: String, token: String) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val query = """
+                query GetInfluencerById(${"$"}getInfluencerByIdId: ID!){
+                  getInfluencerById(id: ${"$"}getInfluencerByIdId) {
+                    id
+                    email
+                    name
+                    role
+                    profileCompleted
+                    updatedAt
+                    bio
+                    location
+                    categories {
+                      category
+                      subCategory
+                    }
+                    platforms {
+                      platform
+                      profileUrl
+                      followers
+                      avgViews
+                      engagement
+                      formats
+                      connected
+                      minFollowers
+                      minEngagement
+                    }
+                    audienceInsights {
+                      topLocations {
+                        city
+                        country
+                        percentage
+                      }
+                      genderSplit {
+                        male
+                        female
+                      }
+                      ageGroups {
+                        range
+                        percentage
+                      }
+                    }
+                    strengths
+                    pricing {
+                      platform
+                      deliverable
+                      price
+                      currency
+                    }
+                    availability
+                    logoUrl
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "getInfluencerByIdId" to id
+            )
+
+            val result = GraphQLClient.query(query = query, variables = variables as Map<String, Any>?, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    if (data != null) {
+                        val influencerObj = data.optJSONObject("getInfluencerById")
+                        if (influencerObj != null) {
+                            val influencer = parseInfluencer(influencerObj)
+                            _influencerProfile.postValue(influencer)
+                        } else {
+                            _influencerProfile.postValue(null)
+                        }
+                    } else {
+                        val errors = jsonObject.optJSONArray("errors")
+                        if (errors != null && errors.length() > 0) {
+                            val message = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
+                            _error.postValue(message)
+                        } else {
+                            _error.postValue("No data returned")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("InfluencerViewModel", "Parsing error", e)
+                    _error.postValue("Parsing error: ${e.message}")
+                }
+            }.onFailure {
+                Log.e("InfluencerViewModel", "Network error", it)
+                _error.postValue("Network error: ${it.message}")
+            }
+            _loading.postValue(false)
+        }
+    }
+
     private fun parseInfluencer(obj: JSONObject): InfluencerProfile {
         val categoriesList = mutableListOf<Category>()
         val categoriesArray = obj.optJSONArray("categories")
@@ -169,6 +264,49 @@ class InfluencerViewModel : ViewModel() {
             }
         }
 
+        val audienceInsightsObj = obj.optJSONObject("audienceInsights")
+        var audienceInsights: AudienceInsights? = null
+        if (audienceInsightsObj != null) {
+            val topLocations = mutableListOf<LocationInsight>()
+            val locationsArray = audienceInsightsObj.optJSONArray("topLocations")
+            if (locationsArray != null) {
+                for (i in 0 until locationsArray.length()) {
+                    val locObj = locationsArray.getJSONObject(i)
+                    topLocations.add(LocationInsight(
+                        city = locObj.optString("city"),
+                        country = locObj.optString("country"),
+                        percentage = locObj.optDouble("percentage").toFloat()
+                    ))
+                }
+            }
+
+            val genderSplitObj = audienceInsightsObj.optJSONObject("genderSplit")
+            val genderSplit = if (genderSplitObj != null) {
+                GenderSplit(
+                    male = genderSplitObj.optDouble("male").toFloat(),
+                    female = genderSplitObj.optDouble("female").toFloat()
+                )
+            } else null
+
+            val ageGroups = mutableListOf<AgeGroupInsight>()
+            val ageArray = audienceInsightsObj.optJSONArray("ageGroups")
+            if (ageArray != null) {
+                for (i in 0 until ageArray.length()) {
+                    val ageObj = ageArray.getJSONObject(i)
+                    ageGroups.add(AgeGroupInsight(
+                        range = ageObj.optString("range"),
+                        percentage = ageObj.optDouble("percentage").toFloat()
+                    ))
+                }
+            }
+
+            audienceInsights = AudienceInsights(
+                topLocations = topLocations,
+                genderSplit = genderSplit,
+                ageGroups = ageGroups
+            )
+        }
+
         return InfluencerProfile(
             id = obj.optString("id", ""),
             email = obj.optString("email", ""),
@@ -184,7 +322,7 @@ class InfluencerViewModel : ViewModel() {
             pricing = pricingList,
             availability = if (obj.has("availability")) obj.optBoolean("availability") else null,
             logoUrl = obj.optString("logoUrl", null),
-            audienceInsights = null
+            audienceInsights = audienceInsights
         )
     }
 }
