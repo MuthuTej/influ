@@ -795,7 +795,7 @@ fun BrandCardBrand(
                         )
                         
                         StatIconText(
-                            iconRes = R.drawable.vector, 
+                            iconRes = android.R.drawable.ic_menu_view,
                             text = "Avg Views: ${formatCount(mainPlatform.avgViews ?: 0)}",
                             iconTint = Color(0xFF1E3A8A)
                         )

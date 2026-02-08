@@ -210,7 +210,7 @@ fun CampaignAnalyticsPage(navController: NavController) {
 }
 
 @Composable
-fun StatCard(title: String, value: String, change: String, modifier: Modifier = Modifier) {
+private fun StatCard(title: String, value: String, change: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.padding(4.dp),
         shape = RoundedCornerShape(12.dp),
@@ -226,7 +226,7 @@ fun StatCard(title: String, value: String, change: String, modifier: Modifier = 
 }
 
 @Composable
-fun LegendItem(color: Color, text: String) {
+private fun LegendItem(color: Color, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier
             .size(10.dp)
@@ -237,7 +237,7 @@ fun LegendItem(color: Color, text: String) {
 }
 
 @Composable
-fun HitRateItem(progress: Float, text: String, description: String, icon: ImageVector) {
+private fun HitRateItem(progress: Float, text: String, description: String, icon: ImageVector) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(50.dp)) {
             CircularProgressIndicator(
@@ -258,7 +258,7 @@ fun HitRateItem(progress: Float, text: String, description: String, icon: ImageV
 }
 
 @Composable
-fun TopLocationsCard() {
+private fun TopLocationsCard() {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -353,7 +353,7 @@ fun TopLocationsCard() {
 }
 
 @Composable
-fun GenderSplitCard(modifier: Modifier = Modifier) {
+private fun GenderSplitCard(modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -398,7 +398,7 @@ fun GenderSplitCard(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun AgeGroupCard(modifier: Modifier = Modifier) {
+private fun AgeGroupCard(modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -428,7 +428,7 @@ fun AgeGroupCard(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun RowScope.Bar(fraction: Float, label: String) {
+private fun RowScope.Bar(fraction: Float, label: String) {
     Column(
         modifier = Modifier.weight(1f),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -445,7 +445,7 @@ fun RowScope.Bar(fraction: Float, label: String) {
 }
 
 @Composable
-fun DonutChart(
+private fun DonutChart(
     values: List<Float>,
     colors: List<Color>,
     modifier: Modifier = Modifier,
@@ -470,7 +470,7 @@ fun DonutChart(
 }
 
 @Composable
-fun LocationStatItem(color: Color, label: String, value: String) {
+private fun LocationStatItem(color: Color, label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

@@ -204,13 +204,15 @@ class InfluencerViewModel : ViewModel() {
         val categoriesArray = obj.optJSONArray("categories")
         if (categoriesArray != null) {
             for (i in 0 until categoriesArray.length()) {
-                val catObj = categoriesArray.getJSONObject(i)
-                categoriesList.add(
-                    Category(
-                        category = catObj.optString("category", ""),
-                        subCategory = catObj.optString("subCategory", "")
+                val catObj = categoriesArray.optJSONObject(i)
+                if (catObj != null) {
+                    categoriesList.add(
+                        Category(
+                            category = catObj.optString("category", ""),
+                            subCategory = catObj.optString("subCategory", "")
+                        )
                     )
-                )
+                }
             }
         }
 
@@ -218,25 +220,27 @@ class InfluencerViewModel : ViewModel() {
         val platformsArray = obj.optJSONArray("platforms")
         if (platformsArray != null) {
             for (i in 0 until platformsArray.length()) {
-                val platObj = platformsArray.getJSONObject(i)
-                val formatsArray = platObj.optJSONArray("formats")
-                val formatsList = mutableListOf<String>()
-                if (formatsArray != null) {
-                    for (j in 0 until formatsArray.length()) {
-                        formatsList.add(formatsArray.getString(j))
+                val platObj = platformsArray.optJSONObject(i)
+                if (platObj != null) {
+                    val formatsArray = platObj.optJSONArray("formats")
+                    val formatsList = mutableListOf<String>()
+                    if (formatsArray != null) {
+                        for (j in 0 until formatsArray.length()) {
+                            formatsList.add(formatsArray.getString(j))
+                        }
                     }
-                }
-                platformsList.add(
-                    Platform(
-                        platform = platObj.optString("platform", ""),
-                        profileUrl = platObj.optString("profileUrl", ""),
-                        followers = platObj.optInt("followers", 0),
-                        avgViews = platObj.optInt("avgViews", 0),
-                        engagement = platObj.optDouble("engagement", 0.0).toFloat(),
-                        formats = formatsList,
-                        connected = if (platObj.has("connected")) platObj.optBoolean("connected") else null
+                    platformsList.add(
+                        Platform(
+                            platform = platObj.optString("platform", ""),
+                            profileUrl = platObj.optString("profileUrl", ""),
+                            followers = platObj.optInt("followers", 0),
+                            avgViews = platObj.optInt("avgViews", 0),
+                            engagement = platObj.optDouble("engagement", 0.0).toFloat(),
+                            formats = formatsList,
+                            connected = if (platObj.has("connected")) platObj.optBoolean("connected") else null
+                        )
                     )
-                )
+                }
             }
         }
 
@@ -252,15 +256,17 @@ class InfluencerViewModel : ViewModel() {
         val pricingArray = obj.optJSONArray("pricing")
         if (pricingArray != null) {
             for (i in 0 until pricingArray.length()) {
-                val prObj = pricingArray.getJSONObject(i)
-                pricingList.add(
-                    PricingInfo(
-                        platform = prObj.optString("platform", ""),
-                        deliverable = prObj.optString("deliverable", ""),
-                        price = prObj.optInt("price", 0),
-                        currency = prObj.optString("currency", "")
+                val prObj = pricingArray.optJSONObject(i)
+                if (prObj != null) {
+                    pricingList.add(
+                        PricingInfo(
+                            platform = prObj.optString("platform", ""),
+                            deliverable = prObj.optString("deliverable", ""),
+                            price = prObj.optInt("price", 0),
+                            currency = prObj.optString("currency", "")
+                        )
                     )
-                )
+                }
             }
         }
 
@@ -271,12 +277,14 @@ class InfluencerViewModel : ViewModel() {
             val locationsArray = audienceInsightsObj.optJSONArray("topLocations")
             if (locationsArray != null) {
                 for (i in 0 until locationsArray.length()) {
-                    val locObj = locationsArray.getJSONObject(i)
-                    topLocations.add(LocationInsight(
-                        city = locObj.optString("city"),
-                        country = locObj.optString("country"),
-                        percentage = locObj.optDouble("percentage").toFloat()
-                    ))
+                    val locObj = locationsArray.optJSONObject(i)
+                    if (locObj != null) {
+                        topLocations.add(LocationInsight(
+                            city = locObj.optString("city"),
+                            country = locObj.optString("country"),
+                            percentage = locObj.optDouble("percentage").toFloat()
+                        ))
+                    }
                 }
             }
 
@@ -292,11 +300,13 @@ class InfluencerViewModel : ViewModel() {
             val ageArray = audienceInsightsObj.optJSONArray("ageGroups")
             if (ageArray != null) {
                 for (i in 0 until ageArray.length()) {
-                    val ageObj = ageArray.getJSONObject(i)
-                    ageGroups.add(AgeGroupInsight(
-                        range = ageObj.optString("range"),
-                        percentage = ageObj.optDouble("percentage").toFloat()
-                    ))
+                    val ageObj = ageArray.optJSONObject(i)
+                    if (ageObj != null) {
+                        ageGroups.add(AgeGroupInsight(
+                            range = ageObj.optString("range"),
+                            percentage = ageObj.optDouble("percentage").toFloat()
+                        ))
+                    }
                 }
             }
 
