@@ -172,8 +172,8 @@ fun InfluencerDetailScreen(
                     InfluencerDetailRow("Location", location)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
                     
-                    val availability = influencerProfile?.availability ?: "N/A"
-                    InfluencerDetailRow("Availability", availability as String)
+                    val availability = influencerProfile?.availability?.toString() ?: "N/A"
+                    InfluencerDetailRow("Availability", availability)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
                     
                     val platforms = influencerProfile?.platforms?.joinToString(", ") { it.platform }
@@ -230,5 +230,6 @@ private fun InfluencerDetailRow(label: String, value: String) {
         )
     }
 }
+
 
 

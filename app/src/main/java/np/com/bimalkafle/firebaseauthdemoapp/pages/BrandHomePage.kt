@@ -140,7 +140,7 @@ fun BrandHomePage(
                     Spacer(modifier = Modifier.height(40.dp))
                     Button(
                         onClick = {
-                            FirebaseAuth.getInstance().signOut()
+                            authViewModel.signout()
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
