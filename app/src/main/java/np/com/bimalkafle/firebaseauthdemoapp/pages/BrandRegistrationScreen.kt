@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -11,6 +12,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,10 +48,10 @@ fun BrandRegistrationScreen(
     var subCategory by remember { mutableStateOf("Fashion") }
     var description by remember { mutableStateOf("") }
     var campaignObjective by remember { mutableStateOf("Brand Awareness") }
-    val platformOptions = listOf("Instagram", "YouTube", "TikTok", "Twitter", "Facebook")
+    val platformOptions = listOf("Instagram", "YouTube", "Twitter", "Facebook")
     val selectedPlatforms = remember { mutableStateListOf<String>() }
-    var ageMin by remember { mutableStateOf("") }
-    var ageMax by remember { mutableStateOf("") }
+    var ageMin by remember { mutableStateOf("18") }
+    var ageMax by remember { mutableStateOf("25") }
     var gender by remember { mutableStateOf("Any") }
     var profileUrl by remember { mutableStateOf("") }
     var logoUrl by remember { mutableStateOf("") }
@@ -154,8 +157,7 @@ fun BrandRegistrationScreen(
                 onValueChange = { brandName = it },
                 label = { Text("Brand Name") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                shape = RoundedCornerShape(12.dp)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -171,8 +173,7 @@ fun BrandRegistrationScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                    shape = RoundedCornerShape(12.dp)
                 )
                 ExposedDropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }) {
                     DropdownMenuItem(text = { Text("E-commerce") }, onClick = { brandCategory = "E-commerce"; categoryExpanded = false })
@@ -200,8 +201,7 @@ fun BrandRegistrationScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                    shape = RoundedCornerShape(12.dp)
                 )
                 ExposedDropdownMenu(expanded = subCategoryExpanded, onDismissRequest = { subCategoryExpanded = false }) {
                     subCategoryOptions.forEach { option ->
@@ -219,8 +219,7 @@ fun BrandRegistrationScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                shape = RoundedCornerShape(12.dp)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -236,8 +235,7 @@ fun BrandRegistrationScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                    shape = RoundedCornerShape(12.dp)
                 )
                 ExposedDropdownMenu(expanded = objectiveExpanded, onDismissRequest = { objectiveExpanded = false }) {
                     DropdownMenuItem(text = { Text("Brand Awareness") }, onClick = { campaignObjective = "Brand Awareness"; objectiveExpanded = false })
@@ -268,22 +266,8 @@ fun BrandRegistrationScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                OutlinedTextField(
-                    value = ageMin,
-                    onValueChange = { ageMin = it },
-                    label = { Text("Min Age") },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
-                )
-                OutlinedTextField(
-                    value = ageMax,
-                    onValueChange = { ageMax = it },
-                    label = { Text("Max Age") },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
-                )
+                AgeInput(label = "Min Age", value = ageMin, onValueChange = { ageMin = it }, modifier = Modifier.weight(1f))
+                AgeInput(label = "Max Age", value = ageMax, onValueChange = { ageMax = it }, modifier = Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(16.dp))
             var genderExpanded by remember { mutableStateOf(false) }
@@ -297,8 +281,7 @@ fun BrandRegistrationScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                    shape = RoundedCornerShape(12.dp)
                 )
                 ExposedDropdownMenu(expanded = genderExpanded, onDismissRequest = { genderExpanded = false }) {
                     DropdownMenuItem(text = { Text("Any") }, onClick = { gender = "Any"; genderExpanded = false })
@@ -314,8 +297,7 @@ fun BrandRegistrationScreen(
                 onValueChange = { profileUrl = it },
                 label = { Text("Profile URL (Website)") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                shape = RoundedCornerShape(12.dp)
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -325,8 +307,7 @@ fun BrandRegistrationScreen(
                 onValueChange = { logoUrl = it },
                 label = { Text("Logo Url") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                shape = RoundedCornerShape(12.dp)
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -413,6 +394,33 @@ fun BrandRegistrationScreen(
             }
         }
     }
+}
+
+@Composable
+fun AgeInput(label: String, value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    val currentValue = value.toIntOrNull() ?: 0
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383)),
+        trailingIcon = {
+            Column {
+                Icon(
+                    imageVector = Icons.Default.ArrowDropUp,
+                    contentDescription = "Increment",
+                    modifier = Modifier.clickable { onValueChange((currentValue + 1).toString()) }
+                )
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = "Decrement",
+                    modifier = Modifier.clickable { onValueChange((currentValue - 1).toString()) }
+                )
+            }
+        }
+    )
 }
 
 @Preview(showBackground = true)
