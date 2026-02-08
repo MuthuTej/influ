@@ -29,7 +29,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.google.firebase.auth.FirebaseAuth
+import androidx.navigation.compose.rememberNavController
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
@@ -85,7 +85,8 @@ fun InfluencerHomePage(modifier: Modifier = Modifier, navController: NavControll
     InfluencerHomePageContent(
         modifier = modifier,
         onSignOut = { authViewModel.signout() },
-        onCreateProposal = { navController.navigate("influencer_create_proposal") }
+        onCreateProposal = { navController.navigate("influencer_create_proposal") },
+        navController = navController
     )
 }
 
@@ -93,7 +94,8 @@ fun InfluencerHomePage(modifier: Modifier = Modifier, navController: NavControll
 fun InfluencerHomePageContent(
     modifier: Modifier = Modifier,
     onSignOut: () -> Unit,
-    onCreateProposal: () -> Unit
+    onCreateProposal: () -> Unit,
+    navController: NavController
 ) {
     var selectedBottomNavItem by remember { mutableStateOf("Home") }
 
@@ -107,7 +109,8 @@ fun InfluencerHomePageContent(
             BottomNavigationBar(
                 selectedItem = selectedBottomNavItem,
                 onItemSelected = { selectedBottomNavItem = it },
-                onCreateProposal = onCreateProposal
+                onCreateProposal = onCreateProposal,
+                navController = navController
             )
         }
     ) { paddingValues ->
@@ -118,7 +121,7 @@ fun InfluencerHomePageContent(
                 .background(Color(0xFFF5F5F5))
         ) {
             item {
-                HeaderAndReachSection()
+                HeaderAndReachSection(navController)
             }
 
             item {
@@ -132,7 +135,7 @@ fun InfluencerHomePageContent(
                 ) {
                     // Find Brands Button moved inside this Column
                     Button(
-                        onClick = { /*TODO*/ },
+                        onClick = { navController.navigate("discover") },
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = themeColor2),
                         modifier = Modifier
@@ -158,7 +161,7 @@ fun InfluencerHomePageContent(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     brandRow.forEach { brand ->
-                        BrandCard(brand = brand, modifier = Modifier.weight(1f).padding(vertical = 4.dp))
+                        BrandCard(brand = brand, modifier = Modifier.weight(1f).padding(vertical = 4.dp), navController = navController)
                     }
                     if (brandRow.size < 2) {
                         Spacer(modifier = Modifier.weight(1f))
@@ -168,23 +171,12 @@ fun InfluencerHomePageContent(
                     .height(16.dp)
                     .background(Color.White))
             }
-            item {
-                Spacer(modifier = Modifier.height(40.dp))
-                Button(
-                    onClick = {
-                        FirebaseAuth.getInstance().signOut()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Sign Out")
-                }
-            }
         }
     }
 }
 
 @Composable
-fun HeaderAndReachSection() {
+fun HeaderAndReachSection(navController: NavController) {
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -227,14 +219,16 @@ fun HeaderAndReachSection() {
                     Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
                     Text("A2D NANDA", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Favorite, contentDescription = "Favorites", tint = Color.White)
+                IconButton(onClick = { navController.navigate("wishlist") }) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Favorite, contentDescription = "Favorites", tint = Color.White)
+                    }
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
@@ -437,7 +431,7 @@ fun TopPicksSection() {
 }
 
 @Composable
-fun BrandCard(brand: Brand, modifier: Modifier = Modifier) {
+fun BrandCard(brand: Brand, modifier: Modifier = Modifier, navController: NavController) {
     var isFavorite by remember { mutableStateOf(brand.isFavorite) }
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -455,7 +449,10 @@ fun BrandCard(brand: Brand, modifier: Modifier = Modifier) {
                         .aspectRatio(1f),
                     contentScale = ContentScale.Crop
                 )
-                IconButton(onClick = { isFavorite = !isFavorite }) {
+                IconButton(onClick = { 
+                    isFavorite = !isFavorite
+                    if(isFavorite) navController.navigate("wishlist")
+                 }) {
                     Icon(
                         if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                         contentDescription = "Favorite",
@@ -483,7 +480,7 @@ fun BrandCard(brand: Brand, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun BottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, onCreateProposal: () -> Unit) {
+fun BottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, onCreateProposal: () -> Unit, navController: NavController) {
     val items = listOf("Home", "Search", "", "History", "Profile")
     val icons = mapOf(
         "Home" to Icons.Default.Home,
@@ -520,7 +517,11 @@ fun BottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, 
                         icon = { Icon(icons[item]!!, contentDescription = item) },
                         label = { Text(item) },
                         selected = selectedItem == item,
-                        onClick = { onItemSelected(item) },
+                        onClick = { 
+                            onItemSelected(item)
+                            if(item == "Profile") navController.navigate("influencerProfile")
+                            else if(item == "Search") navController.navigate("discover")
+                        },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = themeColor2,
                             unselectedIconColor = Color.Gray,
@@ -541,7 +542,8 @@ fun InfluencerHomePagePreview() {
     FirebaseAuthDemoAppTheme {
         InfluencerHomePageContent(
             onSignOut = {},
-            onCreateProposal = {}
+            onCreateProposal = {},
+            navController = rememberNavController()
         )
     }
 }

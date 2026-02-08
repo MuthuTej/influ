@@ -103,5 +103,14 @@ fun MyAppNavigation(
         composable("proposals") {
             ProposalPage(onBack = { navController.popBackStack() })
         }
+        composable("wishlist") {
+            WishlistScreen(navController)
+        }
+        composable("influencerProfile") {
+            InfluencerProfileScreen(navController)
+        }
+        composable("discover") {
+            DiscoverBrandsScreen(navController)
+        }
     })
 }

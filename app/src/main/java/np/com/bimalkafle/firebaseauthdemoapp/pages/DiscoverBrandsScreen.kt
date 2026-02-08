@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -55,6 +57,7 @@ fun DiscoverBrandsScreen(navController: NavController) {
     var selectedBudget by remember { mutableStateOf("Budget") }
     val budgets = listOf("$1000", "$5000", "$10000+")
     val themeColor = Color(0xFFFF8383)
+    var selectedBottomNavItem by remember { mutableStateOf("Search") }
 
     Scaffold(
         topBar = {
@@ -84,7 +87,7 @@ fun DiscoverBrandsScreen(navController: NavController) {
                         colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.Transparent),
                         actions = {
                             Row {
-                                IconButton(onClick = { /*TODO: Implement favorite logic*/ }) {
+                                IconButton(onClick = { navController.navigate("wishlist") }) {
                                     Icon(Icons.Default.FavoriteBorder, contentDescription = "Favorite", tint = Color.White)
                                 }
                                 IconButton(onClick = { /*TODO: Implement notification logic*/ }) {
@@ -145,6 +148,54 @@ fun DiscoverBrandsScreen(navController: NavController) {
                     }
                 }
             }
+        },
+        bottomBar = {
+            val items = listOf("Home", "Search", "", "History", "Profile")
+            val icons = mapOf(
+                "Home" to Icons.Default.Home,
+                "Search" to Icons.Default.Search,
+                "History" to Icons.Default.History,
+                "Profile" to Icons.Default.Person
+            )
+
+            NavigationBar(
+                containerColor = Color.White,
+                tonalElevation = 8.dp,
+                modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            ) {
+                items.forEach { item ->
+                    if (item.isEmpty()) {
+                        FloatingActionButton(
+                            onClick = { /*TODO*/ },
+                            containerColor = themeColor,
+                            shape = CircleShape,
+                            modifier = Modifier.offset(y = (-16).dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
+                        }
+                    } else {
+                        NavigationBarItem(
+                            icon = { Icon(icons[item]!!, contentDescription = item) },
+                            label = { Text(item) },
+                            selected = selectedBottomNavItem == item,
+                            onClick = { 
+                                selectedBottomNavItem = item 
+                                if(item == "Home")
+                                    navController.navigate("influencer_home")
+                                else if(item == "Search")
+                                    navController.navigate("discover")
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = themeColor,
+                                unselectedIconColor = Color.Gray,
+                                selectedTextColor = themeColor,
+                                unselectedTextColor = Color.Gray,
+                                indicatorColor = themeColor.copy(alpha = 0.1f)
+                            )
+                        )
+                    }
+                }
+            }
         }
     ) { paddingValues ->
         LazyColumn(
@@ -161,7 +212,7 @@ fun DiscoverBrandsScreen(navController: NavController) {
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     it.forEach { brand ->
-                        BrandDiscoverCard(brand = brand, modifier = Modifier.weight(1f))
+                        BrandDiscoverCard(brand = brand, modifier = Modifier.weight(1f), navController = navController)
                     }
                     if (it.size < 2) {
                         Spacer(modifier = Modifier.weight(1f))
@@ -224,7 +275,7 @@ fun FilterChip(
 }
 
 @Composable
-fun BrandDiscoverCard(brand: DiscoverBrand, modifier: Modifier = Modifier) {
+fun BrandDiscoverCard(brand: DiscoverBrand, modifier: Modifier = Modifier, navController: NavController) {
     var isFavorite by remember { mutableStateOf(brand.isFavorite) }
     val themeColor = Color(0xFFFF8383)
     Card(
@@ -243,7 +294,10 @@ fun BrandDiscoverCard(brand: DiscoverBrand, modifier: Modifier = Modifier) {
                         .aspectRatio(1f),
                     contentScale = ContentScale.Crop
                 )
-                IconButton(onClick = { isFavorite = !isFavorite }) {
+                IconButton(onClick = { 
+                    isFavorite = !isFavorite 
+                    if(isFavorite) navController.navigate("wishlist")
+                }) {
                     Icon(
                         if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                         contentDescription = "Favorite",
