@@ -51,6 +51,9 @@ class InfluencerViewModel : ViewModel() {
                       platforms {
                         platform
                         profileUrl
+                        followers
+                        avgViews
+                        engagement
                         formats
                         connected
                       }
@@ -132,8 +135,11 @@ class InfluencerViewModel : ViewModel() {
                     Platform(
                         platform = platObj.optString("platform", ""),
                         profileUrl = platObj.optString("profileUrl", ""),
+                        followers = platObj.optInt("followers", 0),
+                        avgViews = platObj.optInt("avgViews", 0),
+                        engagement = platObj.optDouble("engagement", 0.0).toFloat(),
                         formats = formatsList,
-                        connected = platObj.optBoolean("connected")
+                        connected = if (platObj.has("connected")) platObj.optBoolean("connected") else null
                     )
                 )
             }
@@ -168,7 +174,7 @@ class InfluencerViewModel : ViewModel() {
             email = obj.optString("email", ""),
             name = obj.optString("name", ""),
             role = obj.optString("role", ""),
-            profileCompleted = obj.optBoolean("profileCompleted"),
+            profileCompleted = if (obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
             updatedAt = obj.optString("updatedAt", null),
             bio = obj.optString("bio", null),
             location = obj.optString("location", null),
@@ -176,8 +182,9 @@ class InfluencerViewModel : ViewModel() {
             platforms = platformsList,
             strengths = strengthsList,
             pricing = pricingList,
-            availability = obj.optString("availability", null),
-            logoUrl = obj.optString("logoUrl", null)
+            availability = if (obj.has("availability")) obj.optBoolean("availability") else null,
+            logoUrl = obj.optString("logoUrl", null),
+            audienceInsights = null
         )
     }
 }

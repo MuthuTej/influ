@@ -11,10 +11,33 @@ data class InfluencerProfile(
     val location: String?,
     val categories: List<Category>?,
     val platforms: List<Platform>?,
+    val audienceInsights: AudienceInsights?,
     val strengths: List<String>?,
     val pricing: List<PricingInfo>?,
-    val availability: String?,
+    val availability: Boolean?,
     val logoUrl: String?
+)
+
+data class AudienceInsights(
+    val topLocations: List<LocationInsight>?,
+    val genderSplit: GenderSplit?,
+    val ageGroups: List<AgeGroupInsight>?
+)
+
+data class LocationInsight(
+    val city: String,
+    val country: String,
+    val percentage: Float
+)
+
+data class GenderSplit(
+    val male: Float,
+    val female: Float
+)
+
+data class AgeGroupInsight(
+    val range: String,
+    val percentage: Float
 )
 
 data class Category(
@@ -25,8 +48,13 @@ data class Category(
 data class Platform(
     val platform: String,
     val profileUrl: String,
+    val followers: Int?,
+    val avgViews: Int?,
+    val engagement: Float?,
     val formats: List<String>?,
-    val connected: Boolean?
+    val connected: Boolean?,
+    val minFollowers: Int? = null,
+    val minEngagement: Float? = null
 )
 
 data class PricingInfo(
