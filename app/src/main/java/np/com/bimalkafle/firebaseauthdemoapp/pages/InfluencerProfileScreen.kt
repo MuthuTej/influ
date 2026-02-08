@@ -2,6 +2,7 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -207,7 +209,17 @@ fun InfluencerProfileScreen(navController: NavController) {
             }
             item {
                 ProfileSection {
-                    ProfileItem(icon = Icons.Default.ExitToApp, text = "Log Out", showArrow = true)
+                    ProfileItem(
+                        icon = Icons.Default.ExitToApp,
+                        text = "Log Out",
+                        showArrow = true,
+                        onClick = {
+                            FirebaseAuth.getInstance().signOut()
+                            navController.navigate("login") {
+                                popUpTo(0)
+                            }
+                        }
+                    )
                 }
             }
         }
@@ -230,10 +242,17 @@ fun ProfileSection(
 }
 
 @Composable
-fun ProfileItem(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, value: String? = null, showArrow: Boolean = false) {
+fun ProfileItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    value: String? = null,
+    showArrow: Boolean = false,
+    onClick: () -> Unit = {}
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
