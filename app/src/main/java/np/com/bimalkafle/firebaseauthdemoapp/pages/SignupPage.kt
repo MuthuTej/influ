@@ -96,6 +96,7 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
             .offset(y = offset)
             .verticalScroll(rememberScrollState())
             .imePadding()
+            .navigationBarsPadding()
     ) {
         SignupPageContent(
             modifier = Modifier,
