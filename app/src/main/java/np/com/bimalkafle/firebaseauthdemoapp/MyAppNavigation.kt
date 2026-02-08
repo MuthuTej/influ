@@ -47,7 +47,8 @@ fun MyAppNavigation(
             BrandDetailsScreen(
                 onBack = { navController.popBackStack() },
                 onCreateCampaign = { navController.navigate("create_campaign") },
-                onGoToHome = { navController.navigate("brand_home") }
+                onGoToHome = { navController.navigate("brand_home") },
+                brandViewModel = brandViewModel
             )
         }
         composable("create_campaign") {

@@ -37,3 +37,22 @@ data class Influencer(
     val logoUrl: String?,
     val updatedAt: String?
 )
+
+data class BrandCategory(
+    val category: String,
+    val subCategory: String
+)
+
+data class Brand(
+    val id: String,
+    val email: String,
+    val name: String,
+    val role: String,
+    val profileCompleted: Boolean?,
+    val updatedAt: String?,
+    val brandCategory: BrandCategory?,
+    val about: String?,
+    val primaryObjective: String?,
+    val profileUrl: String?,
+    val logoUrl: String?
+)
