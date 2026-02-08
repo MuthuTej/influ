@@ -3,19 +3,19 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import coil.compose.AsyncImage
 
 import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +40,12 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import androidx.compose.ui.tooling.preview.Preview
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.ImageVector
+
+private val brandThemeColor = Color(0xFFFF8383)
 
 @Composable
 fun BrandHomePage(
@@ -73,15 +79,15 @@ fun BrandHomePage(
         }
     }
 
+    var selectedBottomNavItem by remember { mutableStateOf("Home") }
+
     Scaffold(
-        bottomBar = { BottomNavigationBar() },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate("create_campaign")},
-                containerColor = Color(0xFFFF8383)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-            }
+        bottomBar = {
+            BrandBottomNavigationBar(
+                selectedItem = selectedBottomNavItem,
+                onItemSelected = { selectedBottomNavItem = it },
+                onCreateCampaign = { navController.navigate("create_campaign") }
+            )
         }
     ) { padding ->
 
@@ -94,18 +100,47 @@ fun BrandHomePage(
                 modifier = modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .background(Color(0xFFF5F5F5)),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .background(Color.White)
             ) {
 
-                item { HeaderSection() }
-                item { ActiveCampaignSection(collaborations) }
+                item { BrandHeaderAndReachSection() }
 
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp)
+                    ) {
+                        ActiveCampaignSection(collaborations)
+                        TopPicksSection()
+                    }
+
+                }
+                items(sampleBrands.chunked(2)) { brandRow ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White)
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        brandRow.forEach { brand ->
+                            BrandCard(brand = brand, modifier = Modifier.weight(1f).padding(vertical = 4.dp) , navController)
+                        }
+                        if (brandRow.size < 2) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                    Spacer(modifier = Modifier
+                        .height(16.dp)
+                        .background(Color.White))
+                }
                 item {
                     Spacer(modifier = Modifier.height(40.dp))
                     Button(
-                        onClick = { authViewModel.signout() },
+                        onClick = {
+                            FirebaseAuth.getInstance().signOut()
+                        },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Sign Out")
@@ -117,32 +152,31 @@ fun BrandHomePage(
 }
 
 @Composable
-fun HeaderSection() {
+fun BrandHeaderAndReachSection() {
+
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
+
     val headerHeight = screenHeight * 0.32f
-    val contentPaddingTop = headerHeight - 40.dp
+    val cardHeight = screenHeight * 0.28f
 
     Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(headerHeight + cardHeight * 0.6f) // dynamic total height
     ) {
 
-        // 🔥 Gradient Header
+        // ---------------- HEADER ----------------
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            Color(0xFFFF8383),
-                            Color(0xFF6C63FF)
-                        )
-                    )
-                )
+                .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
+                .background(brandThemeColor)
         ) {
 
             Image(
-                painter = painterResource(R.drawable.vector),
+                painter = painterResource(id = R.drawable.vector),
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
@@ -150,103 +184,193 @@ fun HeaderSection() {
                 contentScale = ContentScale.Crop
             )
 
-            // Top Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, start = 16.dp, end = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(top = 28.dp, start = 16.dp, end = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
-                Text(
-                    text = "Hello, Myntra 👋",
+                Surface(
+                    shape = CircleShape,
                     color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(
-                        Icons.Default.FavoriteBorder,
+                    modifier = Modifier.size(54.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.brand_profile),
                         contentDescription = null,
-                        tint = Color.White
-                    )
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        tint = Color.White
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .clip(CircleShape)
                     )
                 }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
+                    Text(
+                        "Myntra 👋",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                IconBubble(Icons.Default.Favorite, Color.Red)
+                Spacer(modifier = Modifier.width(10.dp))
+                IconBubble(Icons.Default.Notifications, Color.Black)
             }
+        }
 
-            // 💎 Floating Stats Card
-            Card(
+        // ---------------- STATS CARD ----------------
+        Card(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = headerHeight - (cardHeight * 0.75f)) // 🔥 dynamic overlap
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth()
+                .height(cardHeight),
+            shape = RoundedCornerShape(30.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 25.dp)
+        ) {
+
+            Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(y = 40.dp)
-                    .padding(horizontal = 24.dp)
-                    .fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            listOf(Color(0xFF4FACFE), Color(0xFF6C63FF))
+                        )
+                    )
             ) {
-                Box(
+
+                Column(
                     modifier = Modifier
-                        .background(
-                            brush = Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF4FACFE),
-                                    Color(0xFF6C63FF)
-                                )
-                            )
-                        )
-                        .padding(24.dp)
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
-                        Text(
-                            text = "Total Reach",
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                    Text(
+                        "Total Reach",
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
 
-                        Text(
-                            text = "2.4 M",
-                            color = Color.White,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Text(
+                        "2.4 M",
+                        fontSize = 50.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            OverlayStatItem("Engagement", "6.1%")
-                            OverlayStatItem("Leads", "1.2K")
-                            OverlayStatItem("Spent", "₹18.4K")
-                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+
+                        BrandStatChip("Engagement", "6.1 %", Modifier.weight(1f))
+                        BrandStatChip("Leads", "1.2 K", Modifier.weight(1f))
+                        BrandStatChip("Spent", "18.4K", Modifier.weight(1f))
+
                     }
                 }
             }
         }
 
+        // ---------------- FLOATING BUTTON ----------------
+        Button(
+            onClick = { },
+            shape = RoundedCornerShape(30.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFFFF6B6B)
+            ),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = headerHeight + (cardHeight * 0.20f))
+                .fillMaxWidth(0.65f)
+                .height(52.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 10.dp)
+        ) {
+            Text(
+                "Find Influencer",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.Black
+            )
+        }
+    }
+}
+
+@Composable
+fun IconBubble(icon: ImageVector, tint: Color) {
+    Surface(
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.25f),
+        modifier = Modifier.size(42.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        }
     }
 }
 @Composable
-private fun OverlayStatItem(title: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = title,
-            color = Color.White.copy(alpha = 0.8f),
-            fontSize = 12.sp
-        )
-        Text(
-            text = value,
-            color = Color.White,
-            fontWeight = FontWeight.Bold
-        )
+fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
+
+    Card(
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.15f)
+        ),
+        border = BorderStroke(
+            width = 1.5.dp,
+            color = Color.White.copy(alpha = 0.35f)
+        ),
+        modifier = modifier
+            .aspectRatio(1f)
+    ) {
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.25f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        ) {
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(vertical = 18.dp, horizontal = 8.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+
+                Text(
+                    text = label,
+                    color = Color(0xFF4A2E2E),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = value,
+                    color = Color.White,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+        }
     }
 }
 
@@ -257,11 +381,28 @@ fun ActiveCampaignSection(collaborations: List<np.com.bimalkafle.firebaseauthdem
         modifier = Modifier.fillMaxWidth()
     ) {
 
-        Text(
-            text = "Active Campaigns",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
+            Text(
+                text = "Active Campaigns",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(brandThemeColor.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = collaborations.size.toString(),
+                    color = brandThemeColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -273,47 +414,54 @@ fun ActiveCampaignSection(collaborations: List<np.com.bimalkafle.firebaseauthdem
                 modifier = Modifier.padding(8.dp)
             )
         } else {
-             // Height logic: Show roughly 3 items if possible.
-             // Note: Currently using Box with calculated height was for scroll within scroll,
-             // but here we are in a parent LazyColumn. Ideally, we shouldn't nest LazyColumn.
-             // But the original code had it. To avoid crash "Vertically scrollable component was measured with an infinity maximum height constraints",
-             // we either use a fixed height or just loop items in the parent lazy column.
-             // The original code used a Box with height and inner LazyColumn, which works but isn't ideal.
-             // Let's stick to the original design but map the data.
+            val configuration = LocalConfiguration.current
+            val screenHeight = configuration.screenHeightDp.dp
+            val maxSectionHeight = screenHeight * 0.20f
+            val singleCardHeight = 170.dp
 
-            val itemHeight = 160.dp // Approximate height of card + padding
-            val visibleItems = minOf(collaborations.size, 3)
-            val boxHeight = if (visibleItems > 0) itemHeight * visibleItems else 100.dp
-            fun calculateDaysAgo(updatedAt: String?): String {
-                return try {
-                    val instant = Instant.parse(updatedAt)
-                    val updatedDate = instant.atZone(ZoneId.systemDefault()).toLocalDate()
-                    val today = LocalDateTime.now().toLocalDate()
-                    val days = ChronoUnit.DAYS.between(updatedDate, today)
-
-                    when {
-                        days == 0L -> "Today"
-                        days == 1L -> "1 day ago"
-                        else -> "$days days ago"
-                    }
-                } catch (e: Exception) {
-                    "Recently"
-                }
+            val finalHeight = if (maxSectionHeight > singleCardHeight) {
+                maxSectionHeight
+            } else {
+                singleCardHeight
             }
 
-            Box(
+            LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(boxHeight)
+                    .height(finalHeight)
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(end = 16.dp)
             ) {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(collaborations) { collaboration ->
-                        val pricing = collaboration.pricing?.firstOrNull()
-                        val updatedAt = collaboration.influencer.updatedAt
-                        val timeAgo = calculateDaysAgo(updatedAt)
+                items(collaborations) { collaboration ->
 
+                    val pricing = collaboration.pricing?.firstOrNull()
+                    val updatedAt = collaboration.influencer.updatedAt
+
+                    fun calculateDaysAgo(updatedAt: String?): String {
+                        return try {
+                            val instant = Instant.parse(updatedAt)
+                            val updatedDate = instant.atZone(ZoneId.systemDefault()).toLocalDate()
+                            val today = LocalDateTime.now().toLocalDate()
+                            val days = ChronoUnit.DAYS.between(updatedDate, today)
+
+                            when {
+                                days == 0L -> "Today"
+                                days == 1L -> "1 day ago"
+                                else -> "$days days ago"
+                            }
+                        } catch (e: Exception) {
+                            "Recently"
+                        }
+                    }
+
+                    val timeAgo = calculateDaysAgo(updatedAt)
+
+                    Box(
+                        modifier = Modifier
+                            .width(300.dp)
+                            .fillMaxHeight()
+                    ) {
                         CampaignItem(
                             influencerName = collaboration.influencer.name,
                             influencerLogo = collaboration.influencer.logoUrl,
@@ -366,129 +514,158 @@ fun CampaignItem(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp)
         ) {
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
 
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(primaryColor.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (!influencerLogo.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = influencerLogo,
-                                contentDescription = influencerName,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape)
-                            )
-                        } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(primaryColor.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!influencerLogo.isNullOrEmpty()) {
+                                AsyncImage(
+                                    model = influencerLogo,
+                                    contentDescription = influencerName,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape)
+                                )
+                            } else {
+                                Text(
+                                    text = if (influencerName.isNotEmpty()) influencerName.first().uppercase() else "?",
+                                    color = primaryColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column {
                             Text(
-                                text = if (influencerName.isNotEmpty()) influencerName.first().uppercase() else "?",
-                                color = primaryColor,
-                                fontWeight = FontWeight.Bold
+                                text = influencerName,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                            Text(
+                                text = campaignTitle,
+                                fontSize = 13.sp,
+                                color = Color.Gray
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Column {
-                        Text(
-                            text = influencerName,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            text = campaignTitle,
-                            fontSize = 13.sp,
-                            color = Color.Gray
-                        )
-                    }
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = statusColor.copy(alpha = 0.15f)
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+
+                Text(
+                    text = "$deliverable • $platform",
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = status,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        text = "$currency $price",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = primaryColor
+                    )
+                    Text(
+                        text = time,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = statusColor
+                        color = Color.Gray
                     )
                 }
             }
 
-            Divider(color = Color.LightGray.copy(alpha = 0.3f))
-
-            Text(
-                text = "$deliverable • $platform",
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+            Surface(
+                shape = RoundedCornerShape(25),
+                color = statusColor.copy(alpha = 0.15f),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
             ) {
                 Text(
-                    text = "$currency $price",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = primaryColor
-                )
-                Text(
-                    text = time,
-                    fontSize = 12.sp,
-                    color = Color.Gray
+                    text = status,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = statusColor
                 )
             }
         }
     }
 }
 @Composable
-fun BottomNavigationBar() {
-    NavigationBar {
-        NavigationBarItem(
-            selected = true,
-            onClick = { },
-            icon = { Icon(Icons.Default.Home, null) },
-            label = { Text("Home") }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = { Icon(Icons.Default.Search, null) },
-            label = { Text("Search") }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = { Icon(Icons.Default.History, null) },
-            label = { Text("History") }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = { Icon(Icons.Default.Person, null) },
-            label = { Text("Profile") }
-        )
+fun BrandBottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, onCreateCampaign: () -> Unit) {
+    val items = listOf("Home", "Search", "", "History", "Profile")
+    val icons = mapOf(
+        "Home" to Icons.Default.Home,
+        "Search" to Icons.Default.Search,
+        "History" to Icons.Default.History,
+        "Profile" to Icons.Default.Person
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+    ) {
+        NavigationBar(
+            containerColor = Color.White,
+            tonalElevation = 8.dp,
+            modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+        ) {
+            items.forEach { item ->
+                if (item.isEmpty()) {
+                    FloatingActionButton(
+                        onClick = onCreateCampaign,
+                        containerColor = brandThemeColor,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .offset(y = (-7).dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White, modifier = Modifier.size(32.dp))
+                    }
+                } else {
+                    NavigationBarItem(
+                        icon = { Icon(icons[item]!!, contentDescription = item) },
+                        label = { Text(item) },
+                        selected = selectedItem == item,
+                        onClick = { onItemSelected(item) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = brandThemeColor,
+                            unselectedIconColor = Color.Gray,
+                            selectedTextColor = brandThemeColor,
+                            unselectedTextColor = Color.Gray,
+                            indicatorColor = brandThemeColor.copy(alpha = 0.1f)
+                        )
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -527,12 +704,9 @@ fun BrandHomePagePreview() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF5F5F5))
-                .padding(16.dp)
+                .background(Color.White)
         ) {
-            HeaderSection()
-            Spacer(modifier = Modifier.height(16.dp))
-            Spacer(modifier = Modifier.height(16.dp))
+            BrandHeaderAndReachSection()
             ActiveCampaignSection(sampleCollaborations)
 
         }
