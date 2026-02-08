@@ -173,7 +173,7 @@ fun InfluencerDetailScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
                     
                     val availability = influencerProfile?.availability ?: "N/A"
-                    InfluencerDetailRow("Availability", availability)
+                    InfluencerDetailRow("Availability", availability as String)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
                     
                     val platforms = influencerProfile?.platforms?.joinToString(", ") { it.platform }

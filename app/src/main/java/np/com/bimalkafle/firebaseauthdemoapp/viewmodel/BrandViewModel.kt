@@ -7,12 +7,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 
+import np.com.bimalkafle.firebaseauthdemoapp.model.AgeGroupInsight
+import np.com.bimalkafle.firebaseauthdemoapp.model.AudienceInsights
 import np.com.bimalkafle.firebaseauthdemoapp.model.Brand
 import np.com.bimalkafle.firebaseauthdemoapp.model.BrandCategory
 import np.com.bimalkafle.firebaseauthdemoapp.model.Campaign
+import np.com.bimalkafle.firebaseauthdemoapp.model.Category
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
+import np.com.bimalkafle.firebaseauthdemoapp.model.GenderSplit
 import np.com.bimalkafle.firebaseauthdemoapp.model.Influencer
+import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
+import np.com.bimalkafle.firebaseauthdemoapp.model.LocationInsight
+import np.com.bimalkafle.firebaseauthdemoapp.model.Platform
 import np.com.bimalkafle.firebaseauthdemoapp.model.Pricing
+import np.com.bimalkafle.firebaseauthdemoapp.model.PricingInfo
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
 import org.json.JSONArray
 import org.json.JSONObject
@@ -22,6 +30,9 @@ class BrandViewModel : ViewModel() {
     private val _collaborations = MutableLiveData<List<Collaboration>>()
     val collaborations: LiveData<List<Collaboration>> = _collaborations
 
+    private val _influencers = MutableLiveData<List<InfluencerProfile>>()
+    val influencers: LiveData<List<InfluencerProfile>> = _influencers
+
     private val _brandProfile = MutableLiveData<Brand?>()
     val brandProfile: LiveData<Brand?> = _brandProfile
 
@@ -30,6 +41,218 @@ class BrandViewModel : ViewModel() {
 
     private val _error = MutableLiveData<String?>()
     val error: LiveData<String?> = _error
+
+    fun fetchInfluencers(token: String) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val query = """
+                query GetInfluencers {
+                  getInfluencers {
+                    id
+                    email
+                    name
+                    role
+                    profileCompleted
+                    updatedAt
+                    bio
+                    location
+                    categories {
+                      category
+                      subCategory
+                    }
+                    platforms {
+                      platform
+                      profileUrl
+                      followers
+                      avgViews
+                      engagement
+                      formats
+                      connected
+                      minFollowers
+                      minEngagement
+                    }
+                    audienceInsights {
+                      topLocations {
+                        city
+                        country
+                        percentage
+                      }
+                      genderSplit {
+                        male
+                        female
+                      }
+                      ageGroups {
+                        range
+                        percentage
+                      }
+                    }
+                    strengths
+                    pricing {
+                      platform
+                      deliverable
+                      price
+                      currency
+                    }
+                    availability
+                    logoUrl
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    if (data != null) {
+                        val influencersArray = data.optJSONArray("getInfluencers")
+                        if (influencersArray != null) {
+                            val list = parseInfluencers(influencersArray)
+                            _influencers.postValue(list)
+                        } else {
+                            _influencers.postValue(emptyList())
+                        }
+                    } else {
+                        val errors = jsonObject.optJSONArray("errors")
+                        if (errors != null && errors.length() > 0) {
+                            val message = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
+                            _error.postValue(message)
+                        } else {
+                            _error.postValue("No data returned")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("BrandViewModel", "Parsing error", e)
+                    _error.postValue("Parsing error: ${e.message}")
+                }
+            }.onFailure {
+                Log.e("BrandViewModel", "Network error", it)
+                _error.postValue("Network error: ${it.message}")
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    private fun parseInfluencers(jsonArray: JSONArray): List<InfluencerProfile> {
+        val list = mutableListOf<InfluencerProfile>()
+        for (i in 0 until jsonArray.length()) {
+            val obj = jsonArray.optJSONObject(i)
+            if (obj != null) {
+                list.add(parseInfluencerProfile(obj))
+            }
+        }
+        return list
+    }
+
+    private fun parseInfluencerProfile(obj: JSONObject): InfluencerProfile {
+        val categoriesArray = obj.optJSONArray("categories")
+        val categories = mutableListOf<Category>()
+        if (categoriesArray != null) {
+            for (i in 0 until categoriesArray.length()) {
+                val cObj = categoriesArray.optJSONObject(i)
+                if (cObj != null) {
+                    categories.add(Category(cObj.optString("category"), cObj.optString("subCategory")))
+                }
+            }
+        }
+
+        val platformsArray = obj.optJSONArray("platforms")
+        val platforms = mutableListOf<Platform>()
+        if (platformsArray != null) {
+            for (i in 0 until platformsArray.length()) {
+                val pObj = platformsArray.optJSONObject(i)
+                if (pObj != null) {
+                    platforms.add(
+                        Platform(
+                            platform = pObj.optString("platform"),
+                            profileUrl = pObj.optString("profileUrl"),
+                            followers = pObj.optInt("followers", 0),
+                            avgViews = pObj.optInt("avgViews", 0),
+                            engagement = pObj.optDouble("engagement", 0.0).toFloat(),
+                            formats = null,
+                            connected = pObj.optBoolean("connected")
+                        )
+                    )
+                }
+            }
+        }
+
+        val pricingArray = obj.optJSONArray("pricing")
+        val pricing = mutableListOf<PricingInfo>()
+        if (pricingArray != null) {
+            for (i in 0 until pricingArray.length()) {
+                val pObj = pricingArray.optJSONObject(i)
+                if (pObj != null) {
+                    pricing.add(
+                        PricingInfo(
+                            platform = pObj.optString("platform"),
+                            deliverable = pObj.optString("deliverable"),
+                            price = pObj.optInt("price"),
+                            currency = pObj.optString("currency")
+                        )
+                    )
+                }
+            }
+        }
+
+        val strengthsArray = obj.optJSONArray("strengths")
+        val strengths = mutableListOf<String>()
+        if (strengthsArray != null) {
+            for (i in 0 until strengthsArray.length()) {
+                strengths.add(strengthsArray.getString(i))
+            }
+        }
+
+        val aiObj = obj.optJSONObject("audienceInsights")
+        val audienceInsights = if (aiObj != null) {
+            val topLocationsArray = aiObj.optJSONArray("topLocations")
+            val topLocations = mutableListOf<LocationInsight>()
+            if (topLocationsArray != null) {
+                for (i in 0 until topLocationsArray.length()) {
+                    val lObj = topLocationsArray.optJSONObject(i)
+                    if (lObj != null) {
+                        topLocations.add(LocationInsight(lObj.optString("city"), lObj.optString("country"), lObj.optDouble("percentage").toFloat()))
+                    }
+                }
+            }
+
+            val gsObj = aiObj.optJSONObject("genderSplit")
+            val genderSplit = if (gsObj != null) {
+                GenderSplit(gsObj.optDouble("male").toFloat(), gsObj.optDouble("female").toFloat())
+            } else null
+
+            val ageGroupsArray = aiObj.optJSONArray("ageGroups")
+            val ageGroups = mutableListOf<AgeGroupInsight>()
+            if (ageGroupsArray != null) {
+                for (i in 0 until ageGroupsArray.length()) {
+                    val aObj = ageGroupsArray.optJSONObject(i)
+                    if (aObj != null) {
+                        ageGroups.add(AgeGroupInsight(aObj.optString("range"), aObj.optDouble("percentage").toFloat()))
+                    }
+                }
+            }
+
+            AudienceInsights(topLocations, genderSplit, ageGroups)
+        } else null
+
+        return InfluencerProfile(
+            id = obj.optString("id"),
+            email = obj.optString("email"),
+            name = obj.optString("name"),
+            role = obj.optString("role"),
+            profileCompleted = obj.optBoolean("profileCompleted"),
+            updatedAt = obj.optString("updatedAt"),
+            bio = obj.optString("bio"),
+            location = obj.optString("location"),
+            categories = categories,
+            platforms = platforms,
+            audienceInsights = audienceInsights,
+            strengths = strengths,
+            pricing = pricing,
+            availability = obj.optBoolean("availability"),
+            logoUrl = obj.optString("logoUrl")
+        )
+    }
 
     fun fetchBrandDetails(token: String) {
         _loading.value = true
@@ -184,54 +407,57 @@ class BrandViewModel : ViewModel() {
     private fun parseCollaborations(jsonArray: JSONArray): List<Collaboration> {
         val list = mutableListOf<Collaboration>()
         for (i in 0 until jsonArray.length()) {
-            val obj = jsonArray.getJSONObject(i)
-            
-            val campaignObj = obj.getJSONObject("campaign")
-            val campaign = Campaign(
-                id = campaignObj.getString("id"),
-                title = campaignObj.getString("title")
-            )
+            val obj = jsonArray.optJSONObject(i) ?: continue
+
+            val campaignObj = obj.optJSONObject("campaign")
+            val campaign = if (campaignObj != null) {
+                Campaign(
+                    id = campaignObj.optString("id"),
+                    title = campaignObj.optString("title")
+                )
+            } else {
+                Campaign("unknown", "Unknown Campaign")
+            }
 
             val influencerObj = obj.optJSONObject("influencer")
             val influencer = if (influencerObj != null) {
                  Influencer(
-                    name = influencerObj.getString("name"),
+                    name = influencerObj.optString("name", "Unknown"),
                     bio = influencerObj.optString("bio"),
                     logoUrl = influencerObj.optString("logoUrl"),
                     updatedAt = influencerObj.optString("updatedAt")
                 )
             } else {
-                // Fallback or skip
                  Influencer("Unknown", null, null, null)
             }
-
 
             val pricingList = mutableListOf<Pricing>()
             val pricingArray = obj.optJSONArray("pricing")
             if (pricingArray != null) {
                 for (j in 0 until pricingArray.length()) {
-                    val pObj = pricingArray.getJSONObject(j)
-                    pricingList.add(
-                        Pricing(
-                            currency = pObj.getString("currency"),
-                            deliverable = pObj.getString("deliverable"),
-                            platform = pObj.getString("platform"),
-                            price = pObj.getInt("price")
+                    val pObj = pricingArray.optJSONObject(j)
+                    if (pObj != null) {
+                        pricingList.add(
+                            Pricing(
+                                currency = pObj.optString("currency"),
+                                deliverable = pObj.optString("deliverable"),
+                                platform = pObj.optString("platform"),
+                                price = pObj.optInt("price")
+                            )
                         )
-                    )
+                    }
                 }
             }
 
-
             list.add(
                 Collaboration(
-                    id = obj.getString("id"),
-                    status = obj.getString("status"),
+                    id = obj.optString("id"),
+                    status = obj.optString("status"),
                     message = obj.optString("message"),
-                    createdAt = obj.getString("createdAt"),
+                    createdAt = obj.optString("createdAt"),
                     campaign = campaign,
                     pricing = pricingList,
-                    initiatedBy = obj.getString("initiatedBy"),
+                    initiatedBy = obj.optString("initiatedBy"),
                     influencer = influencer
                 )
             )

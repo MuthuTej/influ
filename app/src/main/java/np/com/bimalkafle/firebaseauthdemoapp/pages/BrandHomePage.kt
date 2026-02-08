@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -44,6 +45,12 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontStyle
+import np.com.bimalkafle.firebaseauthdemoapp.model.Campaign
+import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
+import np.com.bimalkafle.firebaseauthdemoapp.model.Influencer
+import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
+import np.com.bimalkafle.firebaseauthdemoapp.model.Pricing
 
 private val brandThemeColor = Color(0xFFFF8383)
 
@@ -57,6 +64,7 @@ fun BrandHomePage(
 
     val authState = authViewModel.authState.observeAsState()
     val collaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
+    val influencers by brandViewModel.influencers.observeAsState(initial = emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
     val error by brandViewModel.error.observeAsState()
 
@@ -67,6 +75,7 @@ fun BrandHomePage(
                 val firebaseToken = result.token
                 if (firebaseToken != null) {
                     brandViewModel.fetchCollaborations(firebaseToken)
+                    brandViewModel.fetchInfluencers(firebaseToken)
                 }
             }
     }
@@ -112,28 +121,20 @@ fun BrandHomePage(
                             .padding(top = 16.dp)
                     ) {
                         ActiveCampaignSection(collaborations)
-                        TopPicksSection()
+                        TopPicksSectionBrand()
                     }
 
                 }
-                items(sampleBrands.chunked(2)) { brandRow ->
-                    Row(
+                items(influencers) { influencer ->
+                    BrandCardBrand(
+                        influencer = influencer, 
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White)
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        brandRow.forEach { brand ->
-                            BrandCard(brand = brand, modifier = Modifier.weight(1f).padding(vertical = 4.dp) , navController)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        onCardClick = {
+                            navController.navigate("brand_influencer_detail/${influencer.id}")
                         }
-                        if (brandRow.size < 2) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                    Spacer(modifier = Modifier
-                        .height(16.dp)
-                        .background(Color.White))
+                    )
                 }
                 item {
                     Spacer(modifier = Modifier.height(40.dp))
@@ -375,7 +376,7 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ActiveCampaignSection(collaborations: List<np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration>) {
+fun ActiveCampaignSection(collaborations: List<Collaboration>) {
 
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -409,7 +410,7 @@ fun ActiveCampaignSection(collaborations: List<np.com.bimalkafle.firebaseauthdem
         if (collaborations.isEmpty()) {
             Text(
                 text = "No active campaigns found.",
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                fontStyle = FontStyle.Italic,
                 color = Color.Gray,
                 modifier = Modifier.padding(8.dp)
             )
@@ -417,7 +418,7 @@ fun ActiveCampaignSection(collaborations: List<np.com.bimalkafle.firebaseauthdem
             val configuration = LocalConfiguration.current
             val screenHeight = configuration.screenHeightDp.dp
             val maxSectionHeight = screenHeight * 0.20f
-            val singleCardHeight = 170.dp
+            val singleCardHeight = 140.dp
 
             val finalHeight = if (maxSectionHeight > singleCardHeight) {
                 maxSectionHeight
@@ -431,7 +432,6 @@ fun ActiveCampaignSection(collaborations: List<np.com.bimalkafle.firebaseauthdem
                     .height(finalHeight)
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(end = 16.dp)
             ) {
                 items(collaborations) { collaboration ->
 
@@ -617,6 +617,277 @@ fun CampaignItem(
         }
     }
 }
+
+@Composable
+fun TopPicksSectionBrand() {
+    var selectedPlatform by remember { mutableStateOf("YouTube") }
+    val platforms = listOf("YouTube", "Instagram", "Facebook")
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text("Top Picks", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            TabRow(
+                selectedTabIndex = platforms.indexOf(selectedPlatform),
+                containerColor = Color.Transparent,
+                indicator = {
+                    TabRowDefaults.SecondaryIndicator(
+                        modifier = Modifier.tabIndicatorOffset(it[platforms.indexOf(selectedPlatform)]),
+                        color = brandThemeColor
+                    )
+                }
+            ) {
+                platforms.forEach { platform ->
+                    val iconRes = when (platform) {
+                        "YouTube" -> R.drawable.ic_youtube
+                        "Instagram" -> R.drawable.ic_instagram
+                        "Facebook" -> R.drawable.ic_facebook
+                        else -> R.drawable.ic_youtube
+                    }
+                    Tab(
+                        selected = selectedPlatform == platform,
+                        onClick = { selectedPlatform = platform },
+                        icon = {
+                            Icon(
+                                painter = painterResource(id = iconRes),
+                                contentDescription = platform,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BrandCardBrand(
+    influencer: InfluencerProfile, 
+    modifier: Modifier = Modifier, 
+    onCardClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier
+            .padding(vertical = 4.dp)
+            .clickable { onCardClick() }
+    ) {
+        Box(modifier = Modifier.padding(16.dp)) {
+            // "Available" tag in top right
+            if (influencer.availability == true) {
+                Surface(
+                    color = Color(0xFF4CAF50),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Available",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+
+            Column {
+                // Top Section: Profile info
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = brandThemeColor.copy(alpha = 0.1f),
+                        modifier = Modifier.size(64.dp)
+                    ) {
+                        if (!influencer.logoUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = influencer.logoUrl,
+                                contentDescription = influencer.name,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = influencer.name.firstOrNull()?.uppercase() ?: "?",
+                                    color = brandThemeColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 24.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = influencer.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = Color(0xFF1A1A1A)
+                        )
+                        Text(
+                            text = influencer.location ?: "Location N/A",
+                            fontSize = 14.sp,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = influencer.bio ?: "No bio available.",
+                            fontSize = 13.sp,
+                            color = Color.DarkGray,
+                            lineHeight = 18.sp,
+                            maxLines = 3
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        val categoriesText = influencer.categories?.joinToString(" • ") { it.category } ?: ""
+                        Text(
+                            text = categoriesText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = brandThemeColor
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Stats Section
+                val mainPlatform = influencer.platforms?.firstOrNull { it.platform == "INSTAGRAM" } 
+                    ?: influencer.platforms?.firstOrNull()
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    if (mainPlatform != null) {
+                        StatIconText(
+                            iconRes = if (mainPlatform.platform == "YOUTUBE") R.drawable.ic_youtube else R.drawable.ic_instagram,
+                            text = "${formatCount(mainPlatform.followers ?: 0)} Followers",
+                            iconTint = if (mainPlatform.platform == "YOUTUBE") Color.Red else Color(0xFFE4405F)
+                        )
+                        
+                        StatIconText(
+                            iconRes = R.drawable.vector, 
+                            text = "Avg Views: ${formatCount(mainPlatform.avgViews ?: 0)}",
+                            iconTint = Color(0xFF1E3A8A)
+                        )
+                    }
+                }
+
+                // Strengths Section
+                if (!influencer.strengths.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Strengths", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF4B5563))
+                        Text(" | ", color = Color.LightGray)
+                        Text(
+                            text = influencer.strengths.joinToString(" | "),
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Pricing Section
+                if (!influencer.pricing.isNullOrEmpty()) {
+                    Text(
+                        text = "Pricing",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color(0xFF1A1A1A)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    influencer.pricing.take(2).forEach { pricing ->
+                        Row(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_instagram),
+                                contentDescription = null,
+                                tint = Color(0xFFE4405F),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${pricing.deliverable}: ",
+                                fontSize = 13.sp,
+                                color = Color.DarkGray
+                            )
+                            Text(
+                                text = "₹${String.format("%,d", pricing.price)} ${pricing.currency}",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatIconText(iconRes: Int, text: String, iconTint: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF4B5563)
+        )
+    }
+}
+
+fun formatCount(count: Int): String {
+    return when {
+        count >= 1000000 -> "${count / 1000000}M"
+        count >= 1000 -> "${count / 1000}K"
+        else -> count.toString()
+    }
+}
+
 @Composable
 fun BrandBottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, onCreateCampaign: () -> Unit) {
     val items = listOf("Home", "Search", "", "History", "Profile")
@@ -673,25 +944,25 @@ fun BrandBottomNavigationBar(selectedItem: String, onItemSelected: (String) -> U
 @Composable
 fun BrandHomePagePreview() {
     val sampleCollaborations = listOf(
-        np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration(
+        Collaboration(
             id = "1",
             status = "ACCEPTED",
             message = "Excited to collaborate!",
             createdAt = "",
             initiatedBy = "BRAND",
-            campaign = np.com.bimalkafle.firebaseauthdemoapp.model.Campaign(
+            campaign = Campaign(
                 id = "c1",
                 title = "Summer Launch 2024"
             ),
             pricing = listOf(
-                np.com.bimalkafle.firebaseauthdemoapp.model.Pricing(
+                Pricing(
                     currency = "USD",
                     deliverable = "Reel",
                     platform = "INSTAGRAM",
                     price = 600
                 )
             ),
-            influencer = np.com.bimalkafle.firebaseauthdemoapp.model.Influencer(
+            influencer = Influencer(
                 name = "testinfluencer",
                 bio = null,
                 logoUrl = null,
@@ -708,7 +979,7 @@ fun BrandHomePagePreview() {
         ) {
             BrandHeaderAndReachSection()
             ActiveCampaignSection(sampleCollaborations)
-
+            TopPicksSectionBrand()
         }
     }
 }
