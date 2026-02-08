@@ -57,6 +57,7 @@ import org.json.JSONObject
 fun InfluencerRegistrationScreen(navController: NavController) {
     var name by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
+    var logoUrl by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
 
@@ -173,7 +174,15 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
             )
             Spacer(modifier = Modifier.height(16.dp))
-
+            OutlinedTextField(
+                value = logoUrl,
+                onValueChange = { logoUrl = it },
+                label = { Text("Logo URL") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+            )
+            Spacer(modifier = Modifier.height(16.dp))
             Text("Category", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
             FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 categoryOptions.forEach { category ->
@@ -332,7 +341,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
 
             Button(
                 onClick = {
-                    if (name.isEmpty() || location.isEmpty() || bio.isEmpty() || selectedCategories.isEmpty() || selectedPlatforms.isEmpty() || pricing.isEmpty()) {
+                    if (name.isEmpty() || location.isEmpty() || bio.isEmpty() || logoUrl.isEmpty() || selectedCategories.isEmpty() || selectedPlatforms.isEmpty() || pricing.isEmpty()) {
                         Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
@@ -356,8 +365,8 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                                 put("name", name)
                                                 put("bio", bio)
                                                 put("location", location)
-                                                put("availability", "Available") // Default as discussed
-                                                put("logoUrl", "")
+                                                put("availability", true) // Default as discussed
+                                                put("logoUrl", logoUrl)
                                                 
                                                 val categoriesJson = JSONArray()
                                                 selectedCategories.forEach { cat ->
