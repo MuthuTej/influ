@@ -50,6 +50,7 @@ fun BrandRegistrationScreen(
     var ageMax by remember { mutableStateOf("") }
     var gender by remember { mutableStateOf("Any") }
     var profileUrl by remember { mutableStateOf("") }
+    var logoUrl by remember { mutableStateOf("") }
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -89,9 +90,12 @@ fun BrandRegistrationScreen(
                 contentScale = ContentScale.Crop
 
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            IconButton(onClick = onBack, modifier = Modifier.padding(16.dp)) {
+            IconButton(onClick = {
+                FirebaseAuth.getInstance().signOut()
+                onBack()
+            }, modifier = Modifier.padding(16.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
 
@@ -308,6 +312,17 @@ fun BrandRegistrationScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            OutlinedTextField(
+                value = logoUrl,
+                onValueChange = { logoUrl = it },
+                label = { Text("Logo Url") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
             Button(
                 onClick = {
                     if (isLoading) return@Button
@@ -334,7 +349,8 @@ fun BrandRegistrationScreen(
                                     ageMin = ageMin.toIntOrNull(),
                                     ageMax = ageMax.toIntOrNull(),
                                     gender = gender,
-                                    profileUrl = profileUrl
+                                    profileUrl = profileUrl,
+                                    logoUrl=logoUrl
                                 )
                                 Log.d("BRAND_DEBUG", "Mutation result: $success")
                                 isLoading = false

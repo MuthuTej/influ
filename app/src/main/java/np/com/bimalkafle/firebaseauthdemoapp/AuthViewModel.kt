@@ -38,8 +38,11 @@ class AuthViewModel : ViewModel() {
                     if (token != null) {
                         viewModelScope.launch {
                             val result = BackendRepository.getUserRole(token)
-                            result.onSuccess { role ->
-                                _authState.value = AuthState.Authenticated(role)
+                            result.onSuccess { dataString ->
+                                val parts = dataString.split("|")
+                                val role = parts[0]
+                                val isProfileCompletedBackend = parts.getOrNull(1)?.toBoolean() ?: false
+                                _authState.value = AuthState.Authenticated(role, isProfileCompletedBackend)
                             }.onFailure {
                                 _authState.value = AuthState.Error(it.message ?: "Failed to fetch role")
                             }
@@ -88,7 +91,8 @@ class AuthViewModel : ViewModel() {
                                 viewModelScope.launch {
                                     val result = BackendRepository.signUp(name, role, token)
                                     result.onSuccess {
-                                        _authState.value = AuthState.Authenticated(role)
+                                        // New signup: Profile is NOT completed yet
+                                        _authState.value = AuthState.Authenticated(role, false)
                                     }.onFailure {
                                         _authState.value = AuthState.Error(it.message ?: "Sync with backend failed")
                                     }
@@ -113,7 +117,7 @@ class AuthViewModel : ViewModel() {
 }
 
 sealed class AuthState {
-    data class Authenticated(val role: String) : AuthState()
+    data class Authenticated(val role: String, val isProfileCompleted: Boolean) : AuthState()
     object Unauthenticated : AuthState()
     object Loading : AuthState()
     data class Error(val message: String) : AuthState()

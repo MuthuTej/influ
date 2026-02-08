@@ -50,10 +50,26 @@ class SplashViewModel(private val prefsManager: PrefsManager) : ViewModel() {
                     if (token != null) {
                         viewModelScope.launch {
                             val result = BackendRepository.getUserRole(token)
-                            result.onSuccess { role ->
-                                // 4. Check Profile Completion
-                                val isProfileCompleted = prefsManager.isProfileCompleted(currentUser.uid)
-                                if (isProfileCompleted) {
+                            result.onSuccess { dataString ->
+                                val parts = dataString.split("|")
+                                val role = parts[0]
+                                val isBackendCompleted = parts.getOrNull(1)?.toBoolean() ?: false
+
+                                // Logic to determine if user should go to dashboard
+                                val highlightCompleted = if (role.equals("BRAND", ignoreCase = true)) {
+                                    // Brand: Trust backend
+                                    if (isBackendCompleted) {
+                                        prefsManager.saveProfileCompleted(currentUser.uid, true) // Sync local
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    // Influencer: Trust local (backend is always false/unknown for now)
+                                    prefsManager.isProfileCompleted(currentUser.uid)
+                                }
+
+                                if (highlightCompleted) {
                                     _splashState.value = SplashState.NavigateToDashboard(role)
                                 } else {
                                     _splashState.value = SplashState.NavigateToRegistration(role)

@@ -22,7 +22,8 @@ object BrandRepository {
         ageMin: Int?,
         ageMax: Int?,
         gender: String,
-        profileUrl: String?
+        profileUrl: String?,
+        logoUrl: String
     ): Boolean = withContext(Dispatchers.IO) {
 
         val url = URL("https://connect-backend-e22a.onrender.com/graphql")
@@ -47,6 +48,7 @@ object BrandRepository {
             put("input", JSONObject().apply {
                 put("name", name)
                 put("profileUrl", profileUrl)
+                put("logoUrl" , logoUrl)
                 put("about", about)
                 put("primaryObjective", primaryObjective)
 

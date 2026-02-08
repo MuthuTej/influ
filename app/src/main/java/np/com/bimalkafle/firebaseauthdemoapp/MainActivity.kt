@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModelFactory
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,6 +20,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val authViewModel : AuthViewModel by viewModels()
         val splashViewModel: SplashViewModel by viewModels { SplashViewModelFactory(this) }
+        val brandViewModel: BrandViewModel by viewModels()
         
         setContent {
             FirebaseAuthDemoAppTheme {
@@ -26,7 +28,8 @@ class MainActivity : ComponentActivity() {
                     MyAppNavigation(
                         modifier = Modifier, // Remove padding to allow content to draw behind system bars
                         authViewModel = authViewModel,
-                        splashViewModel = splashViewModel
+                        splashViewModel = splashViewModel,
+                        brandViewModel = brandViewModel
                     )
                 }
             }

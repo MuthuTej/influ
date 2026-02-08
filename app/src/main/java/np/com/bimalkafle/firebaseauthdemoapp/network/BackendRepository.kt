@@ -81,6 +81,7 @@ object BackendRepository {
                     me {
                         __typename
                         role
+                        profileCompleted
                     }
                 }
             """.trimIndent()
@@ -101,8 +102,12 @@ object BackendRepository {
                     val message = errors.getJSONObject(0).getString("message")
                     Result.failure(Exception(message))
                 } else {
-                    val role = jsonResponse.getJSONObject("data").getJSONObject("me").getString("role")
-                    Result.success(role)
+                    val data = jsonResponse.getJSONObject("data").getJSONObject("me")
+                    val role = data.getString("role")
+                    val isProfileCompleted = data.optBoolean("profileCompleted", false)
+                    // Return both role and completion status as a formatted string or pair
+                    // Since Result returns String, we'll pack it: "ROLE|TRUE"
+                    Result.success("$role|$isProfileCompleted")
                 }
             } else {
                 Result.failure(Exception("Server returned code $responseCode"))

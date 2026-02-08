@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import np.com.bimalkafle.firebaseauthdemoapp.pages.*
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -14,7 +15,8 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
 fun MyAppNavigation(
     modifier: Modifier = Modifier, 
     authViewModel: AuthViewModel,
-    splashViewModel: SplashViewModel
+    splashViewModel: SplashViewModel,
+    brandViewModel: BrandViewModel
 ) {
     val navController = rememberNavController()
 
@@ -32,7 +34,14 @@ fun MyAppNavigation(
             SignupPage(modifier, navController, authViewModel)
         }
         composable("brand_registration") {
-            BrandRegistrationScreen(onBack = { navController.popBackStack() }, onNext = { navController.navigate("brand_details") })
+            BrandRegistrationScreen(
+                onBack = {
+                    navController.navigate("login") {
+                        popUpTo(0)
+                    }
+                },
+                onNext = { navController.navigate("brand_details") }
+            )
         }
         composable("brand_details") {
             BrandDetailsScreen(
@@ -75,7 +84,7 @@ fun MyAppNavigation(
             )
         }
         composable("brand_home") {
-            BrandHomePage(modifier, navController, authViewModel)
+            BrandHomePage(modifier, navController, authViewModel, brandViewModel)
         }
         composable("influencer_home") {
             InfluencerHomePage(modifier, navController, authViewModel)

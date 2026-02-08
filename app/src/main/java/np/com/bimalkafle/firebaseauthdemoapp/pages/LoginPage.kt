@@ -44,21 +44,37 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             is AuthState.Authenticated -> {
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
                 if (uid != null) {
-                    if (prefsManager.isProfileCompleted(uid)) {
-                        // Profile completed -> Dashboard
-                        val route = if (state.role.equals("BRAND", ignoreCase = true)) "brand_home" else "influencer_home"
-                        navController.navigate(route) {
-                            popUpTo("login") { inclusive = true }
+                        // Determine if we should go to Dashboard or Registration
+                        val isBrand = state.role.equals("BRAND", ignoreCase = true)
+                        val isInfluencer = !isBrand
+                        
+                        val isProfileCompleted = if (isBrand) {
+                             if (state.isProfileCompleted) {
+                                 prefsManager.saveProfileCompleted(uid, true)
+                                 true
+                             } else {
+                                 false
+                             }
+                        } else {
+                             // Influencer check local
+                             prefsManager.isProfileCompleted(uid)
                         }
-                    } else {
-                        // Profile NOT completed -> Registration
-                        val route = if (state.role.equals("BRAND", ignoreCase = true)) "brand_registration" else "influencer_registration"
-                        navController.navigate(route) {
-                            popUpTo("login") { inclusive = true }
+
+                        if (isProfileCompleted) {
+                            val route = if (isBrand) "brand_home" else "influencer_home"
+                            navController.navigate(route) {
+                                popUpTo("login") { inclusive = true }
+                            }
+                        } else {
+                            val route = if (isBrand) "brand_registration" else "influencer_registration"
+                            navController.navigate(route) {
+                                // Keep login in backstack? Usually no if we are moving forward to onboarding flow
+                                // But here we treat registration as next step
+                            }
                         }
                     }
                 }
-            }
+
             is AuthState.Error -> {
                 Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
             }
