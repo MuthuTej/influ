@@ -26,6 +26,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -39,10 +41,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
-fun CampaignDetailsPage(onBack: () -> Unit = {}, onSearchInfluencer: () -> Unit = {}) {
+fun CampaignDetailsPage(
+    onBack: () -> Unit = {},
+    onSearchInfluencer: () -> Unit = {},
+    campaignViewModel: CampaignViewModel = CampaignViewModel()
+) {
+    val createdCampaign by campaignViewModel.createdCampaign.observeAsState()
+    
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
@@ -74,14 +86,27 @@ fun CampaignDetailsPage(onBack: () -> Unit = {}, onSearchInfluencer: () -> Unit 
                     .padding(top = 48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.brand_profile),
-                    contentDescription = "Brand Logo",
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                )
+                if (createdCampaign?.brand?.logoUrl != null) {
+                    AsyncImage(
+                        model = createdCampaign?.brand?.logoUrl,
+                        contentDescription = "Brand Logo",
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color.White),
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(id = R.drawable.brand_profile)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.brand_profile),
+                        contentDescription = "Brand Logo",
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    )
+                }
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "You're all set",
@@ -96,7 +121,6 @@ fun CampaignDetailsPage(onBack: () -> Unit = {}, onSearchInfluencer: () -> Unit 
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                // Stepper can be added here
             }
         }
 
@@ -127,17 +151,31 @@ fun CampaignDetailsPage(onBack: () -> Unit = {}, onSearchInfluencer: () -> Unit 
                     .background(Color(0xFFF5F5F5))
                     .padding(16.dp)
             ) {
-                CampaignDetailRow("Brand Name", "Myntra")
+                CampaignDetailRow("Brand Name", createdCampaign?.brand?.name ?: "N/A")
                 Divider(color = Color.LightGray)
-                CampaignDetailRow("Category", "Ecommerce")
+                CampaignDetailRow("Category", createdCampaign?.brand?.brandCategory?.category ?: "N/A")
                 Divider(color = Color.LightGray)
-                CampaignDetailRow("Budget Range", "50K - 2L")
+                
+                val budgetRange = if (createdCampaign?.budgetMin != null && createdCampaign?.budgetMax != null) {
+                    "₹${formatBudgetValue(createdCampaign?.budgetMin?.toFloat() ?: 0f)} - ${formatBudgetValue(createdCampaign?.budgetMax?.toFloat() ?: 0f)}"
+                } else "N/A"
+                CampaignDetailRow("Budget Range", budgetRange)
                 Divider(color = Color.LightGray)
-                CampaignDetailRow("Duration", "Jan 14 - Feb 14")
+
+                val duration = if (createdCampaign?.startDate != null && createdCampaign?.endDate != null) {
+                    "${formatDate(createdCampaign?.startDate!!)} - ${formatDate(createdCampaign?.endDate!!)}"
+                } else "N/A"
+                CampaignDetailRow("Duration", duration)
                 Divider(color = Color.LightGray)
-                CampaignDetailRow("Age group", "18-60")
+
+                val ageRange = if (createdCampaign?.brand?.targetAudience?.ageMin != null && createdCampaign?.brand?.targetAudience?.ageMax != null) {
+                    "${createdCampaign?.brand?.targetAudience?.ageMin} - ${createdCampaign?.brand?.targetAudience?.ageMax}"
+                } else "N/A"
+                CampaignDetailRow("Age group", ageRange)
                 Divider(color = Color.LightGray)
-                CampaignDetailRow("Platform", "Insta, YT")
+
+                val platforms = createdCampaign?.brand?.preferredPlatforms?.joinToString(", ") { it.platform } ?: "N/A"
+                CampaignDetailRow("Platform", platforms)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -161,6 +199,30 @@ fun CampaignDetailsPage(onBack: () -> Unit = {}, onSearchInfluencer: () -> Unit 
                 }
             }
         }
+    }
+}
+
+private fun formatBudgetValue(value: Float): String {
+    return if (value >= 100) {
+        val lakhs = value / 100f
+        if (lakhs.rem(1) == 0f) {
+            "${lakhs.toInt()}L"
+        } else {
+            String.format("%.1f", lakhs) + "L"
+        }
+    } else {
+        "${value.toInt()}K"
+    }
+}
+
+private fun formatDate(dateString: String): String {
+    return try {
+        val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val outputFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
+        val date = inputFormat.parse(dateString)
+        outputFormat.format(date!!)
+    } catch (e: Exception) {
+        dateString
     }
 }
 
