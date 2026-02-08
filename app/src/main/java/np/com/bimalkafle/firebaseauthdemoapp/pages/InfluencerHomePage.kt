@@ -29,6 +29,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
@@ -166,6 +167,17 @@ fun InfluencerHomePageContent(
                 Spacer(modifier = Modifier
                     .height(16.dp)
                     .background(Color.White))
+            }
+            item {
+                Spacer(modifier = Modifier.height(40.dp))
+                Button(
+                    onClick = {
+                        FirebaseAuth.getInstance().signOut()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Sign Out")
+                }
             }
         }
     }

@@ -10,6 +10,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.pages.*
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -18,7 +19,8 @@ fun MyAppNavigation(
     authViewModel: AuthViewModel,
     splashViewModel: SplashViewModel,
     brandViewModel: BrandViewModel,
-    influencerViewModel: InfluencerViewModel
+    influencerViewModel: InfluencerViewModel,
+    campaignViewModel: CampaignViewModel
 ) {
     val navController = rememberNavController()
 
@@ -56,13 +58,18 @@ fun MyAppNavigation(
         composable("create_campaign") {
             CreateCampaignScreen(
                 onBack = { navController.popBackStack() },
-                onNext = { navController.navigate("create_campaign_2") }
+                onNext = { navController.navigate("create_campaign_2") },
+                campaignViewModel = campaignViewModel
             )
         }
         composable("create_campaign_2") {
             CreateCampaignScreen2(
                 onBack = { navController.popBackStack() },
-                onNext = { navController.navigate("campaign_details") }
+                onNext = { 
+                    navController.navigate("campaign_details")
+                },
+                campaignViewModel = campaignViewModel,
+                authViewModel = authViewModel
             )
         }
         composable("campaign_details") {

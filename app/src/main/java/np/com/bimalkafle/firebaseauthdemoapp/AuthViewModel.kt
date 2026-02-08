@@ -113,6 +113,8 @@ class AuthViewModel : ViewModel() {
         _authState.value = AuthState.Unauthenticated
     }
 
+    companion object
+
 
 }
 

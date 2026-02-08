@@ -77,7 +77,7 @@ fun BrandHomePage(
         bottomBar = { BottomNavigationBar() },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { },
+                onClick = { navController.navigate("create_campaign")},
                 containerColor = Color(0xFFFF8383)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)

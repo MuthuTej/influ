@@ -42,6 +42,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -49,14 +50,14 @@ import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
-    var campaignName by remember { mutableStateOf("") }
-    var campaignBrief by remember { mutableStateOf("") }
+fun CreateCampaignScreen(
+    onBack: () -> Unit = {}, 
+    onNext: () -> Unit = {},
+    campaignViewModel: CampaignViewModel = CampaignViewModel()
+) {
     val platforms = listOf("Youtube", "Instagram", "Facebook", "Twitter")
-    var selectedPlatforms by remember { mutableStateOf(setOf<String>()) }
 
     var showDatePicker by remember { mutableStateOf(false) }
-    var selectedDate by remember { mutableStateOf<Date?>(null) }
     var dateField by remember { mutableStateOf<String?>(null) }
 
 
@@ -131,8 +132,8 @@ fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
                 .verticalScroll(rememberScrollState())
         ) {
             OutlinedTextField(
-                value = campaignName,
-                onValueChange = { campaignName = it },
+                value = campaignViewModel.title,
+                onValueChange = { campaignViewModel.title = it },
                 label = { Text("Name of the Campaign") },
                 modifier = Modifier
                     .fillMaxWidth(),
@@ -145,12 +146,26 @@ fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = campaignBrief,
-                onValueChange = { campaignBrief = it },
+                value = campaignViewModel.description,
+                onValueChange = { campaignViewModel.description = it },
                 label = { Text("Campaign Brief") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFFFF8383)
+                )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = campaignViewModel.objective,
+                onValueChange = { campaignViewModel.objective = it },
+                label = { Text("Campaign Objective") },
+                modifier = Modifier
+                    .fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFFFF8383)
@@ -166,12 +181,12 @@ fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 platforms.forEach { platform ->
-                    val isSelected = selectedPlatforms.contains(platform)
+                    val isSelected = campaignViewModel.selectedPlatforms.contains(platform)
                     PlatformChip(platform, isSelected) {
-                        selectedPlatforms = if (isSelected) {
-                            selectedPlatforms - platform
+                        campaignViewModel.selectedPlatforms = if (isSelected) {
+                            campaignViewModel.selectedPlatforms - platform
                         } else {
-                            selectedPlatforms + platform
+                            campaignViewModel.selectedPlatforms + platform
                         }
                     }
                 }
@@ -181,8 +196,8 @@ fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
             Text("Optional Campaign Timeline", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                DateSelector(label = "Start Date", date = selectedDate, modifier = Modifier.weight(1f), onClick = { dateField = "start"; showDatePicker = true })
-                DateSelector(label = "End Date", date = selectedDate, modifier = Modifier.weight(1f), onClick = { dateField = "end"; showDatePicker = true })
+                DateSelector(label = "Start Date", date = campaignViewModel.startDate, modifier = Modifier.weight(1f), onClick = { dateField = "start"; showDatePicker = true })
+                DateSelector(label = "End Date", date = campaignViewModel.endDate, modifier = Modifier.weight(1f), onClick = { dateField = "end"; showDatePicker = true })
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -222,7 +237,12 @@ fun CreateCampaignScreen(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
                     TextButton(onClick = {
                         showDatePicker = false
                         datePickerState.selectedDateMillis?.let {
-                            selectedDate = Date(it)
+                            val date = Date(it)
+                            if (dateField == "start") {
+                                campaignViewModel.startDate = date
+                            } else {
+                                campaignViewModel.endDate = date
+                            }
                         }
                     }) {
                         Text("OK")

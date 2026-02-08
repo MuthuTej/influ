@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,6 +52,7 @@ import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import org.json.JSONArray
 import org.json.JSONObject
+import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -64,6 +66,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val auth = FirebaseAuth.getInstance()
+    val prefsManager = remember { PrefsManager(context) }
 
     val deliverables = listOf("Reels/Shorts", "Story", "Post", "Video")
     val selectedDeliverables = remember { mutableStateListOf<String>() }
@@ -100,7 +103,15 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                     .alpha(0.2f),
                 contentScale = ContentScale.Crop
             )
-            IconButton(onClick = { navController.popBackStack() }, modifier = Modifier.padding(16.dp)) {
+            IconButton(
+                onClick = {
+                    FirebaseAuth.getInstance().signOut()
+                    navController.popBackStack()
+                },
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(16.dp)
+            ) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
             Column(
@@ -410,6 +421,9 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                             val result = BackendRepository.setupInfluencerProfile(input, token)
                                             isLoading = false
                                             result.onSuccess {
+                                                user.uid.let { uid ->
+                                                    prefsManager.saveProfileCompleted(uid, true)
+                                                }
                                                 Toast.makeText(context, "Profile setup successful!", Toast.LENGTH_SHORT).show()
                                                 navController.navigate("influencer_detail")
                                             }.onFailure {

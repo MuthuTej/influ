@@ -48,19 +48,36 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun CreateCampaignScreen2(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
-    var budgetRange by remember { mutableStateOf(50f..200f) }
-    var ageRange by remember { mutableStateOf(18f..60f) }
+fun CreateCampaignScreen2(
+    onBack: () -> Unit = {}, 
+    onNext: () -> Unit = {},
+    campaignViewModel: CampaignViewModel = CampaignViewModel(),
+    authViewModel: AuthViewModel = AuthViewModel()
+) {
     val locations = listOf("India", "USA", "Sri Lanka", "Maldives", "UK")
-    var selectedLocations by remember { mutableStateOf(setOf<String>()) }
-    var selectedGender by remember { mutableStateOf("Any") }
+    
+    val loading by campaignViewModel.loading.observeAsState(false)
+    val error by campaignViewModel.error.observeAsState()
+    val success by campaignViewModel.createCampaignSuccess.observeAsState(false)
+
+    LaunchedEffect(success) {
+        if (success) {
+            onNext()
+            // clear state if needed, or keep it for review
+        }
+    }
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -134,15 +151,18 @@ fun CreateCampaignScreen2(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
             Text("Budget Range", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "₹${formatBudgetValue(budgetRange.start)} - ${formatBudgetValue(budgetRange.endInclusive)}",
+                "₹${formatBudgetValue(campaignViewModel.budgetMin.toFloat())} - ${formatBudgetValue(campaignViewModel.budgetMax.toFloat())}",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
             RangeSlider(
-                value = budgetRange,
-                onValueChange = { budgetRange = it },
+                value = campaignViewModel.budgetMin.toFloat()..campaignViewModel.budgetMax.toFloat(),
+                onValueChange = { 
+                    campaignViewModel.budgetMin = it.start.toInt()
+                    campaignViewModel.budgetMax = it.endInclusive.toInt()
+                },
                 valueRange = 1f..500f,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
@@ -162,12 +182,12 @@ fun CreateCampaignScreen2(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 locations.forEach { location ->
-                    val isSelected = selectedLocations.contains(location)
+                    val isSelected = campaignViewModel.selectedLocations.contains(location)
                     LocationChip(location, isSelected) {
-                        selectedLocations = if (isSelected) {
-                            selectedLocations - location
+                        campaignViewModel.selectedLocations = if (isSelected) {
+                            campaignViewModel.selectedLocations - location
                         } else {
-                            selectedLocations + location
+                            campaignViewModel.selectedLocations + location
                         }
                     }
                 }
@@ -179,15 +199,18 @@ fun CreateCampaignScreen2(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
             Text("Age group", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "${ageRange.start.toInt()} - ${ageRange.endInclusive.toInt()}",
+                "${campaignViewModel.ageMin} - ${campaignViewModel.ageMax}",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
             RangeSlider(
-                value = ageRange,
-                onValueChange = { ageRange = it },
+                value = campaignViewModel.ageMin.toFloat()..campaignViewModel.ageMax.toFloat(),
+                onValueChange = { 
+                    campaignViewModel.ageMin = it.start.toInt()
+                    campaignViewModel.ageMax = it.endInclusive.toInt()
+                },
                 valueRange = 1f..100f,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
@@ -210,17 +233,33 @@ fun CreateCampaignScreen2(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                GenderButton("Male", selectedGender == "Male", { selectedGender = "Male" }, Modifier.weight(1f))
-                GenderButton("Female", selectedGender == "Female", { selectedGender = "Female" }, Modifier.weight(1f))
-                GenderButton("Any", selectedGender == "Any", { selectedGender = "Any" }, Modifier.weight(1f))
+                GenderButton("Male", campaignViewModel.selectedGender == "Male", { campaignViewModel.selectedGender = "Male" }, Modifier.weight(1f))
+                GenderButton("Female", campaignViewModel.selectedGender == "Female", { campaignViewModel.selectedGender = "Female" }, Modifier.weight(1f))
+                GenderButton("Any", campaignViewModel.selectedGender == "Any", { campaignViewModel.selectedGender = "Any" }, Modifier.weight(1f))
             }
 
 
             Spacer(modifier = Modifier.height(32.dp))
 
             // Next Button
+            if (error != null) {
+                Text(
+                    text = error!!,
+                    color = Color.Red,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            // Next Button (Submit)
             Button(
-                onClick = onNext,
+                onClick = {
+                    FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { result ->
+                        result.token?.let { token ->
+                            campaignViewModel.createCampaign(token)
+                        }
+                    }
+                },
+                enabled = !loading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -231,10 +270,14 @@ fun CreateCampaignScreen2(onBack: () -> Unit = {}, onNext: () -> Unit = {}) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFFF8383)),
+                        .background(if (loading) Color.Gray else Color(0xFFFF8383)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
+                    if (loading) {
+                        androidx.compose.material3.CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("SUBMIT", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
