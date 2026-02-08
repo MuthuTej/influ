@@ -47,6 +47,7 @@ import androidx.navigation.NavController
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
+import androidx.compose.foundation.layout.imePadding
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
@@ -87,7 +88,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     val headerHeight = screenHeight * 0.4f
     val formPaddingTop = headerHeight - 80.dp
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().imePadding()) {
         // Header
         Box(
             modifier = Modifier

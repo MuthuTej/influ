@@ -6,7 +6,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,11 +27,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import np.com.bimalkafle.firebaseauthdemoapp.R
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
+import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.network.BrandRepository
 import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
+
 @SuppressLint("UnrememberedMutableState")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -63,17 +63,20 @@ fun BrandRegistrationScreen(
     val prefsManager = PrefsManager(context)
     var isLoading by remember { mutableStateOf(false) }
 
-    val isFormValid by androidx.compose.runtime.derivedStateOf {
-        brandName.isNotBlank() &&
-                description.isNotBlank() &&
-                selectedPlatforms.isNotEmpty() &&
-                ageMin.toIntOrNull() != null &&
-                ageMax.toIntOrNull() != null &&
-                ageMin.toIntOrNull()!! <= ageMax.toIntOrNull()!!
+    val isFormValid by remember {
+        derivedStateOf {
+            brandName.isNotBlank() &&
+                    description.isNotBlank() &&
+                    selectedPlatforms.isNotEmpty() &&
+                    ageMin.toIntOrNull() != null &&
+                    ageMax.toIntOrNull() != null &&
+                    ageMin.toIntOrNull()!! <= ageMax.toIntOrNull()!!
+        }
     }
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
     ) {
 
         // Header
@@ -86,8 +89,7 @@ fun BrandRegistrationScreen(
             Image(
                 painter = painterResource(id = R.drawable.vector),
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize()
-                    .alpha(0.2f),
+                modifier = Modifier.fillMaxSize().alpha(0.2f),
                 contentScale = ContentScale.Crop
 
             )
