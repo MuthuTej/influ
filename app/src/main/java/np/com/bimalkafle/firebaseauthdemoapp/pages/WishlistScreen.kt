@@ -3,6 +3,9 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +20,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -31,6 +35,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.R
 fun WishlistScreen(navController: NavController) {
     val themeColor = Color(0xFFFF8383)
     var selectedBottomNavItem by remember { mutableStateOf("Home") }
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
 
     Scaffold(
         topBar = {
@@ -113,7 +118,7 @@ fun WishlistScreen(navController: NavController) {
                 items.forEach { item ->
                     if (item.isEmpty()) {
                         FloatingActionButton(
-                            onClick = { /*TODO*/ },
+                            onClick = { navController.navigate("influencer_create_proposal") },
                             containerColor = themeColor,
                             shape = CircleShape,
                             modifier = Modifier.offset(y = (-16).dp)
@@ -127,8 +132,13 @@ fun WishlistScreen(navController: NavController) {
                             selected = selectedBottomNavItem == item,
                             onClick = { 
                                 selectedBottomNavItem = item 
-                                if(item == "Search")
+                                if (item == "Home") {
+                                    navController.navigate("influencer_home")
+                                } else if (item == "Search") {
                                     navController.navigate("discover")
+                                } else if (item == "Profile") {
+                                    navController.navigate("influencerProfile")
+                                }
                             },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = themeColor,
@@ -184,21 +194,19 @@ fun WishlistScreen(navController: NavController) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            items(discoverBrands.chunked(2)) {
-                Row(
+            item {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = screenWidth / 2 - 24.dp),
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .height(600.dp) // Adjust height as needed
                         .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    it.forEach { brand ->
-                        BrandDiscoverCard(brand = brand, modifier = Modifier.weight(1f), navController = navController)
-                    }
-                    if (it.size < 2) {
-                        Spacer(modifier = Modifier.weight(1f))
+                    items(discoverBrands) { brand ->
+                        BrandDiscoverCard(brand = brand, navController = navController)
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

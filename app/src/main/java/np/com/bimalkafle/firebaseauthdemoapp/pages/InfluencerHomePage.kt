@@ -3,6 +3,9 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -90,6 +93,7 @@ fun InfluencerHomePage(modifier: Modifier = Modifier, navController: NavControll
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InfluencerHomePageContent(
     modifier: Modifier = Modifier,
@@ -101,6 +105,7 @@ fun InfluencerHomePageContent(
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
+    val screenWidth = configuration.screenWidthDp.dp
 
     val headerHeight = screenHeight * 0.3f
     Scaffold(
@@ -152,24 +157,20 @@ fun InfluencerHomePageContent(
                 }
             }
 
-            items(sampleBrands.chunked(2)) { brandRow ->
-                Row(
+            item {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = screenWidth / 2 - 24.dp),
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .height(screenHeight) // Adjust height dynamically
                         .background(Color.White)
                         .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    brandRow.forEach { brand ->
-                        BrandCard(brand = brand, modifier = Modifier.weight(1f).padding(vertical = 4.dp), navController = navController)
-                    }
-                    if (brandRow.size < 2) {
-                        Spacer(modifier = Modifier.weight(1f))
+                    items(sampleBrands) { brand ->
+                        BrandCard(brand = brand, navController = navController)
                     }
                 }
-                Spacer(modifier = Modifier
-                    .height(16.dp)
-                    .background(Color.White))
             }
         }
     }
@@ -330,7 +331,7 @@ fun CampaignCard(campaign: Campaign) {
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.width(280.dp)
+        modifier = Modifier.widthIn(max = 280.dp) // Maintain a max width
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(

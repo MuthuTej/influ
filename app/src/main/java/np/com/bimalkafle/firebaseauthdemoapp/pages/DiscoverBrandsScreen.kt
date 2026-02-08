@@ -4,8 +4,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -58,6 +60,7 @@ fun DiscoverBrandsScreen(navController: NavController) {
     val budgets = listOf("$1000", "$5000", "$10000+")
     val themeColor = Color(0xFFFF8383)
     var selectedBottomNavItem by remember { mutableStateOf("Search") }
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
 
     Scaffold(
         topBar = {
@@ -166,12 +169,12 @@ fun DiscoverBrandsScreen(navController: NavController) {
                 items.forEach { item ->
                     if (item.isEmpty()) {
                         FloatingActionButton(
-                            onClick = { /*TODO*/ },
+                            onClick = { navController.navigate("influencer_create_proposal") },
                             containerColor = themeColor,
                             shape = CircleShape,
                             modifier = Modifier.offset(y = (-16).dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
+                            Icon(Icons.Default.Add, contentDescription = "Create Proposal", tint = Color.White)
                         }
                     } else {
                         NavigationBarItem(
@@ -180,10 +183,13 @@ fun DiscoverBrandsScreen(navController: NavController) {
                             selected = selectedBottomNavItem == item,
                             onClick = { 
                                 selectedBottomNavItem = item 
-                                if(item == "Home")
+                                if (item == "Home") {
                                     navController.navigate("influencer_home")
-                                else if(item == "Search")
+                                } else if (item == "Search") {
                                     navController.navigate("discover")
+                                } else if (item == "Profile") {
+                                    navController.navigate("influencerProfile")
+                                }
                             },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = themeColor,
@@ -198,27 +204,18 @@ fun DiscoverBrandsScreen(navController: NavController) {
             }
         }
     ) { paddingValues ->
-        LazyColumn(
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = screenWidth / 2 - 24.dp),
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize()
                 .background(Color(0xFFF5F5F5))
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(discoverBrands.chunked(2)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    it.forEach { brand ->
-                        BrandDiscoverCard(brand = brand, modifier = Modifier.weight(1f), navController = navController)
-                    }
-                    if (it.size < 2) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
+            items(discoverBrands) { brand ->
+                BrandDiscoverCard(brand = brand, navController = navController)
             }
         }
     }
