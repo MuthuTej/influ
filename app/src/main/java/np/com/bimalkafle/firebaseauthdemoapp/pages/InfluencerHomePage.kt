@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
@@ -37,9 +38,9 @@ import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 data class Campaign(
     val id: Int,
     val brandName: String,
-    val brandLogo: Int,
+    val brandLogo:Int,
     val campaignName: String,
-    val progress: Float
+    val progress: Int
 )
 
 data class Brand(
@@ -53,9 +54,9 @@ data class Brand(
 
 // Sample Data with corrected logos
 val sampleCampaigns = listOf(
-    Campaign(1, "Coca Cola", R.drawable.brand_profile, "Christmas special colab", 0.7f),
-    Campaign(2, "Nike", R.drawable.brand_profile, "Christmas special colab", 0.5f),
-    Campaign(3, "McDonald's", R.drawable.brand_profile, "Christmas special colab", 0.9f)
+    Campaign(1, "Coca Cola", R.drawable.splash1," Christmas special colab", 2),
+    Campaign( 2, "Nike",R.drawable.splash1,  "Christmas special colab", 1),
+    Campaign(3, "McDonald's", R.drawable.splash1,"Christmas special colab", 2)
 )
 
 val sampleBrands = listOf(
@@ -66,7 +67,7 @@ val sampleBrands = listOf(
 )
 
 // Color Theme from InfluencerRegistrationScreen
-val themeColor = Color(0xFFFF8383)
+val themeColor2 = Color(0xFFFF8383)
 
 
 @Composable
@@ -104,20 +105,10 @@ fun InfluencerHomePageContent(
         bottomBar = {
             BottomNavigationBar(
                 selectedItem = selectedBottomNavItem,
-                onItemSelected = { selectedBottomNavItem = it }
+                onItemSelected = { selectedBottomNavItem = it },
+                onCreateProposal = onCreateProposal
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onCreateProposal,
-                containerColor = themeColor,
-                shape = CircleShape,
-                modifier = Modifier.size(64.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Create Proposal", tint = Color.White, modifier = Modifier.size(32.dp))
-            }
-        },
-        floatingActionButtonPosition = FabPosition.Center
+        }
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -136,8 +127,22 @@ fun InfluencerHomePageContent(
                         .offset(y = (-40).dp) // Overlap effect
                         .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                         .background(Color.White)
-                        .padding(top = 16.dp)
+                        .padding(top = 16.dp) // Padding for content inside the card
                 ) {
+                    // Find Brands Button moved inside this Column
+                    Button(
+                        onClick = { /*TODO*/ },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColor2),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp) // Horizontal padding for the button
+                            .height(50.dp)
+                    ) {
+                        Text("Find Brands", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                    Spacer(modifier = Modifier.height(16.dp)) // Spacer after the button
+
                     ActiveCampaignsSection(sampleCampaigns)
                     TopPicksSection()
                 }
@@ -152,13 +157,15 @@ fun InfluencerHomePageContent(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     brandRow.forEach { brand ->
-                        BrandCard(brand = brand, modifier = Modifier.weight(1f))
+                        BrandCard(brand = brand, modifier = Modifier.weight(1f).padding(vertical = 4.dp))
                     }
                     if (brandRow.size < 2) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp).background(Color.White))
+                Spacer(modifier = Modifier
+                    .height(16.dp)
+                    .background(Color.White))
             }
         }
     }
@@ -170,12 +177,12 @@ fun HeaderAndReachSection() {
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
-    val headerHeight = screenHeight * 0.5f
+    val headerHeight = screenHeight * 0.4f
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(headerHeight)
-            .background(color = themeColor)
+            .background(color = themeColor2)
     ) {
         Image(
             painter = painterResource(id = R.drawable.vector),
@@ -256,20 +263,6 @@ fun HeaderAndReachSection() {
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Find Brands Button
-            Button(
-                onClick = { /*TODO*/ },
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                modifier = Modifier
-                    .fillMaxWidth(0.8f)
-                    .height(50.dp)
-            ) {
-                Text("Find Brands", color = themeColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
             Spacer(modifier = Modifier.height(40.dp)) // To create space for the overlap
         }
     }
@@ -301,12 +294,12 @@ fun ActiveCampaignsSection(campaigns: List<Campaign>) {
                 modifier = Modifier
                     .size(24.dp)
                     .clip(CircleShape)
-                    .background(themeColor.copy(alpha = 0.2f)),
+                    .background(themeColor2.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = campaigns.size.toString(),
-                    color = themeColor,
+                    color = themeColor2,
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp
                 )
@@ -333,32 +326,55 @@ fun CampaignCard(campaign: Campaign) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.width(280.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Image(
-                painter = painterResource(id = campaign.brandLogo),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(campaign.brandName, fontWeight = FontWeight.Bold)
-                Text(campaign.campaignName, fontSize = 12.sp, color = Color.Gray)
-                Spacer(modifier = Modifier.height(4.dp))
-                LinearProgressIndicator(
-                    progress = { campaign.progress },
-                    color = themeColor,
-                    trackColor = themeColor.copy(alpha = 0.2f)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(id = campaign.brandLogo),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
                 )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(campaign.brandName, fontWeight = FontWeight.Bold)
+                    Text(campaign.campaignName, fontSize = 12.sp, color = Color.Gray)
+                }
+                Icon(Icons.Default.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
             }
-            Icon(Icons.Default.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+            Spacer(modifier = Modifier.height(16.dp))
+            // New segmented progress indicator
+            SegmentedProgressIndicator(currentStage = campaign.progress)
         }
     }
 }
+
+
+@Composable
+fun SegmentedProgressIndicator(currentStage: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp), // Add space between segments
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Create 4 segments
+        for (i in 1..4) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(4.dp)
+                    .background(
+                        color = if (i <= currentStage) themeColor2 else themeColor2.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(2.dp) // Optional: for rounded corners on each segment
+                    )
+            )
+        }
+    }
+}
+
+
 
 @Composable
 fun TopPicksSection() {
@@ -377,11 +393,10 @@ fun TopPicksSection() {
             TabRow(
                 selectedTabIndex = platforms.indexOf(selectedPlatform),
                 containerColor = Color.Transparent,
-                contentColor = themeColor,
                 indicator = {
                     TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(it[platforms.indexOf(selectedPlatform)]),
-                        color = themeColor
+                        color = themeColor2
                     )
                 }
             ) {
@@ -416,7 +431,7 @@ fun BrandCard(brand: Brand, modifier: Modifier = Modifier) {
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = modifier
+        modifier = modifier.padding(vertical = 4.dp)
     ) {
         Column {
             Box(contentAlignment = Alignment.TopEnd) {
@@ -432,7 +447,7 @@ fun BrandCard(brand: Brand, modifier: Modifier = Modifier) {
                     Icon(
                         if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                         contentDescription = "Favorite",
-                        tint = if (isFavorite) Color.Red else Color.White
+                        tint = if (isFavorite) Color.Red else themeColor2
                     )
                 }
             }
@@ -444,7 +459,7 @@ fun BrandCard(brand: Brand, modifier: Modifier = Modifier) {
                         Icon(
                             Icons.Filled.CheckCircle,
                             contentDescription = "Verified",
-                            tint = themeColor,
+                            tint = themeColor2,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -456,8 +471,8 @@ fun BrandCard(brand: Brand, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun BottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit) {
-    val items = listOf("Home", "Search", "History", "Profile")
+fun BottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, onCreateProposal: () -> Unit) {
+    val items = listOf("Home", "Search", "", "History", "Profile")
     val icons = mapOf(
         "Home" to Icons.Default.Home,
         "Search" to Icons.Default.Search,
@@ -475,30 +490,34 @@ fun BottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit) 
             tonalElevation = 8.dp,
             modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
         ) {
-            items.forEachIndexed { index, item ->
-                if (index == 2) {
-                    // Placeholder for the FAB
+            items.forEach { item ->
+                if (item.isEmpty()) {
+                    // Replaced placeholder with FloatingActionButton
+                    FloatingActionButton(
+                        onClick = onCreateProposal,
+                        containerColor = themeColor2,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .offset(y = (-7).dp) // Half of its height to make it float
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Create Proposal", tint = Color.White, modifier = Modifier.size(32.dp))
+                    }
+                } else {
                     NavigationBarItem(
-                        selected = false,
-                        onClick = { },
-                        icon = { },
-                        enabled = false
+                        icon = { Icon(icons[item]!!, contentDescription = item) },
+                        label = { Text(item) },
+                        selected = selectedItem == item,
+                        onClick = { onItemSelected(item) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = themeColor2,
+                            unselectedIconColor = Color.Gray,
+                            selectedTextColor = themeColor2,
+                            unselectedTextColor = Color.Gray,
+                            indicatorColor = themeColor2.copy(alpha = 0.1f)
+                        )
                     )
                 }
-
-                NavigationBarItem(
-                    icon = { Icon(icons[item]!!, contentDescription = item) },
-                    label = { Text(item) },
-                    selected = selectedItem == item,
-                    onClick = { onItemSelected(item) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = themeColor,
-                        unselectedIconColor = Color.Gray,
-                        selectedTextColor = themeColor,
-                        unselectedTextColor = Color.Gray,
-                        indicatorColor = themeColor.copy(alpha = 0.1f)
-                    )
-                )
             }
         }
     }
