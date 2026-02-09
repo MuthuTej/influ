@@ -68,6 +68,8 @@ fun BrandHomePage(
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
     val error by brandViewModel.error.observeAsState()
 
+    val brandProfile by brandViewModel.brandProfile.observeAsState()
+
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser
             ?.getIdToken(true)
@@ -76,6 +78,7 @@ fun BrandHomePage(
                 if (firebaseToken != null) {
                     brandViewModel.fetchCollaborations(firebaseToken)
                     brandViewModel.fetchInfluencers(firebaseToken)
+                    brandViewModel.fetchBrandDetails(firebaseToken)
                 }
             }
     }
@@ -113,7 +116,7 @@ fun BrandHomePage(
                     .background(Color.White)
             ) {
 
-                item { BrandHeaderAndReachSection() }
+                item { BrandHeaderAndReachSection(brandProfile) }
 
                 item {
                     Column(
@@ -154,7 +157,7 @@ fun BrandHomePage(
 }
 
 @Composable
-fun BrandHeaderAndReachSection() {
+fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoapp.model.Brand?) {
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -198,13 +201,24 @@ fun BrandHeaderAndReachSection() {
                     color = Color.White,
                     modifier = Modifier.size(54.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.brand_profile),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .padding(6.dp)
-                            .clip(CircleShape)
-                    )
+                    if (!brandProfile?.logoUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = brandProfile?.logoUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.brand_profile),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .padding(6.dp)
+                                .clip(CircleShape)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -212,7 +226,7 @@ fun BrandHeaderAndReachSection() {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
                     Text(
-                        "Myntra 👋",
+                        "${brandProfile?.name ?: "Guest"} 👋",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
