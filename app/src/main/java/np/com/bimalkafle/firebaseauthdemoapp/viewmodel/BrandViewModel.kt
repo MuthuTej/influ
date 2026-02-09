@@ -346,26 +346,45 @@ class BrandViewModel : ViewModel() {
                 query GetCollaborations {
                   getCollaborations {
                     id
+                    campaignId
+                    brandId
+                    influencerId
                     status
                     message
-                    createdAt
-                    campaign {
-                      id
-                      title
-                    }
                     pricing {
-                      currency
-                      deliverable
                       platform
+                      deliverable
                       price
+                      currency
                     }
                     initiatedBy
+                    createdAt
+                    updatedAt
+                    campaign {
+                      id
+                      brandId
+                      title
+                      description
+                      objective
+                      budgetMin
+                      budgetMax
+                      startDate
+                      endDate
+                      status
+                      createdAt
+                      updatedAt
+                    }
                     influencer {
                       name
                       bio
                       logoUrl
                       updatedAt
                     }
+                    paymentStatus
+                    razorpayOrderId
+                    advancePaid
+                    finalPaid
+                    totalAmount
                   }
                 }
             """.trimIndent()
@@ -404,6 +423,48 @@ class BrandViewModel : ViewModel() {
         }
     }
 
+    fun updateCollaborationStatus(token: String, collaborationId: String, status: String, message: String? = null, onComplete: (Boolean) -> Unit) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val mutation = """
+                mutation UpdateCollaboration(${"$"}input: UpdateCollaborationInput!) {
+                  updateCollaboration(input: ${"$"}input) {
+                    id
+                    status
+                    message
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "input" to mapOf(
+                    "collaborationId" to collaborationId,
+                    "status" to status,
+                    "message" to message
+                )
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("updateCollaboration") != null) {
+                    fetchCollaborations(token) // Refresh the list
+                    onComplete(true)
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Update failed"
+                    _error.postValue(errorMsg)
+                    onComplete(false)
+                }
+            }.onFailure {
+                _error.postValue("Network error: ${it.message}")
+                onComplete(false)
+            }
+            _loading.postValue(false)
+        }
+    }
+
     private fun parseCollaborations(jsonArray: JSONArray): List<Collaboration> {
         val list = mutableListOf<Collaboration>()
         for (i in 0 until jsonArray.length()) {
@@ -413,10 +474,20 @@ class BrandViewModel : ViewModel() {
             val campaign = if (campaignObj != null) {
                 Campaign(
                     id = campaignObj.optString("id"),
-                    title = campaignObj.optString("title")
+                    brandId = campaignObj.optString("brandId"),
+                    title = campaignObj.optString("title"),
+                    description = campaignObj.optString("description"),
+                    objective = campaignObj.optString("objective"),
+                    budgetMin = if (campaignObj.isNull("budgetMin")) null else campaignObj.optInt("budgetMin"),
+                    budgetMax = if (campaignObj.isNull("budgetMax")) null else campaignObj.optInt("budgetMax"),
+                    startDate = campaignObj.optString("startDate"),
+                    endDate = campaignObj.optString("endDate"),
+                    status = campaignObj.optString("status"),
+                    createdAt = campaignObj.optString("createdAt"),
+                    updatedAt = campaignObj.optString("updatedAt")
                 )
             } else {
-                Campaign("unknown", "Unknown Campaign")
+                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null, null)
             }
 
             val influencerObj = obj.optJSONObject("influencer")
@@ -439,10 +510,10 @@ class BrandViewModel : ViewModel() {
                     if (pObj != null) {
                         pricingList.add(
                             Pricing(
-                                currency = pObj.optString("currency"),
-                                deliverable = pObj.optString("deliverable"),
                                 platform = pObj.optString("platform"),
-                                price = pObj.optInt("price")
+                                deliverable = pObj.optString("deliverable"),
+                                price = pObj.optInt("price"),
+                                currency = pObj.optString("currency")
                             )
                         )
                     }
@@ -452,13 +523,22 @@ class BrandViewModel : ViewModel() {
             list.add(
                 Collaboration(
                     id = obj.optString("id"),
+                    campaignId = obj.optString("campaignId"),
+                    brandId = obj.optString("brandId"),
+                    influencerId = obj.optString("influencerId"),
                     status = obj.optString("status"),
                     message = obj.optString("message"),
-                    createdAt = obj.optString("createdAt"),
-                    campaign = campaign,
                     pricing = pricingList,
                     initiatedBy = obj.optString("initiatedBy"),
-                    influencer = influencer
+                    createdAt = obj.optString("createdAt"),
+                    updatedAt = obj.optString("updatedAt"),
+                    campaign = campaign,
+                    influencer = influencer,
+                    paymentStatus = obj.optString("paymentStatus"),
+                    razorpayOrderId = obj.optString("razorpayOrderId"),
+                    advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),
+                    finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
+                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optInt("totalAmount")
                 )
             )
         }

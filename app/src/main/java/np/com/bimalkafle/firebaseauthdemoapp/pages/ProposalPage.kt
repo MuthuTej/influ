@@ -5,16 +5,16 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.HighlightOff
-import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,12 +28,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.unit.Dp
+import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import com.google.firebase.auth.FirebaseAuth
+import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
 enum class ProposalStatus(val displayName: String, val color: Color, val icon: ImageVector) {
+    PENDING("Pending", Color(0xFFFFC107), Icons.Default.HourglassEmpty),
+    NEGOTIATION("Negotiation", Color(0xFFFF9800), Icons.Default.ChatBubbleOutline),
     ACCEPTED("Accepted", Color(0xFF4CAF50), Icons.Default.CheckCircle),
     REJECTED("Rejected", Color(0xFFF44336), Icons.Default.HighlightOff),
-    PENDING("Pending", Color(0xFFFFC107), Icons.Default.HourglassEmpty)
+    REVOKED("Revoked", Color(0xFF9E9E9E), Icons.Default.Undo),
+    IN_PROGRESS("In Progress", Color(0xFF2196F3), Icons.Default.PlayArrow),
+    WAITING_FOR_PAYMENT("Wait Payment", Color(0xFF9C27B0), Icons.Default.AccountBalanceWallet),
+    COMPLETED("Completed", Color(0xFF388E3C), Icons.Default.TaskAlt)
 }
 
 enum class ProposalType {
@@ -42,90 +55,183 @@ enum class ProposalType {
 }
 
 data class Proposal(
-    val id: Int,
-    val brandName: String,
-    val brandLogo: Int,
-    val campaignName: String,
+    val id: String,
+    val influencerName: String,
+    val campaignTitle: String,
     val budget: String,
     val deliverable: String,
-    val duration: String,
+    val platform: String,
     val status: ProposalStatus,
-    val type: ProposalType
+    val type: ProposalType,
+    val logoUrl: String?,
+    val date: String,
+    val totalAmount: String,
+    val paymentStatus: String
 )
 
-val sampleProposals = listOf(
-    Proposal(1, "Myntra", R.drawable.brand_profile, "Christmas special colab", "₹ 50K - 60K", "2 post | 2 stories", "Feb 14 - Mar 14", ProposalStatus.ACCEPTED, ProposalType.SENT),
-    Proposal(2, "Myntra", R.drawable.brand_profile, "Christmas special colab", "₹ 50K - 60K", "2 post | 2 stories", "Feb 14 - Mar 14", ProposalStatus.PENDING, ProposalType.SENT),
-    Proposal(3, "Myntra", R.drawable.brand_profile, "Christmas special colab", "₹ 50K - 60K", "2 post | 2 stories", "Feb 14 - Mar 14", ProposalStatus.REJECTED, ProposalType.SENT),
-    Proposal(4, "Myntra", R.drawable.brand_profile, "Christmas special colab", "₹ 50K - 60K", "2 post | 2 stories", "Feb 14 - Mar 14", ProposalStatus.ACCEPTED, ProposalType.RECEIVED),
-    Proposal(5, "Myntra", R.drawable.brand_profile, "Christmas special colab", "₹ 50K - 60K", "2 post | 2 stories", "Feb 14 - Mar 14", ProposalStatus.PENDING, ProposalType.RECEIVED),
-    Proposal(6, "Myntra", R.drawable.brand_profile, "Christmas special colab", "₹ 50K - 60K", "2 post | 2 stories", "Feb 14 - Mar 14", ProposalStatus.REJECTED, ProposalType.RECEIVED),
-)
+fun Collaboration.toProposal(currentUserId: String): Proposal {
+    val pricing = this.pricing?.firstOrNull()
+    val isBrandInitiated = this.initiatedBy == "BRAND"
+    // Assuming if brand is current user, and "BRAND" initiated, then it's SENT.
+    // If brand is current user, and "INFLUENCER" initiated, then it's RECEIVED.
+    // This logic might need adjustment based on how initiatedBy is stored (UID or Role)
+    // The example says BRAND or INFLUENCER strings.
+    
+    return Proposal(
+        id = this.id,
+        influencerName = this.influencer.name,
+        campaignTitle = this.campaign.title,
+        budget = if (pricing != null) "${pricing.currency} ${pricing.price}" else "N/A",
+        deliverable = pricing?.deliverable ?: "N/A",
+        platform = pricing?.platform ?: "N/A",
+        status = try {
+            ProposalStatus.valueOf(this.status.uppercase())
+        } catch (e: Exception) {
+            ProposalStatus.PENDING
+        },
+        type = if (this.initiatedBy == "BRAND") ProposalType.SENT else ProposalType.RECEIVED,
+        logoUrl = this.influencer.logoUrl,
+        date = this.createdAt.take(10),
+        totalAmount = if (this.totalAmount != null) "₹${this.totalAmount}" else "N/A",
+        paymentStatus = this.paymentStatus ?: "pending"
+    )
+}
 
 @Composable
-fun ProposalPage(onBack: () -> Unit) {
-    var selectedTab by remember { mutableStateOf(ProposalType.SENT) }
+fun ProposalPage(
+    modifier: Modifier = Modifier,
+    navController: NavController,
+    authViewModel: AuthViewModel,
+    brandViewModel: BrandViewModel
+) {
+    var selectedTab by remember { mutableStateOf(ProposalType.RECEIVED) } // Set RECEIVED as default for Brand
     var selectedStatus by remember { mutableStateOf<ProposalStatus?>(null) }
 
-    val proposals = sampleProposals.filter { it.type == selectedTab && (selectedStatus == null || it.status == selectedStatus) }
+    val collaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
+    val isLoading by brandViewModel.loading.observeAsState(initial = false)
+    val error by brandViewModel.error.observeAsState()
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+            val firebaseToken = result.token
+            if (firebaseToken != null) {
+                brandViewModel.fetchCollaborations(firebaseToken)
+            }
+        }
+    }
+
+    error?.let {
+        LaunchedEffect(it) {
+            snackbarHostState.showSnackbar(it)
+        }
+    }
+
+    val proposals = collaborations.map { it.toProposal(currentUserId) }
+        .filter { it.type == selectedTab && (selectedStatus == null || it.status == selectedStatus) }
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
-    
-    val headerHeight = screenHeight * 0.15f
-    val contentPaddingTop = headerHeight - 30.dp
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFFF8383))
-    ) {
-        // Header
+    val headerHeight = 120.dp
+    val contentPaddingTop = headerHeight - 20.dp
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            BrandBottomNavigationBar(
+                selectedItem = "History",
+                onItemSelected = { /* Handled in the component */ },
+                onCreateCampaign = { navController.navigate("create_campaign") },
+                navController = navController
+            )
+        }
+    ) { paddingValues ->
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(headerHeight)
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(Color(0xFFFF8383))
         ) {
-            Row(
+            // Header
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 4.dp, top = 24.dp, end = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .height(headerHeight)
+                    .padding(horizontal = 16.dp, vertical = 24.dp)
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = "History & Proposals",
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Proposals",
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
             }
-        }
 
-        // Content Card
-        Column(
-            modifier = Modifier
-                .padding(top = contentPaddingTop)
-                .fillMaxSize()
-                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                .background(Color.White)
-        ) {
-            ProposalToggle(selectedTab = selectedTab, onTabSelected = { 
-                selectedTab = it
-                selectedStatus = null // Reset status filter when tab changes
-            })
-            ProposalSummary(proposals = sampleProposals.filter { it.type == selectedTab }, selectedStatus = selectedStatus, onStatusSelected = { status ->
-                selectedStatus = if (selectedStatus == status) null else status
-            })
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            // Content Card
+            Column(
+                modifier = Modifier
+                    .padding(top = contentPaddingTop)
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                    .background(Color.White)
             ) {
-                items(proposals) { proposal ->
-                    ProposalCard(proposal = proposal)
+                ProposalToggle(selectedTab = selectedTab, onTabSelected = {
+                    selectedTab = it
+                    selectedStatus = null
+                })
+
+                if (isLoading && collaborations.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color(0xFFFF8383))
+                    }
+                } else {
+                    StatusFilterRow(
+                        selectedStatus = selectedStatus,
+                        onStatusSelected = { status ->
+                            selectedStatus = if (selectedStatus == status) null else status
+                        }
+                    )
+
+                    if (proposals.isEmpty()) {
+                        EmptyState(isLoading)
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(bottom = 16.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(proposals) { proposal ->
+                                PremiumProposalCard(
+                                    proposal = proposal,
+                                    onAction = { status ->
+                                        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                            val token = result.token
+                                            if (token != null) {
+                                                brandViewModel.updateCollaborationStatus(token, proposal.id, status) { success ->
+                                                     // Refresh handled by ViewModel
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -137,147 +243,160 @@ fun ProposalToggle(selectedTab: ProposalType, onTabSelected: (ProposalType) -> U
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFFF8383).copy(alpha = 0.1f))
+            .padding(20.dp)
+            .height(54.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFFF5F5F7))
             .padding(4.dp),
     ) {
-        Button(
-            onClick = { onTabSelected(ProposalType.SENT) },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (selectedTab == ProposalType.SENT) Color(0xFFFF8383) else Color.Transparent,
-                contentColor = if (selectedTab == ProposalType.SENT) Color.White else Color.Black
-            ),
-            modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text("Sent")
-        }
-        Button(
-            onClick = { onTabSelected(ProposalType.RECEIVED) },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (selectedTab == ProposalType.RECEIVED) Color(0xFFFF8383) else Color.Transparent,
-                contentColor = if (selectedTab == ProposalType.RECEIVED) Color.White else Color.Black
-            ),
-            modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text("Received")
+        val tabs = listOf(ProposalType.RECEIVED to "Received", ProposalType.SENT to "Sent")
+        tabs.forEach { (tab, label) ->
+            val isSelected = selectedTab == tab
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) Color.White else Color.Transparent)
+                    .clickable { onTabSelected(tab) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) Color(0xFFFF8383) else Color.Gray,
+                    fontSize = 15.sp
+                )
+            }
         }
     }
 }
 
 @Composable
-fun ProposalSummary(proposals: List<Proposal>, selectedStatus: ProposalStatus?, onStatusSelected: (ProposalStatus) -> Unit) {
-    val summary = proposals.groupingBy { it.status }.eachCount()
-    Row(
+fun StatusFilterRow(selectedStatus: ProposalStatus?, onStatusSelected: (ProposalStatus) -> Unit) {
+    Box(modifier = Modifier.padding(bottom = 8.dp)) {
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(ProposalStatus.entries.toTypedArray()) { status ->
+                val isSelected = selectedStatus == status
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onStatusSelected(status) },
+                    label = { Text(status.displayName, fontSize = 12.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = status.color.copy(alpha = 0.15f),
+                        selectedLabelColor = status.color,
+                        labelColor = Color.Gray
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        borderColor = if (isSelected) status.color else Color.LightGray,
+                        selectedBorderColor = status.color,
+                        borderWidth = 1.dp,
+                        selectedBorderWidth = 1.5.dp,
+                        enabled = true,
+                        selected = isSelected
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PremiumProposalCard(proposal: Proposal, onAction: (String) -> Unit) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceAround
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .clickable { /* Detail View? */ }
     ) {
-        FilterChip(
-            selected = selectedStatus == ProposalStatus.ACCEPTED,
-            onClick = { onStatusSelected(ProposalStatus.ACCEPTED) },
-            label = { Text("Accepted ${summary[ProposalStatus.ACCEPTED] ?: 0}") },
-            leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) },
-            border = BorderStroke(1.dp, if (selectedStatus == ProposalStatus.ACCEPTED) Color(0xFF4CAF50) else Color.Gray)
-        )
-        FilterChip(
-            selected = selectedStatus == ProposalStatus.REJECTED,
-            onClick = { onStatusSelected(ProposalStatus.REJECTED) },
-            label = { Text("Rejected ${summary[ProposalStatus.REJECTED] ?: 0}") },
-            leadingIcon = { Icon(Icons.Default.HighlightOff, contentDescription = null) },
-            border = BorderStroke(1.dp, if (selectedStatus == ProposalStatus.REJECTED) Color(0xFFF44336) else Color.Gray)
-        )
-        FilterChip(
-            selected = selectedStatus == ProposalStatus.PENDING,
-            onClick = { onStatusSelected(ProposalStatus.PENDING) },
-            label = { Text("Pending ${summary[ProposalStatus.PENDING] ?: 0}") },
-            leadingIcon = { Icon(Icons.Default.HourglassEmpty, contentDescription = null) },
-            border = BorderStroke(1.dp, if (selectedStatus == ProposalStatus.PENDING) Color(0xFFFFC107) else Color.Gray)
-        )
-    }
-}
-
-@Composable
-fun ProposalCard(proposal: Proposal) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(4.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(id = proposal.brandLogo),
-                    contentDescription = null,
+                Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(54.dp)
                         .clip(CircleShape)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(proposal.brandName, fontWeight = FontWeight.Bold)
-                    Text(proposal.campaignName, fontSize = 12.sp, color = Color.Gray)
-                }
-                StatusBadge(status = proposal.status)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Budget", fontSize = 12.sp, color = Color.Gray)
-                    Text(proposal.budget, fontWeight = FontWeight.SemiBold)
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Deliverable", fontSize = 12.sp, color = Color.Gray)
-                    Text(proposal.deliverable, fontWeight = FontWeight.SemiBold)
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Duration", fontSize = 12.sp, color = Color.Gray)
-                    Text(proposal.duration, fontWeight = FontWeight.SemiBold)
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = { /*TODO*/ }) {
-                    Text("View Campaign", color = Color.Gray)
-                }
-                if (proposal.type == ProposalType.SENT) {
-                    when (proposal.status) {
-                        ProposalStatus.PENDING -> {
-                            Button(
-                                onClick = { /*TODO*/ },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text("Withdraw")
-                            }
-                        }
-                        else -> {}
+                        .background(Color(0xFFF8F9FA))
+                ) {
+                    if (proposal.logoUrl != null) {
+                        AsyncImage(
+                            model = proposal.logoUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.brand_profile),
+                            contentDescription = null,
+                            modifier = Modifier.padding(8.dp)
+                        )
                     }
-                } else { // RECEIVED
-                    if (proposal.status == ProposalStatus.PENDING) {
-                        Button(
-                            onClick = { /*TODO*/ },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("Accept")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = { /*TODO*/ },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("Reject")
-                        }
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = proposal.influencerName,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        color = Color(0xFF1D1D1F)
+                    )
+                    Text(
+                        text = proposal.campaignTitle,
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                }
+                PremiumStatusBadge(status = proposal.status)
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Divider(color = Color(0xFFF2F2F7))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                InfoItem("Total Amount", proposal.totalAmount, Icons.Default.CurrencyRupee)
+                InfoItem("Platform", proposal.platform, Icons.Default.Public)
+                InfoItem("Date", proposal.date, Icons.Default.CalendarToday)
+            }
+
+            if (proposal.type == ProposalType.RECEIVED && proposal.status == ProposalStatus.PENDING) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { onAction("ACCEPTED") },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Accept", fontWeight = FontWeight.Bold)
                     }
+                    OutlinedButton(
+                        onClick = { onAction("REJECTED") },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF44336)),
+                        border = BorderStroke(1.dp, Color(0xFFF44336)),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Reject", fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else if (proposal.type == ProposalType.SENT && proposal.status == ProposalStatus.PENDING) {
+                 Spacer(modifier = Modifier.height(20.dp))
+                 Button(
+                    onClick = { onAction("REVOKED") },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D1D1F)),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Withdraw Proposal", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }
@@ -285,41 +404,74 @@ fun ProposalCard(proposal: Proposal) {
 }
 
 @Composable
-fun StatusBadge(status: ProposalStatus) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(status.color.copy(alpha = 0.1f))
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    ) {
-        Icon(
-            imageVector = status.icon,
-            contentDescription = status.displayName,
-            tint = status.color
-        )
-        Spacer(modifier = Modifier.width(4.dp))
+fun InfoItem(label: String, value: String, icon: ImageVector) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, size = 12.dp, tint = Color.Gray)
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(label, fontSize = 11.sp, color = Color.Gray)
+        }
         Text(
-            text = status.displayName,
-            color = status.color,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold
+            value,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF1D1D1F),
+            modifier = Modifier.padding(top = 2.dp)
         )
+    }
+}
+
+@Composable
+private fun Icon(icon: ImageVector, contentDescription: String?, size: Dp, tint: Color) {
+    Icon(
+        imageVector = icon,
+        contentDescription = contentDescription,
+        modifier = Modifier.size(size),
+        tint = tint
+    )
+}
+
+@Composable
+fun PremiumStatusBadge(status: ProposalStatus) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(status.color.copy(alpha = 0.1f))
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(status.icon, contentDescription = null, size = 14.dp, tint = status.color)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = status.displayName,
+                color = status.color,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun EmptyState(isLoading: Boolean) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        if (!isLoading) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Default.Inbox,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = Color.LightGray
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("No proposals found", color = Color.Gray, fontWeight = FontWeight.Medium)
+            }
+        }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun ProposalPagePreview() {
-    ProposalPage(onBack = {})
-}
-
-@Preview
-@Composable
-fun StatusBadgePreview() {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        StatusBadge(status = ProposalStatus.ACCEPTED)
-        StatusBadge(status = ProposalStatus.REJECTED)
-        StatusBadge(status = ProposalStatus.PENDING)
-    }
+    // Preview with dummy data
 }

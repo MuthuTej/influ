@@ -95,7 +95,8 @@ fun BrandHomePage(
             BrandBottomNavigationBar(
                 selectedItem = selectedBottomNavItem,
                 onItemSelected = { selectedBottomNavItem = it },
-                onCreateCampaign = { navController.navigate("create_campaign") }
+                onCreateCampaign = { navController.navigate("create_campaign") },
+                navController = navController
             )
         }
     ) { padding ->
@@ -889,7 +890,7 @@ fun formatCount(count: Int): String {
 }
 
 @Composable
-fun BrandBottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, onCreateCampaign: () -> Unit) {
+fun BrandBottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, onCreateCampaign: () -> Unit, navController: NavController) {
     val items = listOf("Home", "Search", "", "History", "Profile")
     val icons = mapOf(
         "Home" to Icons.Default.Home,
@@ -925,7 +926,18 @@ fun BrandBottomNavigationBar(selectedItem: String, onItemSelected: (String) -> U
                         icon = { Icon(icons[item]!!, contentDescription = item) },
                         label = { Text(item) },
                         selected = selectedItem == item,
-                        onClick = { onItemSelected(item) },
+                        onClick = { 
+                            onItemSelected(item)
+                            when(item) {
+                                "Home" -> navController.navigate("brand_home") {
+                                    popUpTo("brand_home") { inclusive = true }
+                                }
+                                "Search" -> navController.navigate("brand_search")
+                                "History" -> navController.navigate("brand_history")
+                                "Profile" -> navController.navigate("brand_profile")
+                            }
+                        },
+
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = brandThemeColor,
                             unselectedIconColor = Color.Gray,
@@ -936,50 +948,6 @@ fun BrandBottomNavigationBar(selectedItem: String, onItemSelected: (String) -> U
                     )
                 }
             }
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun BrandHomePagePreview() {
-    val sampleCollaborations = listOf(
-        Collaboration(
-            id = "1",
-            status = "ACCEPTED",
-            message = "Excited to collaborate!",
-            createdAt = "",
-            initiatedBy = "BRAND",
-            campaign = Campaign(
-                id = "c1",
-                title = "Summer Launch 2024"
-            ),
-            pricing = listOf(
-                Pricing(
-                    currency = "USD",
-                    deliverable = "Reel",
-                    platform = "INSTAGRAM",
-                    price = 600
-                )
-            ),
-            influencer = Influencer(
-                name = "testinfluencer",
-                bio = null,
-                logoUrl = null,
-                updatedAt = "2026-02-07T11:35:52.789Z"
-            )
-        )
-    )
-
-    MaterialTheme {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.White)
-        ) {
-            BrandHeaderAndReachSection()
-            ActiveCampaignSection(sampleCollaborations)
-            TopPicksSectionBrand()
         }
     }
 }
