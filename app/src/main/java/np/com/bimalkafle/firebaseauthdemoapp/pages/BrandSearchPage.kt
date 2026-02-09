@@ -34,6 +34,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.components.BrandBottomNavigationBar
 
 @Composable
 fun BrandSearchPage(
@@ -128,6 +129,19 @@ fun BrandSearchPageContent(
                 onCreateCampaign = onCreateCampaignClick,
                 navController = navController
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onCreateCampaignClick,
+                containerColor = Color(0xFFFF8383),
+                shape = CircleShape
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Create Campaign",
+                    tint = Color.White
+                )
+            }
         }
     ) { padding ->
         Column(

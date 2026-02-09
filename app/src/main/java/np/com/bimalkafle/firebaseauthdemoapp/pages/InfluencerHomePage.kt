@@ -485,11 +485,11 @@ fun BrandCard(brand: Brand, modifier: Modifier = Modifier, navController: NavCon
 
 @Composable
 fun BottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, onCreateProposal: () -> Unit, navController: NavController) {
-    val items = listOf("Home", "Search", "", "History", "Profile")
+    val items = listOf("Home", "Search", "Connect", "Profile")
     val icons = mapOf(
         "Home" to Icons.Default.Home,
         "Search" to Icons.Default.Search,
-        "History" to Icons.Default.History,
+        "Connect" to Icons.Default.Chat,
         "Profile" to Icons.Default.Person
     )
 
@@ -504,37 +504,29 @@ fun BottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, 
             modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
         ) {
             items.forEach { item ->
-                if (item.isEmpty()) {
-                    // Replaced placeholder with FloatingActionButton
-                    FloatingActionButton(
-                        onClick = onCreateProposal,
-                        containerColor = themeColor2,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .size(64.dp)
-                            .offset(y = (-7).dp) // Half of its height to make it float
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Create Proposal", tint = Color.White, modifier = Modifier.size(32.dp))
-                    }
-                } else {
-                    NavigationBarItem(
-                        icon = { Icon(icons[item]!!, contentDescription = item) },
-                        label = { Text(item) },
-                        selected = selectedItem == item,
-                        onClick = { 
-                            onItemSelected(item)
-                            if(item == "Profile") navController.navigate("influencerProfile")
-                            else if(item == "Search") navController.navigate("discover")
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = themeColor2,
-                            unselectedIconColor = Color.Gray,
-                            selectedTextColor = themeColor2,
-                            unselectedTextColor = Color.Gray,
-                            indicatorColor = themeColor2.copy(alpha = 0.1f)
-                        )
+                NavigationBarItem(
+                    icon = { Icon(icons[item]!!, contentDescription = item) },
+                    label = { Text(item) },
+                    selected = selectedItem == item,
+                    onClick = { 
+                        onItemSelected(item)
+                        when(item) {
+                            "Home" -> {
+                                // Already here or navigate
+                            }
+                            "Search" -> navController.navigate("discover")
+                            "Connect" -> navController.navigate("chatList")
+                            "Profile" -> navController.navigate("influencerProfile")
+                        }
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = themeColor2,
+                        unselectedIconColor = Color.Gray,
+                        selectedTextColor = themeColor2,
+                        unselectedTextColor = Color.Gray,
+                        indicatorColor = themeColor2.copy(alpha = 0.1f)
                     )
-                }
+                )
             }
         }
     }

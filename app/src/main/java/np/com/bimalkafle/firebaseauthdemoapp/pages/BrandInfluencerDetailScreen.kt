@@ -53,6 +53,7 @@ fun BrandInfluencerDetailScreen(
     influencerId: String,
     onBack: () -> Unit,
     onCreateProposal: (String) -> Unit,
+    onConnect: (String, String) -> Unit,
     influencerViewModel: InfluencerViewModel
 ) {
     val influencer by influencerViewModel.influencerProfile.observeAsState()
@@ -73,7 +74,8 @@ fun BrandInfluencerDetailScreen(
         isLoading = isLoading,
         error = error,
         onBack = onBack,
-        onCreateProposal = { onCreateProposal(influencerId) }
+        onCreateProposal = { onCreateProposal(influencerId) },
+        onConnect = { id, name -> onConnect(id, name) }
     )
 }
 
@@ -84,7 +86,8 @@ fun BrandInfluencerDetailContent(
     isLoading: Boolean,
     error: String?,
     onBack: () -> Unit,
-    onCreateProposal: () -> Unit
+    onCreateProposal: () -> Unit,
+    onConnect: (String, String) -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize().background(detailSoftGray)) {
         if (isLoading) {
@@ -134,7 +137,7 @@ fun BrandInfluencerDetailContent(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Spacer(modifier = Modifier.height(100.dp))
                         // Profile Header Card
-                        NewEnhancedProfileHeader(influencer, onCreateProposal)
+                        NewEnhancedProfileHeader(influencer, onCreateProposal, onConnect)
                     }
                 }
 
@@ -304,14 +307,16 @@ fun PreviewBrandInfluencerDetailScreen() {
         isLoading = false,
         error = null,
         onBack = {},
-        onCreateProposal = {}
+        onCreateProposal = {},
+        onConnect = { _, _ -> }
     )
 }
 
 @Composable
 private fun NewEnhancedProfileHeader(
     influencer: np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile,
-    onCreateProposal: () -> Unit
+    onCreateProposal: () -> Unit,
+    onConnect: (String, String) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -368,6 +373,7 @@ private fun NewEnhancedProfileHeader(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                   // ... existing stats row ... 
                     Row(verticalAlignment = Alignment.CenterVertically) {
 
                         Icon(
@@ -401,22 +407,44 @@ private fun NewEnhancedProfileHeader(
                         )
                     }
 
-                    Button(
-                        onClick = onCreateProposal,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = influencerDetailThemeColor
-                        ),
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(
-                            horizontal = 24.dp,
-                            vertical = 8.dp
-                        )
-                    ) {
-                        Text(
-                            "Create Proposal",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { 
+                                onConnect(influencer.id, influencer.name)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF6C63FF) // Chat color
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(
+                                horizontal = 16.dp,
+                                vertical = 8.dp
+                            )
+                        ) {
+                            Text(
+                                "Connect",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Button(
+                            onClick = onCreateProposal,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = influencerDetailThemeColor
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(
+                                horizontal = 16.dp, // Reduced padding to fit both
+                                vertical = 8.dp
+                            )
+                        ) {
+                            Text(
+                                "Proposal",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }

@@ -51,6 +51,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.Influencer
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.model.Pricing
+import np.com.bimalkafle.firebaseauthdemoapp.components.BrandBottomNavigationBar
 
 private val brandThemeColor = Color(0xFFFF8383)
 
@@ -101,6 +102,19 @@ fun BrandHomePage(
                 onCreateCampaign = { navController.navigate("create_campaign") },
                 navController = navController
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { navController.navigate("create_campaign") },
+                containerColor = brandThemeColor,
+                shape = CircleShape
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Create Campaign",
+                    tint = Color.White
+                )
+            }
         }
     ) { padding ->
 
@@ -904,65 +918,3 @@ fun formatCount(count: Int): String {
     }
 }
 
-@Composable
-fun BrandBottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, onCreateCampaign: () -> Unit, navController: NavController) {
-    val items = listOf("Home", "Search", "", "History", "Profile")
-    val icons = mapOf(
-        "Home" to Icons.Default.Home,
-        "Search" to Icons.Default.Search,
-        "History" to Icons.Default.History,
-        "Profile" to Icons.Default.Person
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White)
-    ) {
-        NavigationBar(
-            containerColor = Color.White,
-            tonalElevation = 8.dp,
-            modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-        ) {
-            items.forEach { item ->
-                if (item.isEmpty()) {
-                    FloatingActionButton(
-                        onClick = onCreateCampaign,
-                        containerColor = brandThemeColor,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .size(64.dp)
-                            .offset(y = (-7).dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White, modifier = Modifier.size(32.dp))
-                    }
-                } else {
-                    NavigationBarItem(
-                        icon = { Icon(icons[item]!!, contentDescription = item) },
-                        label = { Text(item) },
-                        selected = selectedItem == item,
-                        onClick = { 
-                            onItemSelected(item)
-                            when(item) {
-                                "Home" -> navController.navigate("brand_home") {
-                                    popUpTo("brand_home") { inclusive = true }
-                                }
-                                "Search" -> navController.navigate("brand_search")
-                                "History" -> navController.navigate("brand_history")
-                                "Profile" -> navController.navigate("brand_profile")
-                            }
-                        },
-
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = brandThemeColor,
-                            unselectedIconColor = Color.Gray,
-                            selectedTextColor = brandThemeColor,
-                            unselectedTextColor = Color.Gray,
-                            indicatorColor = brandThemeColor.copy(alpha = 0.1f)
-                        )
-                    )
-                }
-            }
-        }
-    }
-}
