@@ -40,6 +40,9 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.model.Category
+import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
+import np.com.bimalkafle.firebaseauthdemoapp.model.Platform
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 
 @Composable
@@ -61,6 +64,21 @@ fun InfluencerDetailScreen(
         }
     }
 
+    InfluencerDetailScreenContent(
+        onBack = onBack,
+        onApproachBrands = onApproachBrands,
+        influencerProfile = influencerProfile,
+        isLoading = isLoading
+    )
+}
+
+@Composable
+fun InfluencerDetailScreenContent(
+    onBack: () -> Unit,
+    onApproachBrands: () -> Unit,
+    influencerProfile: InfluencerProfile?,
+    isLoading: Boolean
+) {
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
@@ -163,19 +181,19 @@ fun InfluencerDetailScreen(
                 ) {
                     InfluencerDetailRow("Creator Name", influencerProfile?.name ?: "N/A")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
-                    
+
                     val categories = influencerProfile?.categories?.joinToString(" | ") { it.category }
                     InfluencerDetailRow("Category", categories ?: "N/A")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
-                    
+
                     val location = influencerProfile?.location ?: "N/A"
                     InfluencerDetailRow("Location", location)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
-                    
+
                     val availability = influencerProfile?.availability?.toString() ?: "N/A"
                     InfluencerDetailRow("Availability", availability)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
-                    
+
                     val platforms = influencerProfile?.platforms?.joinToString(", ") { it.platform }
                     InfluencerDetailRow("Platform", platforms ?: "N/A")
                 }
@@ -231,5 +249,30 @@ private fun InfluencerDetailRow(label: String, value: String) {
     }
 }
 
-
-
+@Preview(showBackground = true)
+@Composable
+fun InfluencerDetailScreenPreview() {
+    val sampleInfluencerProfile = InfluencerProfile(
+        id = "1",
+        email = "influencer@example.com",
+        name = "Jane Doe",
+        role = "influencer",
+        profileCompleted = true,
+        updatedAt = "2023-10-27T10:00:00Z",
+        bio = "Fashion and lifestyle influencer.",
+        location = "New York, USA",
+        categories = listOf(Category("Fashion", "Lifestyle")),
+        platforms = listOf(Platform("Instagram", "http://instagram.com/janedoe", 100000, 5000, 5.0f, listOf("Reels", "Stories"), true)),
+        audienceInsights = null,
+        strengths = listOf("Creative", "Engaging"),
+        pricing = null,
+        availability = true,
+        logoUrl = ""
+    )
+    InfluencerDetailScreenContent(
+        onBack = {},
+        onApproachBrands = {},
+        influencerProfile = sampleInfluencerProfile,
+        isLoading = false
+    )
+}
