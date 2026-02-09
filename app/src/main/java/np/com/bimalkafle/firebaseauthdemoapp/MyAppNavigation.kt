@@ -88,10 +88,14 @@ fun MyAppNavigation(
                 influencerViewModel = influencerViewModel
           )
         }
-        composable("influencer_create_proposal") {
+        composable("influencer_create_proposal/{influencerId}") { backStackEntry ->
+            val influencerId = backStackEntry.arguments?.getString("influencerId") ?: ""
             InfluencerCreateProposal(
+                influencerId = influencerId,
                 onBack = { navController.popBackStack() },
-                onCreateProposal = { navController.navigate("proposals") } // You can change this to navigate to the home screen
+                onCreateProposal = { navController.navigate("brand_home") }, // Navigate to home or proposals
+                brandViewModel = brandViewModel,
+                authViewModel = authViewModel
             )
         }
         composable("brand_home") {
@@ -102,6 +106,7 @@ fun MyAppNavigation(
             BrandInfluencerDetailScreen(
                 influencerId = influencerId,
                 onBack = { navController.popBackStack() },
+                onCreateProposal = { id -> navController.navigate("influencer_create_proposal/$id") },
                 influencerViewModel = influencerViewModel
             )
         }

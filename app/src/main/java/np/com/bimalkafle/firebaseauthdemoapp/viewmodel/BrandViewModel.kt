@@ -35,6 +35,9 @@ class BrandViewModel : ViewModel() {
 
     private val _brandProfile = MutableLiveData<Brand?>()
     val brandProfile: LiveData<Brand?> = _brandProfile
+    
+    private val _myCampaigns = MutableLiveData<List<Campaign>>()
+    val myCampaigns: LiveData<List<Campaign>> = _myCampaigns
 
     private val _loading = MutableLiveData<Boolean>()
     val loading: LiveData<Boolean> = _loading
@@ -336,6 +339,102 @@ class BrandViewModel : ViewModel() {
             profileUrl = obj.optString("profileUrl", null),
             logoUrl = obj.optString("logoUrl", null)
         )
+    }
+
+    fun fetchMyCampaigns(token: String) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val query = """
+                query GetMyCampaigns {
+                  getMyCampaigns {
+                    id
+                    brandId
+                    title
+                    description
+                    objective
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    val campaignsArray = data?.optJSONArray("getMyCampaigns")
+                    if (campaignsArray != null) {
+                        val list = mutableListOf<Campaign>()
+                        for (i in 0 until campaignsArray.length()) {
+                            val obj = campaignsArray.getJSONObject(i)
+                            list.add(
+                                Campaign(
+                                    id = obj.optString("id"),
+                                    brandId = obj.optString("brandId"),
+                                    title = obj.optString("title"),
+                                    description = obj.optString("description"),
+                                    objective = obj.optString("objective"),
+                                    budgetMin = null,
+                                    budgetMax = null,
+                                    startDate = null,
+                                    endDate = null,
+                                    status = null,
+                                    createdAt = null,
+                                    updatedAt = null
+                                )
+                            )
+                        }
+                        _myCampaigns.postValue(list)
+                    } else {
+                        _myCampaigns.postValue(emptyList())
+                    }
+                } catch (e: Exception) {
+                    _error.postValue("Parsing error: ${e.message}")
+                }
+            }.onFailure {
+                _error.postValue("Network error: ${it.message}")
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun inviteInfluencer(token: String, influencerId: String, campaignId: String, message: String, pricing: List<Map<String, Any>>, onComplete: (Boolean) -> Unit) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val mutation = """
+                mutation InviteInfluencer(${"$"}input: InviteInfluencerInput!) {
+                  inviteInfluencer(input: ${"$"}input) {
+                    id
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "input" to mapOf(
+                    "influencerId" to influencerId,
+                    "campaignId" to campaignId,
+                    "message" to message,
+                    "pricing" to pricing
+                )
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("inviteInfluencer") != null) {
+                    onComplete(true)
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Invitation failed"
+                    _error.postValue(errorMsg)
+                    onComplete(false)
+                }
+            }.onFailure {
+                _error.postValue("Network error: ${it.message}")
+                onComplete(false)
+            }
+            _loading.postValue(false)
+        }
     }
 
     fun fetchCollaborations(token: String) {

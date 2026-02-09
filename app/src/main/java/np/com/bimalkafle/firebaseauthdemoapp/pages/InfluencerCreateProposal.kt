@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -40,18 +41,50 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.google.firebase.auth.FirebaseAuth
+import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun InfluencerCreateProposal(onBack: () -> Unit, onCreateProposal: () -> Unit) {
-    val campaignOptions = listOf("Christmas Special Colab", "Summer Sale", "New Year's Eve Party")
-    var selectedCampaign by remember { mutableStateOf(campaignOptions[0]) }
+fun InfluencerCreateProposal(
+    influencerId: String,
+    onBack: () -> Unit,
+    onCreateProposal: () -> Unit,
+    brandViewModel: BrandViewModel,
+    authViewModel: AuthViewModel
+) {
+    val brandProfile by brandViewModel.brandProfile.observeAsState()
+    val myCampaigns by brandViewModel.myCampaigns.observeAsState(emptyList())
+    val isLoading by brandViewModel.loading.observeAsState(false)
+    val error by brandViewModel.error.observeAsState()
+
+    var selectedCampaignId by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }
+    
     val platforms = listOf("Instagram", "Facebook", "Twitter", "YouTube")
     val selectedPlatforms = remember { mutableStateListOf<String>() }
     val deliverables = listOf("Post", "Reels", "Story", "Videos")
     var deliverableQuantities by remember { mutableStateOf(deliverables.associateWith { 0 }) }
     var pricing by remember { mutableStateOf(mapOf<String, Map<String, String>>()) }
+
+    LaunchedEffect(Unit) {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+            val token = result.token
+            if (token != null) {
+                brandViewModel.fetchMyCampaigns(token)
+                brandViewModel.fetchBrandDetails(token)
+            }
+        }
+    }
+
+    LaunchedEffect(myCampaigns) {
+        if (selectedCampaignId.isEmpty() && myCampaigns.isNotEmpty()) {
+            selectedCampaignId = myCampaigns.first().id
+        }
+    }
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -84,15 +117,27 @@ fun InfluencerCreateProposal(onBack: () -> Unit, onCreateProposal: () -> Unit) {
                     .padding(top = 60.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.brand_profile),
-                    contentDescription = "Brand Profile",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                )
+                if (!brandProfile?.logoUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = brandProfile?.logoUrl,
+                        contentDescription = "Brand Profile",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.brand_profile),
+                        contentDescription = "Brand Profile",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    )
+                }
             }
         }
 
@@ -120,9 +165,11 @@ fun InfluencerCreateProposal(onBack: () -> Unit, onCreateProposal: () -> Unit) {
 
             Text("Campaign", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
             var campaignExpanded by remember { mutableStateOf(false) }
+            val selectedCampaignTitle = myCampaigns.find { it.id == selectedCampaignId }?.title ?: "Select Campaign"
+            
             ExposedDropdownMenuBox(expanded = campaignExpanded, onExpandedChange = { campaignExpanded = !campaignExpanded }) {
                 OutlinedTextField(
-                    value = selectedCampaign,
+                    value = selectedCampaignTitle,
                     onValueChange = {},
                     readOnly = true,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = campaignExpanded) },
@@ -133,11 +180,22 @@ fun InfluencerCreateProposal(onBack: () -> Unit, onCreateProposal: () -> Unit) {
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
                 )
                 ExposedDropdownMenu(expanded = campaignExpanded, onDismissRequest = { campaignExpanded = false }) {
-                    campaignOptions.forEach { option ->
-                        DropdownMenuItem(text = { Text(option) }, onClick = { selectedCampaign = option; campaignExpanded = false })
+                    myCampaigns.forEach { campaign ->
+                        DropdownMenuItem(text = { Text(campaign.title) }, onClick = { selectedCampaignId = campaign.id; campaignExpanded = false })
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Message", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+            OutlinedTextField(
+                value = message,
+                onValueChange = { message = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Write a message to the influencer...") },
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
             Text("Platform", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
@@ -272,7 +330,43 @@ fun InfluencerCreateProposal(onBack: () -> Unit, onCreateProposal: () -> Unit) {
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = onCreateProposal,
+                onClick = {
+                    val finalPricing = mutableListOf<Map<String, Any>>()
+                    pricing.forEach { (platform, deliverables) ->
+                        deliverables.forEach { (deliverable, price) ->
+                            if (price.isNotEmpty()) {
+                                finalPricing.add(
+                                    mapOf(
+                                        "platform" to platform.uppercase(),
+                                        "deliverable" to deliverable,
+                                        "price" to (price.toIntOrNull() ?: 0),
+                                        "currency" to "INR" // Default currency
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    if (selectedCampaignId.isNotEmpty() && finalPricing.isNotEmpty()) {
+                        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                            val token = result.token
+                            if (token != null) {
+                                brandViewModel.inviteInfluencer(
+                                    token = token,
+                                    influencerId = influencerId,
+                                    campaignId = selectedCampaignId,
+                                    message = message,
+                                    pricing = finalPricing,
+                                    onComplete = { success ->
+                                        if (success) {
+                                            onCreateProposal()
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -286,8 +380,21 @@ fun InfluencerCreateProposal(onBack: () -> Unit, onCreateProposal: () -> Unit) {
                         .background(Color(0xFFFF8383)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("CREATE PROPOSAL", color = Color.White, fontWeight = FontWeight.Bold)
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("CREATE PROPOSAL", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
+            }
+
+            if (error != null) {
+                Text(
+                    text = error ?: "Unknown error",
+                    color = Color.Red,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
+                )
             }
         }
     }
@@ -351,5 +458,10 @@ fun DeliverableRow(deliverable: String, quantity: Int, onQuantityChange: (Int) -
 @Preview(showBackground = true)
 @Composable
 fun InfluencerCreateProposalPreview() {
-    InfluencerCreateProposal(onBack = {}, onCreateProposal = {})
+    InfluencerCreateProposal(
+        onBack = {}, onCreateProposal = {},
+        influencerId = TODO(),
+        brandViewModel = TODO(),
+        authViewModel = TODO()
+    )
 }

@@ -201,6 +201,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                     color = Color.White,
                     modifier = Modifier.size(54.dp)
                 ) {
+                    Log.d("LOGO_DEBUG", "Logo URL: ${brandProfile?.logoUrl}")
                     if (!brandProfile?.logoUrl.isNullOrEmpty()) {
                         AsyncImage(
                             model = brandProfile?.logoUrl,

@@ -52,6 +52,7 @@ private val platformsColors = mapOf(
 fun BrandInfluencerDetailScreen(
     influencerId: String,
     onBack: () -> Unit,
+    onCreateProposal: (String) -> Unit,
     influencerViewModel: InfluencerViewModel
 ) {
     val influencer by influencerViewModel.influencerProfile.observeAsState()
@@ -71,7 +72,8 @@ fun BrandInfluencerDetailScreen(
         influencer = influencer,
         isLoading = isLoading,
         error = error,
-        onBack = onBack
+        onBack = onBack,
+        onCreateProposal = { onCreateProposal(influencerId) }
     )
 }
 
@@ -81,7 +83,8 @@ fun BrandInfluencerDetailContent(
     influencer: np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile?,
     isLoading: Boolean,
     error: String?,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onCreateProposal: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize().background(detailSoftGray)) {
         if (isLoading) {
@@ -131,7 +134,7 @@ fun BrandInfluencerDetailContent(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Spacer(modifier = Modifier.height(100.dp))
                         // Profile Header Card
-                        NewEnhancedProfileHeader(influencer)
+                        NewEnhancedProfileHeader(influencer, onCreateProposal)
                     }
                 }
 
@@ -300,13 +303,15 @@ fun PreviewBrandInfluencerDetailScreen() {
         influencer = mockInfluencer,
         isLoading = false,
         error = null,
-        onBack = {}
+        onBack = {},
+        onCreateProposal = {}
     )
 }
 
 @Composable
 private fun NewEnhancedProfileHeader(
-    influencer: np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
+    influencer: np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile,
+    onCreateProposal: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -397,9 +402,9 @@ private fun NewEnhancedProfileHeader(
                     }
 
                     Button(
-                        onClick = { },
+                        onClick = onCreateProposal,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = detailSoftGray
+                            containerColor = influencerDetailThemeColor
                         ),
                         shape = RoundedCornerShape(20.dp),
                         contentPadding = PaddingValues(
@@ -408,8 +413,8 @@ private fun NewEnhancedProfileHeader(
                         )
                     ) {
                         Text(
-                            "Collaborate",
-                            color = Color.Black,
+                            "Create Proposal",
+                            color = Color.White,
                             fontWeight = FontWeight.Bold
                         )
                     }
