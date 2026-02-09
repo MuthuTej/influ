@@ -51,16 +51,14 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
                 if (uid != null) {
                     val isBrand = state.role.equals("BRAND", ignoreCase = true)
-                    val isProfileCompleted = if (isBrand) {
+                    val isProfileCompleted =
                         if (state.isProfileCompleted) {
                             prefsManager.saveProfileCompleted(uid, true)
                             true
                         } else {
                             false
                         }
-                    } else {
-                        prefsManager.isProfileCompleted(uid)
-                    }
+
 
                     if (isProfileCompleted) {
                         val route = if (isBrand) "brand_home" else "influencer_home"
