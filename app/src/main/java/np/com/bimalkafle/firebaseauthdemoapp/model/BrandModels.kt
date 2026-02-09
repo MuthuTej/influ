@@ -10,25 +10,44 @@ data class Data(
 
 data class Collaboration(
     val id: String,
+    val campaignId: String,
+    val brandId: String,
+    val influencerId: String,
     val status: String,
     val message: String?,
-    val createdAt: String,
-    val campaign: Campaign,
     val pricing: List<Pricing>?,
     val initiatedBy: String,
-    val influencer: Influencer
+    val createdAt: String,
+    val updatedAt: String,
+    val campaign: Campaign,
+    val influencer: Influencer,
+    val paymentStatus: String?,
+    val razorpayOrderId: String?,
+    val advancePaid: Boolean?,
+    val finalPaid: Boolean?,
+    val totalAmount: Int?
 )
 
 data class Campaign(
     val id: String,
-    val title: String
+    val brandId: String?,
+    val title: String,
+    val description: String?,
+    val objective: String?,
+    val budgetMin: Int?,
+    val budgetMax: Int?,
+    val startDate: String?,
+    val endDate: String?,
+    val status: String?,
+    val createdAt: String?,
+    val updatedAt: String?
 )
 
 data class Pricing(
-    val currency: String,
-    val deliverable: String,
     val platform: String,
-    val price: Int
+    val deliverable: String,
+    val price: Int,
+    val currency: String
 )
 
 data class Influencer(

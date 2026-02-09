@@ -105,11 +105,21 @@ fun MyAppNavigation(
                 influencerViewModel = influencerViewModel
             )
         }
+        composable("brand_search") {
+            BrandSearchPage(modifier, navController, authViewModel, brandViewModel)
+        }
+        composable("brand_history") {
+            ProposalPage (modifier, navController, authViewModel, brandViewModel)
+        }
+        composable("brand_profile") {
+            BrandProfilePage(modifier, navController, authViewModel, brandViewModel)
+        }
+
         composable("influencer_home") {
             InfluencerHomePage(modifier, navController, authViewModel)
         }
         composable("proposals") {
-            ProposalPage(onBack = { navController.popBackStack() })
+            ProposalPage(modifier, navController, authViewModel, brandViewModel)
         }
         composable("wishlist") {
             WishlistScreen(navController)
