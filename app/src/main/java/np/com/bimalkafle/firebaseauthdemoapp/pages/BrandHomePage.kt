@@ -126,7 +126,6 @@ fun BrandHomePage(
             LazyColumn(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .background(Color.White)
             ) {
 

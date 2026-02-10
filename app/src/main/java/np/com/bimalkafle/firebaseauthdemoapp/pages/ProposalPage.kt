@@ -179,7 +179,6 @@ fun ProposalPage(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .background(Color(0xFFFF8383))
         ) {
             // Header
