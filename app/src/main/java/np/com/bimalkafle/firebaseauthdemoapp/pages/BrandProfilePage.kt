@@ -80,7 +80,6 @@ fun BrandProfilePage(
             Column(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .background(Color.White)
                     .verticalScroll(rememberScrollState())
             ) {
