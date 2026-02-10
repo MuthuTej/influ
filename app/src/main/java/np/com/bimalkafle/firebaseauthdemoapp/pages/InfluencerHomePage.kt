@@ -123,7 +123,6 @@ fun InfluencerHomePageContent(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .background(Color(0xFFF5F5F5))
         ) {
             item {

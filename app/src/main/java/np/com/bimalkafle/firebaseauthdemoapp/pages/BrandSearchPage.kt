@@ -133,7 +133,6 @@ fun BrandSearchPageContent(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .padding(padding)
                 .background(Color.White)
         ) {
             // ---------------- REFINED HEADER ----------------
