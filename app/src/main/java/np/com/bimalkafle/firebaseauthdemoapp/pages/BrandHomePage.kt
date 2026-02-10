@@ -51,7 +51,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.Influencer
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.model.Pricing
-import np.com.bimalkafle.firebaseauthdemoapp.components.BrandBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 
 private val brandThemeColor = Color(0xFFFF8383)
 
@@ -96,11 +96,11 @@ fun BrandHomePage(
 
     Scaffold(
         bottomBar = {
-            BrandBottomNavigationBar(
+            CmnBottomNavigationBar(
                 selectedItem = selectedBottomNavItem,
                 onItemSelected = { selectedBottomNavItem = it },
-                onCreateCampaign = { navController.navigate("create_campaign") },
-                navController = navController
+                navController = navController,
+                isBrand = true
             )
         },
         floatingActionButton = {
@@ -527,104 +527,101 @@ fun CampaignItem(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top // Align top to handle different heights
             ) {
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(primaryColor.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (!influencerLogo.isNullOrEmpty()) {
-                                AsyncImage(
-                                    model = influencerLogo,
-                                    contentDescription = influencerName,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape)
-                                )
-                            } else {
-                                Text(
-                                    text = if (influencerName.isNotEmpty()) influencerName.first().uppercase() else "?",
-                                    color = primaryColor,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column {
-                            Text(
-                                text = influencerName,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(primaryColor.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!influencerLogo.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = influencerLogo,
+                                contentDescription = influencerName,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
                             )
+                        } else {
                             Text(
-                                text = campaignTitle,
-                                fontSize = 13.sp,
-                                color = Color.Gray
+                                text = if (influencerName.isNotEmpty()) influencerName.first().uppercase() else "?",
+                                color = primaryColor,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Column {
+                        Text(
+                            text = influencerName,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            text = campaignTitle,
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
+                    }
                 }
+                
+                Spacer(modifier = Modifier.width(8.dp))
 
-                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
-
-                Text(
-                    text = "$deliverable • $platform",
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Surface(
+                    shape = RoundedCornerShape(25),
+                    color = statusColor.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = "$currency $price",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = primaryColor
-                    )
-                    Text(
-                        text = time,
-                        fontSize = 12.sp,
-                        color = Color.Gray
+                        text = status,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = statusColor
                     )
                 }
             }
 
-            Surface(
-                shape = RoundedCornerShape(25),
-                color = statusColor.copy(alpha = 0.15f),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+
+            Text(
+                text = "$deliverable • $platform",
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = status,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = statusColor
+                    text = "$currency $price",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = primaryColor
+                )
+                Text(
+                    text = time,
+                    fontSize = 12.sp,
+                    color = Color.Gray
                 )
             }
         }

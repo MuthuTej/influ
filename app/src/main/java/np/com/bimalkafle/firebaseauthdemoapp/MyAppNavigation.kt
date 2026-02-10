@@ -7,6 +7,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import np.com.bimalkafle.firebaseauthdemoapp.pages.*
+import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatListScreen
+import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatScreen
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
@@ -122,7 +124,7 @@ fun MyAppNavigation(
         }
 
         composable("chatList") {
-            np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatListScreen(
+            ChatListScreen(
                 onChatClick = { chatId, chatName ->
                     navController.navigate("chat/$chatId/$chatName")
                 },
@@ -133,7 +135,7 @@ fun MyAppNavigation(
         composable("chat/{chatId}/{chatName}") { backStackEntry ->
             val chatId = backStackEntry.arguments?.getString("chatId")
             val chatName = backStackEntry.arguments?.getString("chatName")
-            np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatScreen(
+            ChatScreen(
                 chatId = chatId,
                 chatNameParam = chatName,
                 onBack = { navController.popBackStack() },
@@ -144,7 +146,11 @@ fun MyAppNavigation(
         }
 
         composable("influencer_home") {
-            InfluencerHomePage(modifier, navController, authViewModel)
+            InfluencerHomePage(
+                modifier, navController, authViewModel,influencerViewModel)
+        }
+        composable("influencer_search") {
+            InfluencerSearchPage(modifier, navController, influencerViewModel)
         }
         composable("proposals") {
             ProposalPage(modifier, navController, authViewModel, brandViewModel)
