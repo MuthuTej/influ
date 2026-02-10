@@ -28,7 +28,7 @@ import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
-import np.com.bimalkafle.firebaseauthdemoapp.components.BrandBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 
 @Composable
 fun BrandProfilePage(
@@ -51,11 +51,11 @@ fun BrandProfilePage(
 
     Scaffold(
         bottomBar = {
-            BrandBottomNavigationBar(
+            CmnBottomNavigationBar(
                 selectedItem = "Profile",
                 onItemSelected = { /* Handled in the component */ },
-                onCreateCampaign = { navController.navigate("create_campaign") },
-                navController = navController
+                navController = navController,
+                isBrand = true
             )
         },
         floatingActionButton = {
