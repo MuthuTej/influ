@@ -49,7 +49,7 @@ fun ChatListScreen(
                 title = {
                     Text(
                         "Connect Messenger",
-                        color = Color(0xFF6C63FF),
+                        color =Color(0xFFFF8383),
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp
                     )

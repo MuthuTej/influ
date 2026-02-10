@@ -108,7 +108,7 @@ fun ChatListItem(
                     modifier = Modifier
                         .padding(top = 4.dp)
                         .size(20.dp)
-                        .background(Color(0xFF6C63FF), CircleShape), // Matching brand color
+                        .background(Color(0xFFFF8383), CircleShape), // Matching brand color
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -204,7 +204,7 @@ fun MessageBubble(
                     .align(Alignment.CenterStart)
                     .padding(start = 16.dp)
                     .size(24.dp),
-                tint = if (offsetX.value > swipeThreshold) Color(0xFF6C63FF) else Color.Gray
+                tint = if (offsetX.value > swipeThreshold) Color(0xFFFF8383) else Color.Gray
             )
         }
 
@@ -235,7 +235,7 @@ fun MessageBubble(
             Column(
                 modifier = Modifier
                     .background(
-                        if (isMe) Color(0xFF6C63FF) else Color.White,
+                        if (isMe) Color(0xFFFF8383) else Color.White,
                         RoundedCornerShape(16.dp)
                     )
                     .padding(12.dp)
@@ -257,7 +257,7 @@ fun MessageBubble(
                             text = if (repliedMessage.isMe) "You" else "Other",
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
-                            color = if (isMe) Color.White else Color(0xFF6C63FF)
+                            color = if (isMe) Color.White else Color(0xFFFF8383)
                         )
                         Text(
                             text = repliedMessage.text,
@@ -315,7 +315,7 @@ fun MessageInputBar(
                             text = "Replying to ${if (replyingTo.isMe) "You" else chatName}",
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
-                            color = Color(0xFF6C63FF)
+                            color = Color(0xFFFF8383)
                         )
                         Text(
                             text = replyingTo.text,
@@ -350,7 +350,7 @@ fun MessageInputBar(
                 colors = TextFieldDefaults.colors(
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor = Color(0xFF6C63FF)
+                    cursorColor = Color(0xFFFF8383)
                 )
             )
 
@@ -360,7 +360,7 @@ fun MessageInputBar(
                 onClick = onCreateProposal,
                 modifier = Modifier
                     .size(48.dp)
-                    .background(Color(0xFF6C63FF), CircleShape)
+                    .background(Color(0xFFFF8383), CircleShape)
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -380,7 +380,7 @@ fun MessageInputBar(
                 },
                 modifier = Modifier
                     .size(48.dp)
-                    .background(Color(0xFF6C63FF), CircleShape)
+                    .background(Color(0xFFFF8383), CircleShape)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
