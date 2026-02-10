@@ -107,6 +107,7 @@ fun MyAppNavigation(
                 influencerId = influencerId,
                 onBack = { navController.popBackStack() },
                 onCreateProposal = { id -> navController.navigate("influencer_create_proposal/$id") },
+                onConnect = { id, name -> navController.navigate("chat/$id/$name") },
                 influencerViewModel = influencerViewModel
             )
         }
@@ -118,6 +119,28 @@ fun MyAppNavigation(
         }
         composable("brand_profile") {
             BrandProfilePage(modifier, navController, authViewModel, brandViewModel)
+        }
+
+        composable("chatList") {
+            np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatListScreen(
+                onChatClick = { chatId, chatName ->
+                    navController.navigate("chat/$chatId/$chatName")
+                },
+                navController = navController
+            )
+        }
+
+        composable("chat/{chatId}/{chatName}") { backStackEntry ->
+            val chatId = backStackEntry.arguments?.getString("chatId")
+            val chatName = backStackEntry.arguments?.getString("chatName")
+            np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatScreen(
+                chatId = chatId,
+                chatNameParam = chatName,
+                onBack = { navController.popBackStack() },
+                onCreateProposal = { id -> 
+                    navController.navigate("influencer_create_proposal/$id")
+                }
+            )
         }
 
         composable("influencer_home") {

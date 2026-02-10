@@ -40,6 +40,8 @@ import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
+import np.com.bimalkafle.firebaseauthdemoapp.components.BrandBottomNavigationBar
+
 enum class ProposalStatus(val displayName: String, val color: Color, val icon: ImageVector) {
     PENDING("Pending", Color(0xFFFFC107), Icons.Default.HourglassEmpty),
     NEGOTIATION("Negotiation", Color(0xFFFF9800), Icons.Default.ChatBubbleOutline),
@@ -149,6 +151,19 @@ fun ProposalPage(
                 onCreateCampaign = { navController.navigate("create_campaign") },
                 navController = navController
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { navController.navigate("create_campaign") },
+                containerColor = Color(0xFFFF8383),
+                shape = CircleShape
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Create Campaign",
+                    tint = Color.White
+                )
+            }
         }
     ) { paddingValues ->
         Box(

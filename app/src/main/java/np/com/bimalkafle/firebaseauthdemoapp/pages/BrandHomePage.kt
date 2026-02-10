@@ -51,6 +51,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.Influencer
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.model.Pricing
+import np.com.bimalkafle.firebaseauthdemoapp.components.BrandBottomNavigationBar
 
 private val brandThemeColor = Color(0xFFFF8383)
 
@@ -101,6 +102,19 @@ fun BrandHomePage(
                 onCreateCampaign = { navController.navigate("create_campaign") },
                 navController = navController
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { navController.navigate("create_campaign") },
+                containerColor = brandThemeColor,
+                shape = CircleShape
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Create Campaign",
+                    tint = Color.White
+                )
+            }
         }
     ) { padding ->
 
@@ -176,17 +190,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 .fillMaxWidth()
                 .height(headerHeight)
                 .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
-                .background(brandThemeColor)
         ) {
-
-            Image(
-                painter = painterResource(id = R.drawable.vector),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(0.15f),
-                contentScale = ContentScale.Crop
-            )
 
             Row(
                 modifier = Modifier
@@ -224,12 +228,12 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
+                    Text("Hello!", fontSize = 14.sp, color = Color.Black.copy(alpha = 0.9f))
                     Text(
                         "${brandProfile?.name ?: "Guest"} 👋",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color.Black
                     )
                 }
 
@@ -255,7 +259,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 modifier = Modifier
                     .background(
                         brush = Brush.verticalGradient(
-                            listOf(Color(0xFF4FACFE), Color(0xFF6C63FF))
+                            listOf(Color(0xFFFFAFBD), brandThemeColor)
                         )
                     )
             ) {
@@ -302,7 +306,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             onClick = { },
             shape = RoundedCornerShape(30.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFFF6B6B)
+                containerColor = Color(0xFFFF5252)
             ),
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -314,8 +318,8 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             Text(
                 "Find Influencer",
                 fontSize = 20.sp,
-                fontWeight = FontWeight.Black,
-                color = Color.Black
+                fontWeight = FontWeight.Bold,
+                color = Color.White
             )
         }
     }
@@ -325,7 +329,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
 fun IconBubble(icon: ImageVector, tint: Color) {
     Surface(
         shape = CircleShape,
-        color = Color.White.copy(alpha = 0.25f),
+        color = Color(0xFFF5F5F5),
         modifier = Modifier.size(42.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -339,11 +343,12 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
     Card(
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.15f)
+            containerColor = Color.White
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         border = BorderStroke(
-            width = 1.5.dp,
-            color = Color.White.copy(alpha = 0.35f)
+            width = 0.dp,
+            color = Color.Transparent
         ),
         modifier = modifier
             .aspectRatio(1f)
@@ -352,14 +357,7 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.25f),
-                            Color.Transparent
-                        )
-                    )
-                )
+                .background(Color.White)
         ) {
 
             Column(
@@ -372,7 +370,7 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
 
                 Text(
                     text = label,
-                    color = Color(0xFF4A2E2E),
+                    color = Color.Gray,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -381,7 +379,7 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
 
                 Text(
                     text = value,
-                    color = Color.White,
+                    color = Color.Black,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
@@ -903,65 +901,3 @@ fun formatCount(count: Int): String {
     }
 }
 
-@Composable
-fun BrandBottomNavigationBar(selectedItem: String, onItemSelected: (String) -> Unit, onCreateCampaign: () -> Unit, navController: NavController) {
-    val items = listOf("Home", "Search", "", "History", "Profile")
-    val icons = mapOf(
-        "Home" to Icons.Default.Home,
-        "Search" to Icons.Default.Search,
-        "History" to Icons.Default.History,
-        "Profile" to Icons.Default.Person
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White)
-    ) {
-        NavigationBar(
-            containerColor = Color.White,
-            tonalElevation = 8.dp,
-            modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-        ) {
-            items.forEach { item ->
-                if (item.isEmpty()) {
-                    FloatingActionButton(
-                        onClick = onCreateCampaign,
-                        containerColor = brandThemeColor,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .size(64.dp)
-                            .offset(y = (-7).dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White, modifier = Modifier.size(32.dp))
-                    }
-                } else {
-                    NavigationBarItem(
-                        icon = { Icon(icons[item]!!, contentDescription = item) },
-                        label = { Text(item) },
-                        selected = selectedItem == item,
-                        onClick = { 
-                            onItemSelected(item)
-                            when(item) {
-                                "Home" -> navController.navigate("brand_home") {
-                                    popUpTo("brand_home") { inclusive = true }
-                                }
-                                "Search" -> navController.navigate("brand_search")
-                                "History" -> navController.navigate("brand_history")
-                                "Profile" -> navController.navigate("brand_profile")
-                            }
-                        },
-
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = brandThemeColor,
-                            unselectedIconColor = Color.Gray,
-                            selectedTextColor = brandThemeColor,
-                            unselectedTextColor = Color.Gray,
-                            indicatorColor = brandThemeColor.copy(alpha = 0.1f)
-                        )
-                    )
-                }
-            }
-        }
-    }
-}
