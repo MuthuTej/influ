@@ -21,7 +21,10 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.LocationInsight
 import np.com.bimalkafle.firebaseauthdemoapp.model.Platform
 import np.com.bimalkafle.firebaseauthdemoapp.model.Pricing
 import np.com.bimalkafle.firebaseauthdemoapp.model.PricingInfo
+import np.com.bimalkafle.firebaseauthdemoapp.model.PreferredPlatform
+import np.com.bimalkafle.firebaseauthdemoapp.model.TargetAudience
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
+import np.com.bimalkafle.firebaseauthdemoapp.network.BrandRepository
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -279,6 +282,17 @@ class BrandViewModel : ViewModel() {
                       primaryObjective
                       profileUrl
                       logoUrl
+                      preferredPlatforms {
+                        platform
+                        formats
+                        minFollowers
+                        minEngagement
+                      }
+                      targetAudience {
+                        ageMin
+                        ageMax
+                        gender
+                      }
                     }
                   }
                 }
@@ -326,6 +340,42 @@ class BrandViewModel : ViewModel() {
             )
         } else null
 
+        val preferredPlatformsArray = obj.optJSONArray("preferredPlatforms")
+        val preferredPlatforms = if (preferredPlatformsArray != null) {
+            val list = mutableListOf<PreferredPlatform>()
+            for (i in 0 until preferredPlatformsArray.length()) {
+                val pObj = preferredPlatformsArray.optJSONObject(i)
+                if (pObj != null) {
+                    val formatsArray = pObj.optJSONArray("formats")
+                    val formats = if (formatsArray != null) {
+                        val fList = mutableListOf<String>()
+                        for (j in 0 until formatsArray.length()) {
+                            fList.add(formatsArray.getString(j))
+                        }
+                        fList
+                    } else null
+                    list.add(
+                        PreferredPlatform(
+                            platform = pObj.optString("platform"),
+                            formats = formats,
+                            minFollowers = if (pObj.isNull("minFollowers")) null else pObj.optInt("minFollowers"),
+                            minEngagement = if (pObj.isNull("minEngagement")) null else pObj.optDouble("minEngagement")
+                        )
+                    )
+                }
+            }
+            list
+        } else null
+
+        val targetAudienceObj = obj.optJSONObject("targetAudience")
+        val targetAudience = if (targetAudienceObj != null) {
+            TargetAudience(
+                ageMin = if (targetAudienceObj.isNull("ageMin")) null else targetAudienceObj.optInt("ageMin"),
+                ageMax = if (targetAudienceObj.isNull("ageMax")) null else targetAudienceObj.optInt("ageMax"),
+                gender = targetAudienceObj.optString("gender", null)
+            )
+        } else null
+
         return Brand(
             id = obj.optString("id", ""),
             email = obj.optString("email", ""),
@@ -337,8 +387,52 @@ class BrandViewModel : ViewModel() {
             about = obj.optString("about", null),
             primaryObjective = obj.optString("primaryObjective", null),
             profileUrl = obj.optString("profileUrl", null),
-            logoUrl = obj.optString("logoUrl", null)
+            logoUrl = obj.optString("logoUrl", null),
+            preferredPlatforms = preferredPlatforms,
+            targetAudience = targetAudience
         )
+    }
+
+    fun updateBrandProfile(
+        token: String,
+        name: String,
+        brandCategory: String,
+        subCategory: String,
+        about: String,
+        primaryObjective: String,
+        preferredPlatforms: List<String>,
+        ageMin: Int?,
+        ageMax: Int?,
+        gender: String,
+        profileUrl: String?,
+        logoUrl: String,
+        onComplete: (Boolean) -> Unit
+    ) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val success = BrandRepository.setupBrandProfile(
+                token = token,
+                name = name,
+                brandCategory = brandCategory,
+                subCategory = subCategory,
+                about = about,
+                primaryObjective = primaryObjective,
+                preferredPlatforms = preferredPlatforms,
+                ageMin = ageMin,
+                ageMax = ageMax,
+                gender = gender,
+                profileUrl = profileUrl,
+                logoUrl = logoUrl
+            )
+            if (success) {
+                fetchBrandDetails(token)
+            } else {
+                _error.postValue("Failed to update profile")
+            }
+            onComplete(success)
+            _loading.postValue(false)
+        }
     }
 
     fun fetchMyCampaigns(token: String) {
