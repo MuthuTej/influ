@@ -25,7 +25,8 @@ data class Collaboration(
     val razorpayOrderId: String?,
     val advancePaid: Boolean?,
     val finalPaid: Boolean?,
-    val totalAmount: Int?
+    val totalAmount: Int?,
+    val brand: Brand? = null
 )
 
 data class Campaign(
@@ -64,15 +65,47 @@ data class BrandCategory(
 
 data class PreferredPlatform(
     val platform: String,
+    val profileUrl: String?,
+    val followers: Int?,
+    val avgViews: Int?,
+    val engagement: Float?,
     val formats: List<String>?,
+    val connected: Boolean?,
     val minFollowers: Int?,
-    val minEngagement: Double?
+    val minEngagement: Float?
 )
 
 data class TargetAudience(
     val ageMin: Int?,
     val ageMax: Int?,
-    val gender: String?
+    val gender: String?,
+    val locations: List<String>?
+)
+
+data class Reviewer(
+    val id: String,
+    val email: String,
+    val name: String,
+    val role: String,
+    val profileCompleted: Boolean?,
+    val updatedAt: String?,
+    val govtId: String?,
+    val isVerified: Boolean?,
+    val fcmToken: String?,
+    val averageRating: Double?
+)
+
+data class Review(
+    val id: String,
+    val collaborationId: String?,
+    val reviewerId: String,
+    val revieweeId: String,
+    val reviewerRole: String,
+    val rating: Double,
+    val comment: String?,
+    val createdAt: String,
+    val reviewer: Reviewer?,
+    val reviewee: Reviewer?
 )
 
 data class Brand(
@@ -87,6 +120,11 @@ data class Brand(
     val primaryObjective: String?,
     val profileUrl: String?,
     val logoUrl: String?,
+    val govtId: String? = null,
+    val isVerified: Boolean? = null,
+    val reviews: List<Review>? = null,
+    val averageRating: Double? = null,
+    val fcmToken: String? = null,
     val preferredPlatforms: List<PreferredPlatform>? = null,
     val targetAudience: TargetAudience? = null
 )

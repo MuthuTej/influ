@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,19 +23,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 
 private val brandThemeColor = Color(0xFFFF8383)
 
 @Composable
-fun BrandBottomNavigationBar(
+fun CmnBottomNavigationBar(
     selectedItem: String,
     onItemSelected: (String) -> Unit,
-    onCreateCampaign: () -> Unit,
-    navController: NavController
+    navController: NavController,
+    isBrand: Boolean = false
 ) {
-    val items = listOf("Home", "Search", "Connect", "History", "Profile")
+    val items = if (isBrand) {
+        listOf("Home", "Search", "Connect", "History", "Profile")
+    } else {
+        listOf("Home", "Search", "Connect", "History", "Profile")
+    }
+
     val icons = mapOf(
         "Home" to Icons.Default.Home,
         "Search" to Icons.Default.Search,
@@ -64,16 +69,32 @@ fun BrandBottomNavigationBar(
                     selected = selectedItem == item,
                     onClick = {
                         onItemSelected(item)
-                        when (item) {
-                            "Home" -> {
-                                navController.navigate("brand_home") {
-                                    popUpTo("brand_home") { inclusive = true }
+                        // Handle navigation based on role
+                        if (isBrand) {
+                            when (item) {
+                                "Home" -> {
+                                    navController.navigate("brand_home") {
+                                        popUpTo("brand_home") { inclusive = true }
+                                    }
                                 }
+                                "Search" -> navController.navigate("brand_search")
+                                "Connect" -> navController.navigate("chatList")
+                                "History" -> navController.navigate("brand_history")
+                                "Profile" -> navController.navigate("brand_profile")
                             }
-                            "Search" -> navController.navigate("brand_search")
-                            "Connect" -> navController.navigate("chatList")
-                            "History" -> navController.navigate("brand_history")
-                            "Profile" -> navController.navigate("brand_profile")
+                        } else {
+                            // Influencer Navigation
+                            when (item) {
+                                "Home" -> {
+                                    navController.navigate("influencer_home") {
+                                        popUpTo("influencer_home") { inclusive = true }
+                                    }
+                                }
+                                "Search" -> navController.navigate("influencer_search")
+                                "Connect" -> navController.navigate("chatList") // Shared chat list
+                                "History" -> navController.navigate("proposals") // Influencer history/proposals
+                                "Profile" -> navController.navigate("influencerProfile")
+                            }
                         }
                     },
                     colors = NavigationBarItemDefaults.colors(

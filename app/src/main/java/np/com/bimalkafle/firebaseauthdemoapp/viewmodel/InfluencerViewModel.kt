@@ -335,4 +335,528 @@ class InfluencerViewModel : ViewModel() {
             audienceInsights = audienceInsights
         )
     }
+
+    private val _collaborations = MutableLiveData<List<Collaboration>>()
+    val collaborations: LiveData<List<Collaboration>> = _collaborations
+
+    fun fetchCollaborations(token: String) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val query = """
+                query GetCollaborations {
+                  getCollaborations {
+                    id
+                    campaignId
+                    brandId
+                    influencerId
+                    status
+                    message
+                    pricing {
+                      platform
+                      deliverable
+                      price
+                      currency
+                    }
+                    brand {
+                      id
+                      email
+                      name
+                      role
+                      profileCompleted
+                      updatedAt
+                      brandCategory {
+                        category
+                        subCategory
+                      }
+                      about
+                      primaryObjective
+                      preferredPlatforms {
+                        platform
+                        profileUrl
+                        followers
+                        avgViews
+                        engagement
+                        formats
+                        connected
+                        minFollowers
+                        minEngagement
+                      }
+                      targetAudience {
+                        ageMin
+                        ageMax
+                        gender
+                        locations
+                      }
+                      profileUrl
+                      logoUrl
+                      govtId
+                      isVerified
+                      reviews {
+                        id
+                        collaborationId
+                        reviewerId
+                        revieweeId
+                        reviewerRole
+                        rating
+                        comment
+                        createdAt
+                        reviewer {
+                          id
+                          email
+                          name
+                          role
+                          profileCompleted
+                          updatedAt
+                          govtId
+                          isVerified
+                          fcmToken
+                          averageRating
+                        }
+                        reviewee {
+                          id
+                          email
+                          name
+                          role
+                          profileCompleted
+                          updatedAt
+                          govtId
+                          isVerified
+                          fcmToken
+                          averageRating
+                        }
+                      }
+                      averageRating
+                      fcmToken
+                    }
+                    initiatedBy
+                    createdAt
+                    updatedAt
+                    campaign {
+                      id
+                      brandId
+                      title
+                      description
+                      objective
+                      budgetMin
+                      budgetMax
+                      startDate
+                      endDate
+                      status
+                      createdAt
+                      updatedAt
+                    }
+                    paymentStatus
+                    razorpayOrderId
+                    advancePaid
+                    finalPaid
+                    totalAmount
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    if (data != null) {
+                        val collaborationsArray = data.optJSONArray("getCollaborations")
+                        if (collaborationsArray != null) {
+                            val list = parseCollaborations(collaborationsArray)
+                            _collaborations.postValue(list)
+                        } else {
+                            _collaborations.postValue(emptyList())
+                        }
+                    } else {
+                        val errors = jsonObject.optJSONArray("errors")
+                        if (errors != null && errors.length() > 0) {
+                            val message = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
+                            _error.postValue(message)
+                        } else {
+                            _error.postValue("No data returned")
+                        }
+                    }
+
+                } catch (e: Exception) {
+                    Log.e("InfluencerViewModel", "Parsing error", e)
+                    _error.postValue("Parsing error: ${e.message}")
+                }
+            }.onFailure {
+                Log.e("InfluencerViewModel", "Network error", it)
+                _error.postValue("Network error: ${it.message}")
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    private fun parseCollaborations(jsonArray: JSONArray): List<Collaboration> {
+        val list = mutableListOf<Collaboration>()
+        for (i in 0 until jsonArray.length()) {
+            val obj = jsonArray.optJSONObject(i) ?: continue
+
+            val campaignObj = obj.optJSONObject("campaign")
+            val campaign = if (campaignObj != null) {
+                Campaign(
+                    id = campaignObj.optString("id"),
+                    brandId = campaignObj.optString("brandId"),
+                    title = campaignObj.optString("title"),
+                    description = campaignObj.optString("description"),
+                    objective = campaignObj.optString("objective"),
+                    budgetMin = if (campaignObj.isNull("budgetMin")) null else campaignObj.optInt("budgetMin"),
+                    budgetMax = if (campaignObj.isNull("budgetMax")) null else campaignObj.optInt("budgetMax"),
+                    startDate = campaignObj.optString("startDate"),
+                    endDate = campaignObj.optString("endDate"),
+                    status = campaignObj.optString("status"),
+                    createdAt = campaignObj.optString("createdAt"),
+                    updatedAt = campaignObj.optString("updatedAt")
+                )
+            } else {
+                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null, null)
+            }
+
+            // Influencer object is not returned in this query based on user request, creating a dummy or handling nulls if needed.
+            // Actually the query in user request DOES NOT have influencer field in GetCollaborations for InfluencerHomePage.
+            // But Collaboration model needs it. We can create a partial one or empty one.
+            val influencer = Influencer("Me", null, null, null)
+            
+            val brandObj = obj.optJSONObject("brand")
+            val brand = if (brandObj != null) {
+                // Reuse logic from parseBrands but tailored for single object if needed, or duplicate slightly for simplicity in this context
+                // Parse Brand Category
+                val categoryObj = brandObj.optJSONObject("brandCategory")
+                val brandCategory = if (categoryObj != null) {
+                    BrandCategory(
+                        category = categoryObj.optString("category", ""),
+                        subCategory = categoryObj.optString("subCategory", "")
+                    )
+                } else null
+
+                Brand(
+                    id = brandObj.optString("id"),
+                    email = brandObj.optString("email"),
+                    name = brandObj.optString("name"),
+                    role = brandObj.optString("role"),
+                    profileCompleted = if(brandObj.has("profileCompleted")) brandObj.optBoolean("profileCompleted") else null,
+                    updatedAt = brandObj.optString("updatedAt"),
+                    brandCategory = brandCategory,
+                    about = brandObj.optString("about"),
+                    primaryObjective = brandObj.optString("primaryObjective"),
+                    profileUrl = brandObj.optString("profileUrl"),
+                    logoUrl = brandObj.optString("logoUrl"),
+                    govtId = brandObj.optString("govtId"),
+                    isVerified = if(brandObj.has("isVerified")) brandObj.optBoolean("isVerified") else null,
+                    reviews = null, // Simplified
+                    averageRating = if(brandObj.has("averageRating")) brandObj.optDouble("averageRating") else null,
+                    fcmToken = brandObj.optString("fcmToken"),
+                    preferredPlatforms = null, // Simplified
+                    targetAudience = null // Simplified
+                )
+            } else null
+
+            val pricingList = mutableListOf<Pricing>()
+            val pricingArray = obj.optJSONArray("pricing")
+            if (pricingArray != null) {
+                for (j in 0 until pricingArray.length()) {
+                    val pObj = pricingArray.optJSONObject(j)
+                    if (pObj != null) {
+                        pricingList.add(
+                            Pricing(
+                                platform = pObj.optString("platform"),
+                                deliverable = pObj.optString("deliverable"),
+                                price = pObj.optInt("price"),
+                                currency = pObj.optString("currency")
+                            )
+                        )
+                    }
+                }
+            }
+
+            list.add(
+                Collaboration(
+                    id = obj.optString("id"),
+                    campaignId = obj.optString("campaignId"),
+                    brandId = obj.optString("brandId"),
+                    influencerId = obj.optString("influencerId"),
+                    status = obj.optString("status"),
+                    message = obj.optString("message"),
+                    pricing = pricingList,
+                    initiatedBy = obj.optString("initiatedBy"),
+                    createdAt = obj.optString("createdAt"),
+                    updatedAt = obj.optString("updatedAt"),
+                    campaign = campaign,
+                    influencer = influencer,
+                    paymentStatus = obj.optString("paymentStatus"),
+                    razorpayOrderId = obj.optString("razorpayOrderId"),
+                    advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),
+                    finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
+                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optInt("totalAmount"),
+                    brand = brand
+                )
+            )
+        }
+        return list
+    }
+
+    private val _brands = MutableLiveData<List<Brand>>()
+    val brands: LiveData<List<Brand>> = _brands
+
+    fun fetchBrands(token: String) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val query = """
+                query GetBrands {
+                  getBrands {
+                    id
+                    email
+                    name
+                    role
+                    profileCompleted
+                    updatedAt
+                    brandCategory {
+                      category
+                      subCategory
+                    }
+                    about
+                    primaryObjective
+                    preferredPlatforms {
+                      platform
+                      profileUrl
+                      followers
+                      avgViews
+                      engagement
+                      formats
+                      connected
+                      minFollowers
+                      minEngagement
+                    }
+                    targetAudience {
+                      ageMin
+                      ageMax
+                      gender
+                      locations
+                    }
+                    profileUrl
+                    logoUrl
+                    govtId
+                    isVerified
+                    reviews {
+                      id
+                      collaborationId
+                      reviewerId
+                      revieweeId
+                      reviewerRole
+                      rating
+                      comment
+                      createdAt
+                      reviewer {
+                        id
+                        email
+                        name
+                        role
+                        profileCompleted
+                        updatedAt
+                        govtId
+                        isVerified
+                        fcmToken
+                        averageRating
+                      }
+                      reviewee {
+                        id
+                        email
+                        name
+                        role
+                        profileCompleted
+                        updatedAt
+                        govtId
+                        isVerified
+                        fcmToken
+                        averageRating
+                      }
+                    }
+                    averageRating
+                    fcmToken
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    if (data != null) {
+                        val brandsArray = data.optJSONArray("getBrands")
+                        if (brandsArray != null) {
+                            val list = parseBrands(brandsArray)
+                            _brands.postValue(list)
+                        } else {
+                            _brands.postValue(emptyList())
+                        }
+                    } else {
+                        val errors = jsonObject.optJSONArray("errors")
+                        if (errors != null && errors.length() > 0) {
+                            val message = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
+                            _error.postValue(message)
+                        } else {
+                            _error.postValue("No data returned")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("InfluencerViewModel", "Parsing error", e)
+                    _error.postValue("Parsing error: ${e.message}")
+                }
+            }.onFailure {
+                Log.e("InfluencerViewModel", "Network error", it)
+                _error.postValue("Network error: ${it.message}")
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    private fun parseBrands(jsonArray: JSONArray): List<Brand> {
+        val list = mutableListOf<Brand>()
+        for (i in 0 until jsonArray.length()) {
+            val obj = jsonArray.optJSONObject(i) ?: continue
+
+            val categoryObj = obj.optJSONObject("brandCategory")
+            val brandCategory = if (categoryObj != null) {
+                BrandCategory(
+                    category = categoryObj.optString("category", ""),
+                    subCategory = categoryObj.optString("subCategory", "")
+                )
+            } else null
+
+            // preferredPlatforms
+            val prefPlatforms = mutableListOf<PreferredPlatform>()
+            val prefArray = obj.optJSONArray("preferredPlatforms")
+            if (prefArray != null) {
+                for (j in 0 until prefArray.length()) {
+                    val pObj = prefArray.optJSONObject(j)
+                    if (pObj != null) {
+                        val formatsArray = pObj.optJSONArray("formats")
+                        val formatsList = mutableListOf<String>()
+                        if (formatsArray != null) {
+                            for (k in 0 until formatsArray.length()) {
+                                formatsList.add(formatsArray.getString(k))
+                            }
+                        }
+                        
+                        prefPlatforms.add(
+                            PreferredPlatform(
+                                platform = pObj.optString("platform"),
+                                profileUrl = pObj.optString("profileUrl"),
+                                followers = if(pObj.has("followers")) pObj.optInt("followers") else null,
+                                avgViews = if(pObj.has("avgViews")) pObj.optInt("avgViews") else null,
+                                engagement = if(pObj.has("engagement")) pObj.optDouble("engagement").toFloat() else null,
+                                formats = formatsList,
+                                connected = if(pObj.has("connected")) pObj.optBoolean("connected") else null,
+                                minFollowers = if(pObj.has("minFollowers")) pObj.optInt("minFollowers") else null,
+                                minEngagement = if(pObj.has("minEngagement")) pObj.optDouble("minEngagement").toFloat() else null
+                            )
+                        )
+                    }
+                }
+            }
+
+            // targetAudience
+            val taObj = obj.optJSONObject("targetAudience")
+            val targetAudience = if (taObj != null) {
+                val locationsArray = taObj.optJSONArray("locations")
+                val locationsList = mutableListOf<String>()
+                if (locationsArray != null) {
+                    for (k in 0 until locationsArray.length()) {
+                        locationsList.add(locationsArray.getString(k))
+                    }
+                }
+                
+                TargetAudience(
+                    ageMin = if(taObj.has("ageMin")) taObj.optInt("ageMin") else null,
+                    ageMax = if(taObj.has("ageMax")) taObj.optInt("ageMax") else null,
+                    gender = taObj.optString("gender"),
+                    locations = locationsList
+                )
+            } else null
+            
+            // reviews
+            val reviewsList = mutableListOf<Review>()
+            val reviewsArray = obj.optJSONArray("reviews")
+            if (reviewsArray != null) {
+                for (j in 0 until reviewsArray.length()) {
+                    val rObj = reviewsArray.optJSONObject(j)
+                    if (rObj != null) {
+                        val reviewerObj = rObj.optJSONObject("reviewer")
+                        val reviewer = if (reviewerObj != null) {
+                            Reviewer(
+                                id = reviewerObj.optString("id"),
+                                email = reviewerObj.optString("email"),
+                                name = reviewerObj.optString("name"),
+                                role = reviewerObj.optString("role"),
+                                profileCompleted = if(reviewerObj.has("profileCompleted")) reviewerObj.optBoolean("profileCompleted") else null,
+                                updatedAt = reviewerObj.optString("updatedAt"),
+                                govtId = reviewerObj.optString("govtId"),
+                                isVerified = if(reviewerObj.has("isVerified")) reviewerObj.optBoolean("isVerified") else null,
+                                fcmToken = reviewerObj.optString("fcmToken"),
+                                averageRating = if(reviewerObj.has("averageRating")) reviewerObj.optDouble("averageRating") else null
+                            )
+                        } else null
+                        
+                        val revieweeObj = rObj.optJSONObject("reviewee")
+                        val reviewee = if (revieweeObj != null) {
+                             Reviewer(
+                                id = revieweeObj.optString("id"),
+                                email = revieweeObj.optString("email"),
+                                name = revieweeObj.optString("name"),
+                                role = revieweeObj.optString("role"),
+                                profileCompleted = if(revieweeObj.has("profileCompleted")) revieweeObj.optBoolean("profileCompleted") else null,
+                                updatedAt = revieweeObj.optString("updatedAt"),
+                                govtId = revieweeObj.optString("govtId"),
+                                isVerified = if(revieweeObj.has("isVerified")) revieweeObj.optBoolean("isVerified") else null,
+                                fcmToken = revieweeObj.optString("fcmToken"),
+                                averageRating = if(revieweeObj.has("averageRating")) revieweeObj.optDouble("averageRating") else null
+                            )
+                        } else null
+
+                        reviewsList.add(
+                            Review(
+                                id = rObj.optString("id"),
+                                collaborationId = if(rObj.isNull("collaborationId")) null else rObj.optString("collaborationId"),
+                                reviewerId = rObj.optString("reviewerId"),
+                                revieweeId = rObj.optString("revieweeId"),
+                                reviewerRole = rObj.optString("reviewerRole"),
+                                rating = rObj.optDouble("rating"),
+                                comment = rObj.optString("comment"),
+                                createdAt = rObj.optString("createdAt"),
+                                reviewer = reviewer,
+                                reviewee = reviewee
+                            )
+                        )
+                    }
+                }
+            }
+            
+            list.add(
+                Brand(
+                    id = obj.optString("id"),
+                    email = obj.optString("email"),
+                    name = obj.optString("name"),
+                    role = obj.optString("role"),
+                    profileCompleted = if(obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
+                    updatedAt = obj.optString("updatedAt"),
+                    brandCategory = brandCategory,
+                    about = obj.optString("about"),
+                    primaryObjective = obj.optString("primaryObjective"),
+                    profileUrl = obj.optString("profileUrl"),
+                    logoUrl = obj.optString("logoUrl"),
+                    govtId = obj.optString("govtId"),
+                    isVerified = if(obj.has("isVerified")) obj.optBoolean("isVerified") else null,
+                    reviews = reviewsList,
+                    averageRating = if(obj.has("averageRating")) obj.optDouble("averageRating") else null,
+                    fcmToken = obj.optString("fcmToken"),
+                    preferredPlatforms = prefPlatforms,
+                    targetAudience = targetAudience
+                )
+            )
+        }
+        return list
+    }
 }

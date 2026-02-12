@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 
 // App theme colors
 private val themeColor_campaign = Color(0xFFFF8383)
@@ -66,10 +68,9 @@ fun CampaignAnalyticsPage(navController: NavController) {
         topBar = { AnalyticsTopBar(navController) },
         containerColor = Color(0xFFF5F5F5),
         bottomBar = {
-            BottomNavigationBar(
+            CmnBottomNavigationBar(
                 selectedItem = selectedBottomNavItem,
                 onItemSelected = { selectedBottomNavItem = it },
-                onCreateProposal = { navController.navigate("influencer_create_proposal") },
                 navController = navController
             )
         }

@@ -39,6 +39,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.BrandCategory
 import np.com.bimalkafle.firebaseauthdemoapp.model.PreferredPlatform
 import np.com.bimalkafle.firebaseauthdemoapp.model.TargetAudience
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
+import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 
 @Composable
 fun BrandProfilePage(
@@ -91,11 +92,11 @@ fun BrandProfilePage(
             }
         },
         bottomBar = {
-            BrandBottomNavigationBar(
+            CmnBottomNavigationBar(
                 selectedItem = "Profile",
                 onItemSelected = { /* Handled in the component */ },
-                onCreateCampaign = { navController.navigate("create_campaign") },
-                navController = navController
+                navController = navController,
+                isBrand = true
             )
         }
     )
@@ -158,7 +159,6 @@ fun BrandProfileContent(
             Column(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .background(Color.White)
                     .verticalScroll(rememberScrollState())
             ) {

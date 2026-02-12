@@ -40,7 +40,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
-import np.com.bimalkafle.firebaseauthdemoapp.components.BrandBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 
 enum class ProposalStatus(val displayName: String, val color: Color, val icon: ImageVector) {
     PENDING("Pending", Color(0xFFFFC107), Icons.Default.HourglassEmpty),
@@ -142,14 +142,24 @@ fun ProposalPage(
     val headerHeight = 120.dp
     val contentPaddingTop = headerHeight - 20.dp
 
+    val authState = authViewModel.authState.observeAsState()
+    var isBrand by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(authState.value) {
+        if (authState.value is np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated) {
+             val role = (authState.value as np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated).role
+             isBrand = role.equals("BRAND", ignoreCase = true)
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            BrandBottomNavigationBar(
+            CmnBottomNavigationBar(
                 selectedItem = "History",
                 onItemSelected = { /* Handled in the component */ },
-                onCreateCampaign = { navController.navigate("create_campaign") },
-                navController = navController
+                navController = navController,
+                isBrand = isBrand
             )
         },
         floatingActionButton = {
@@ -169,7 +179,6 @@ fun ProposalPage(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .background(Color(0xFFFF8383))
         ) {
             // Header

@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
+import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -135,55 +136,12 @@ fun InfluencerProfileScreen(navController: NavController) {
             }
         },
         bottomBar = {
-            val items = listOf("Home", "Search", "", "History", "Profile")
-            val icons = mapOf(
-                "Home" to Icons.Default.Home,
-                "Search" to Icons.Default.Search,
-                "History" to Icons.Default.History,
-                "Profile" to Icons.Default.Person
+            CmnBottomNavigationBar(
+                selectedItem = selectedBottomNavItem,
+                onItemSelected = { selectedBottomNavItem = it },
+                navController = navController,
+                isBrand = false
             )
-
-            NavigationBar(
-                containerColor = Color.White,
-                tonalElevation = 8.dp,
-                modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-            ) {
-                items.forEach { item ->
-                    if (item.isEmpty()) {
-                        FloatingActionButton(
-                            onClick = { /*TODO*/ },
-                            containerColor = themeColor,
-                            shape = CircleShape,
-                            modifier = Modifier.offset(y = (-16).dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
-                        }
-                    } else {
-                        NavigationBarItem(
-                            icon = { Icon(icons[item]!!, contentDescription = item) },
-                            label = { Text(item) },
-                            selected = selectedBottomNavItem == item,
-                            onClick = {
-                                selectedBottomNavItem = item
-                                if (item == "Home") {
-                                    navController.navigate("influencer_home")
-                                } else if (item == "Search") {
-                                    navController.navigate("discover")
-                                } else if (item == "Profile") {
-                                    navController.navigate("influencerProfile")
-                                }
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = themeColor,
-                                unselectedIconColor = Color.Gray,
-                                selectedTextColor = themeColor,
-                                unselectedTextColor = Color.Gray,
-                                indicatorColor = themeColor.copy(alpha = 0.1f)
-                            )
-                        )
-                    }
-                }
-            }
         }
     ) { paddingValues ->
         LazyColumn(

@@ -51,7 +51,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.Influencer
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.model.Pricing
-import np.com.bimalkafle.firebaseauthdemoapp.components.BrandBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 
 private val brandThemeColor = Color(0xFFFF8383)
 
@@ -96,11 +96,11 @@ fun BrandHomePage(
 
     Scaffold(
         bottomBar = {
-            BrandBottomNavigationBar(
+            CmnBottomNavigationBar(
                 selectedItem = selectedBottomNavItem,
                 onItemSelected = { selectedBottomNavItem = it },
-                onCreateCampaign = { navController.navigate("create_campaign") },
-                navController = navController
+                navController = navController,
+                isBrand = true
             )
         },
         floatingActionButton = {
@@ -126,7 +126,6 @@ fun BrandHomePage(
             LazyColumn(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .background(Color.White)
             ) {
 
@@ -191,17 +190,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 .fillMaxWidth()
                 .height(headerHeight)
                 .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
-                .background(brandThemeColor)
         ) {
-
-            Image(
-                painter = painterResource(id = R.drawable.vector),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(0.15f),
-                contentScale = ContentScale.Crop
-            )
 
             Row(
                 modifier = Modifier
@@ -239,12 +228,12 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
+                    Text("Hello!", fontSize = 14.sp, color = Color.Black.copy(alpha = 0.9f))
                     Text(
                         "${brandProfile?.name ?: "Guest"} 👋",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color.Black
                     )
                 }
 
@@ -270,7 +259,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 modifier = Modifier
                     .background(
                         brush = Brush.verticalGradient(
-                            listOf(Color(0xFF4FACFE), Color(0xFF6C63FF))
+                            listOf(Color(0xFFFFAFBD), brandThemeColor)
                         )
                     )
             ) {
@@ -317,7 +306,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             onClick = { },
             shape = RoundedCornerShape(30.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFFF6B6B)
+                containerColor = Color(0xFFFF5252)
             ),
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -329,8 +318,8 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             Text(
                 "Find Influencer",
                 fontSize = 20.sp,
-                fontWeight = FontWeight.Black,
-                color = Color.Black
+                fontWeight = FontWeight.Bold,
+                color = Color.White
             )
         }
     }
@@ -340,7 +329,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
 fun IconBubble(icon: ImageVector, tint: Color) {
     Surface(
         shape = CircleShape,
-        color = Color.White.copy(alpha = 0.25f),
+        color = Color(0xFFF5F5F5),
         modifier = Modifier.size(42.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -354,11 +343,12 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
     Card(
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.15f)
+            containerColor = Color.White
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         border = BorderStroke(
-            width = 1.5.dp,
-            color = Color.White.copy(alpha = 0.35f)
+            width = 0.dp,
+            color = Color.Transparent
         ),
         modifier = modifier
             .aspectRatio(1f)
@@ -367,14 +357,7 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.25f),
-                            Color.Transparent
-                        )
-                    )
-                )
+                .background(Color.White)
         ) {
 
             Column(
@@ -387,7 +370,7 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
 
                 Text(
                     text = label,
-                    color = Color(0xFF4A2E2E),
+                    color = Color.Gray,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -396,7 +379,7 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
 
                 Text(
                     text = value,
-                    color = Color.White,
+                    color = Color.Black,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
@@ -544,104 +527,101 @@ fun CampaignItem(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top // Align top to handle different heights
             ) {
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(primaryColor.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (!influencerLogo.isNullOrEmpty()) {
-                                AsyncImage(
-                                    model = influencerLogo,
-                                    contentDescription = influencerName,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape)
-                                )
-                            } else {
-                                Text(
-                                    text = if (influencerName.isNotEmpty()) influencerName.first().uppercase() else "?",
-                                    color = primaryColor,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column {
-                            Text(
-                                text = influencerName,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(primaryColor.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!influencerLogo.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = influencerLogo,
+                                contentDescription = influencerName,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
                             )
+                        } else {
                             Text(
-                                text = campaignTitle,
-                                fontSize = 13.sp,
-                                color = Color.Gray
+                                text = if (influencerName.isNotEmpty()) influencerName.first().uppercase() else "?",
+                                color = primaryColor,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Column {
+                        Text(
+                            text = influencerName,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            text = campaignTitle,
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
+                    }
                 }
+                
+                Spacer(modifier = Modifier.width(8.dp))
 
-                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
-
-                Text(
-                    text = "$deliverable • $platform",
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Surface(
+                    shape = RoundedCornerShape(25),
+                    color = statusColor.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = "$currency $price",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = primaryColor
-                    )
-                    Text(
-                        text = time,
-                        fontSize = 12.sp,
-                        color = Color.Gray
+                        text = status,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = statusColor
                     )
                 }
             }
 
-            Surface(
-                shape = RoundedCornerShape(25),
-                color = statusColor.copy(alpha = 0.15f),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+
+            Text(
+                text = "$deliverable • $platform",
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = status,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = statusColor
+                    text = "$currency $price",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = primaryColor
+                )
+                Text(
+                    text = time,
+                    fontSize = 12.sp,
+                    color = Color.Gray
                 )
             }
         }
