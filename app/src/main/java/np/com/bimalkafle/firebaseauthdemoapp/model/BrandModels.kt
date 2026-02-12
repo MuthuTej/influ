@@ -62,6 +62,19 @@ data class BrandCategory(
     val subCategory: String
 )
 
+data class PreferredPlatform(
+    val platform: String,
+    val formats: List<String>?,
+    val minFollowers: Int?,
+    val minEngagement: Double?
+)
+
+data class TargetAudience(
+    val ageMin: Int?,
+    val ageMax: Int?,
+    val gender: String?
+)
+
 data class Brand(
     val id: String,
     val email: String,
@@ -73,5 +86,7 @@ data class Brand(
     val about: String?,
     val primaryObjective: String?,
     val profileUrl: String?,
-    val logoUrl: String?
+    val logoUrl: String?,
+    val preferredPlatforms: List<PreferredPlatform>? = null,
+    val targetAudience: TargetAudience? = null
 )
