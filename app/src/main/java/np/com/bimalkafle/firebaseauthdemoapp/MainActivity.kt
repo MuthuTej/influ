@@ -1,8 +1,12 @@
 package np.com.bimalkafle.firebaseauthdemoapp
 
 import android.util.Log
+import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.tasks.OnCompleteListener
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.launch
+import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -72,6 +76,25 @@ class MainActivity : ComponentActivity() {
 
             // Log and toast
             Log.d("FCM", token)
+            
+            val user = FirebaseAuth.getInstance().currentUser
+            if (user != null) {
+                user.getIdToken(true).addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val idToken = task.result?.token
+                        if (idToken != null) {
+                            lifecycleScope.launch {
+                                val result = BackendRepository.updateFcmToken(idToken, token)
+                                result.onSuccess {
+                                    Log.d("FCM", "FCM Token updated successfully")
+                                }.onFailure {
+                                    Log.e("FCM", "Failed to update FCM Token", it)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         })
     }
 }

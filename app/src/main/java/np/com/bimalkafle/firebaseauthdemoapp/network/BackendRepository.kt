@@ -168,4 +168,61 @@ object BackendRepository {
             Result.failure(e)
         }
     }
+    suspend fun updateFcmToken(token: String, fcmToken: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                mutation UpdateFcmToken(${'$'}fcmToken: String!) {
+                    updateFcmToken(fcmToken: ${'$'}fcmToken) {
+                        success
+                        message
+                    }
+                }
+            """.trimIndent()
+
+            val variables = JSONObject().apply {
+                put("fcmToken", fcmToken)
+            }
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+                put("variables", variables)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    val data = jsonResponse.optJSONObject("data")
+                    val updateResult = data?.optJSONObject("updateFcmToken")
+                    if (updateResult != null && updateResult.optBoolean("success")) {
+                         Result.success(true)
+                    } else {
+                         Result.failure(Exception("Update failed"))
+                    }
+                }
+            } else {
+                val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Log.e("BackendRepository", "Error Response: $errorResponse")
+                Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
+            }
+        } catch (e: Exception) {
+            Log.e("BackendRepository", "Exception: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }
