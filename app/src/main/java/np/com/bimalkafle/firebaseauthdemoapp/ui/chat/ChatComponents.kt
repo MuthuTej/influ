@@ -34,7 +34,71 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatItem
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatMessage
+import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Feedback
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.graphics.vector.ImageVector
 import kotlin.math.roundToInt
+
+@Composable
+fun ActionButtons(
+    status: String,
+    isMe: Boolean,
+    onAccept: () -> Unit,
+    onReject: () -> Unit,
+    onModify: () -> Unit
+) {
+    if (status == "PENDING" && !isMe) {
+        Row(
+            modifier = Modifier.padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onAccept,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Accept", fontSize = 12.sp)
+            }
+
+            Button(
+                onClick = onReject,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Reject", fontSize = 12.sp)
+            }
+
+            Button(
+                onClick = onModify,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Text("Modify", fontSize = 12.sp)
+            }
+        }
+    } else if (status != "PENDING") {
+        Text(
+            text = "Status: $status",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (status == "ACCEPTED") Color(0xFF4CAF50) else Color(0xFFF44336),
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+}
 
 @Composable
 fun ChatListItem(
@@ -179,7 +243,9 @@ fun ChatTopBar(
 fun MessageBubble(
     message: ChatMessage,
     allMessages: List<ChatMessage>,
-    onSwipeToReply: () -> Unit = {}
+    onSwipeToReply: () -> Unit = {},
+    onUpdateStatus: (String, String) -> Unit = { _, _ -> },
+    onModify: (ChatMessage) -> Unit = {}
 ) {
     val isMe = message.isMe
     val offsetX = remember { Animatable(0f) }
@@ -235,7 +301,7 @@ fun MessageBubble(
             Column(
                 modifier = Modifier
                     .background(
-                        if (isMe) Color(0xFFFF8383) else Color.White,
+                        if (isMe) Color(0xFFFF8383) else Color(0xFFEEEEEE),
                         RoundedCornerShape(16.dp)
                     )
                     .padding(12.dp)
@@ -248,7 +314,7 @@ fun MessageBubble(
                             .fillMaxWidth()
                             .padding(bottom = 8.dp)
                             .background(
-                                color = if (isMe) Color.Black.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.3f),
+                                color = if (isMe) Color.Black.copy(alpha = 0.1f) else Color.White,
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(8.dp)
@@ -270,10 +336,25 @@ fun MessageBubble(
                 }
                 // ---------------------------------
 
-                Text(
-                    text = message.text,
-                    color = if (isMe) Color.White else Color.Black
-                )
+                if (message.type == "TEXT") {
+                    Text(
+                        text = message.text,
+                        color = if (isMe) Color.White else Color.Black
+                    )
+                } else {
+                    when (message.type) {
+                        "NEGOTIATION" -> NegotiationBubble(message, isMe, onUpdateStatus) { onModify(message) }
+                        "DELIVERABLES" -> DeliverablesBubble(message, isMe, onUpdateStatus) { onModify(message) }
+                        "BRIEF" -> ActionBubble(message, "Campaign Brief", Icons.Default.Description, isMe, onUpdateStatus) { onModify(message) }
+                        "SCRIPT" -> ActionBubble(message, "Script", Icons.Default.EditNote, isMe, onUpdateStatus) { onModify(message) }
+                        "FEEDBACK" -> ActionBubble(message, "Feedback", Icons.Default.Feedback, isMe, onUpdateStatus) { onModify(message) }
+                        "UPLOAD" -> ActionBubble(message, "Upload", Icons.Default.CloudUpload, isMe, onUpdateStatus) { onModify(message) }
+                        else -> Text(
+                            text = message.text,
+                            color = if (isMe) Color.White else Color.Black
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = message.timeFormatted,
@@ -389,5 +470,123 @@ fun MessageInputBar(
                 )
             }
         }
+            }
+        }
+
+
+@Composable
+fun NegotiationBubble(
+    message: ChatMessage, 
+    isMe: Boolean,
+    onUpdateStatus: (String, String) -> Unit,
+    onModify: () -> Unit
+) {
+    val amount = message.metadata?.get("amount")?.toString() ?: "0"
+    Column {
+        Text(
+            text = "💰 Proposal",
+            fontWeight = FontWeight.Bold,
+            color = if (isMe) Color.White else Color.Black
+        )
+        Text(
+            text = "Budget: $$amount",
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (isMe) Color.White else Color.Black
+        )
+        
+        ActionButtons(
+            status = message.status,
+            isMe = isMe,
+            onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
+            onReject = { onUpdateStatus(message.id, "REJECTED") },
+            onModify = onModify
+        )
+    }
+}
+
+@Composable
+fun DeliverablesBubble(
+    message: ChatMessage, 
+    isMe: Boolean,
+    onUpdateStatus: (String, String) -> Unit,
+    onModify: () -> Unit
+) {
+    val itemsMap = message.metadata?.get("items") as? Map<String, Any> ?: emptyMap()
+    
+    // Fallback for legacy list format if needed, though we switched to map
+    val displayItems = if (itemsMap.isNotEmpty()) {
+        itemsMap.entries.map { "${it.key} (x${it.value})" }
+    } else {
+        message.metadata?.get("items") as? List<String> ?: emptyList()
+    }
+
+    Column {
+        Text(
+            text = "📋 Deliverables",
+            fontWeight = FontWeight.Bold,
+            color = if (isMe) Color.White else Color.Black
+        )
+        displayItems.forEach { item ->
+            Text(
+                text = "• $item",
+                color = if (isMe) Color.White else Color.Black
+            )
+        }
+        
+        ActionButtons(
+            status = message.status,
+            isMe = isMe,
+            onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
+            onReject = { onUpdateStatus(message.id, "REJECTED") },
+            onModify = onModify
+        )
+    }
+}
+
+@Composable
+fun ActionBubble(
+    message: ChatMessage, 
+    title: String, 
+    icon: ImageVector, 
+    isMe: Boolean,
+    onUpdateStatus: (String, String) -> Unit,
+    onModify: () -> Unit
+) {
+    val contentKey = when (message.type) {
+        "BRIEF", "UPLOAD" -> "link"
+        "SCRIPT" -> "content"
+        "FEEDBACK" -> "feedback"
+        else -> "text"
+    }
+    val content = message.metadata?.get(contentKey)?.toString() ?: message.text
+
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (isMe) Color.White else Color(0xFFFF8383),
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = title,
+                fontWeight = FontWeight.Bold,
+                color = if (isMe) Color.White else Color.Black
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = content,
+            color = if (isMe) Color.White else Color.Black
+        )
+        
+        ActionButtons(
+            status = message.status,
+            isMe = isMe,
+            onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
+            onReject = { onUpdateStatus(message.id, "REJECTED") },
+            onModify = onModify
+        )
     }
 }

@@ -149,7 +149,13 @@ class ChatRepository {
             }
     }
 
-    fun sendMessage(receiverId: String, text: String, replyToId: String? = null) {
+    fun sendMessage(
+        receiverId: String, 
+        text: String, 
+        replyToId: String? = null,
+        type: String = "TEXT",
+        metadata: Map<String, Any> = emptyMap()
+    ) {
         val currentUserId = auth.currentUser?.uid ?: return
         val messageId = db.collection("messages").document().id
         val timestamp = System.currentTimeMillis()
@@ -162,7 +168,9 @@ class ChatRepository {
             timestamp = timestamp,
             timeFormatted = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(timestamp)),
             replyToId = replyToId,
-            isRead = false // New message is always unread
+            isRead = false,
+            type = type,
+            metadata = metadata
         )
 
         db.collection("messages").document(messageId).set(message)
@@ -187,5 +195,13 @@ class ChatRepository {
                 userRef.set(chatUser)
             }
         }
+    }
+
+    fun updateMessageStatus(messageId: String, status: String) {
+        db.collection("messages").document(messageId)
+            .update("status", status)
+            .addOnFailureListener { e ->
+                Log.e("ChatRepository", "Error updating message status", e)
+            }
     }
 }

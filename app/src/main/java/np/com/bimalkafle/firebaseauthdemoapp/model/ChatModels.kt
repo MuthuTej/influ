@@ -20,6 +20,9 @@ data class ChatMessage(
     val timestamp: Long = 0,
     val timeFormatted: String = "",
     val replyToId: String? = null,
+    val type: String = "TEXT",
+    val metadata: Map<String, Any> = emptyMap(),
+    val status: String = "PENDING", // PENDING, ACCEPTED, REJECTED
     
     @get:Exclude
     val isMe: Boolean = false,

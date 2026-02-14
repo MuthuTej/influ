@@ -40,11 +40,54 @@ fun ChatScreen(
     val messages by viewModel.messages.collectAsState()
     val chatName by viewModel.chatName.collectAsState()
     val replyingTo by viewModel.replyingTo.collectAsState()
-    
+
     var isProfileExpanded by remember { mutableStateOf(false) }
+    var modificationMessage by remember { mutableStateOf<ChatMessage?>(null) }
 
     BackHandler(enabled = isProfileExpanded) {
         isProfileExpanded = false
+    }
+    
+    // Modification Dialogs
+    if (modificationMessage != null) {
+        val msg = modificationMessage!!
+        when (msg.type) {
+            "NEGOTIATION" -> {
+                val currentAmount = msg.metadata["amount"]?.toString()?.toIntOrNull() ?: 0
+                NegotiationDialog(
+                    initialAmount = currentAmount,
+                    onDismiss = { modificationMessage = null },
+                    onSend = { amount ->
+                        viewModel.sendMessage(
+                            text = "Proposed Budget: $$amount", 
+                            type = "NEGOTIATION", 
+                            metadata = mapOf("amount" to amount)
+                        )
+                        viewModel.updateMessageStatus(msg.id, "MODIFIED")
+                        modificationMessage = null
+                    }
+                )
+            }
+            "DELIVERABLES" -> {
+                @Suppress("UNCHECKED_CAST")
+                val currentItems = msg.metadata["items"] as? Map<String, Int> ?: emptyMap()
+                DeliverablesDialog(
+                    initialDeliverables = currentItems,
+                    onDismiss = { modificationMessage = null },
+                    onSend = { deliverables ->
+                        val text = "Deliverables: ${deliverables.entries.joinToString { "${it.key} (x${it.value})" }}"
+                        viewModel.sendMessage(
+                            text = text, 
+                            type = "DELIVERABLES", 
+                            metadata = mapOf("items" to deliverables)
+                        )
+                        viewModel.updateMessageStatus(msg.id, "MODIFIED")
+                        modificationMessage = null
+                    }
+                )
+            }
+            // Add other modification dialogs as needed
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
@@ -68,20 +111,18 @@ fun ChatScreen(
                 onReply = { message ->
                     viewModel.setReplyingTo(message)
                 },
+                onUpdateStatus = { messageId, status ->
+                    viewModel.updateMessageStatus(messageId, status)
+                },
+                onModify = { message ->
+                    modificationMessage = message
+                },
                 modifier = Modifier.weight(1f)
             )
 
-            MessageInputBar(
-                replyingTo = replyingTo,
-                chatName = chatName,
-                onCancelReply = {
-                    viewModel.setReplyingTo(null)
-                },
-                onSend = { text ->
-                    viewModel.sendMessage(text)
-                },
-                onCreateProposal = {
-                    chatId?.let { onCreateProposal(it) }
+            RestrictedActionPanel(
+                onSend = { text, type, metadata ->
+                    viewModel.sendMessage(text, type, metadata)
                 }
             )
         }
@@ -123,6 +164,8 @@ fun ChatScreen(
 fun MessagesList(
     messages: List<ChatMessage>,
     onReply: (ChatMessage) -> Unit,
+    onUpdateStatus: (String, String) -> Unit,
+    onModify: (ChatMessage) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -141,7 +184,9 @@ fun MessagesList(
             MessageBubble(
                 message = message,
                 allMessages = messages,
-                onSwipeToReply = { onReply(message) }
+                onSwipeToReply = { onReply(message) },
+                onUpdateStatus = onUpdateStatus,
+                onModify = onModify
             )
         }
     }

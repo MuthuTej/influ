@@ -102,17 +102,27 @@ class ChatViewModel : ViewModel() {
         _replyingTo.value = message
     }
 
-    fun sendMessage(text: String) {
+    fun sendMessage(
+        text: String,
+        type: String = "TEXT",
+        metadata: Map<String, Any> = emptyMap()
+    ) {
         val otherUserId = currentOtherUserId ?: return
-        if (text.isBlank()) return
+        if (text.isBlank() && type == "TEXT") return // Allow non-text messages to be "blank" text if needed, or handle text requirement
 
         repository.sendMessage(
             receiverId = otherUserId,
             text = text,
-            replyToId = _replyingTo.value?.id
+            replyToId = _replyingTo.value?.id,
+            type = type,
+            metadata = metadata
         )
         _replyingTo.value = null
     }
     
+    fun updateMessageStatus(messageId: String, status: String) {
+        repository.updateMessageStatus(messageId, status)
+    }
+
     fun getCurrentUserId(): String = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 }
