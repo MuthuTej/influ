@@ -129,11 +129,11 @@ class BrandViewModel : ViewModel() {
                     }
                 } catch (e: Exception) {
                     Log.e("BrandViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("BrandViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -292,6 +292,7 @@ class BrandViewModel : ViewModel() {
                         ageMin
                         ageMax
                         gender
+                        locations
                       }
                     }
                   }
@@ -321,11 +322,11 @@ class BrandViewModel : ViewModel() {
                     }
                 } catch (e: Exception) {
                     Log.e("BrandViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("BrandViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -357,9 +358,14 @@ class BrandViewModel : ViewModel() {
                     list.add(
                         PreferredPlatform(
                             platform = pObj.optString("platform"),
+                            profileUrl = null,
+                            followers = null,
+                            avgViews = null,
+                            engagement = null,
                             formats = formats,
+                            connected = null,
                             minFollowers = if (pObj.isNull("minFollowers")) null else pObj.optInt("minFollowers"),
-                            minEngagement = if (pObj.isNull("minEngagement")) null else pObj.optDouble("minEngagement")
+                            minEngagement = if (pObj.isNull("minEngagement")) null else pObj.optDouble("minEngagement").toFloat()
                         )
                     )
                 }
@@ -369,10 +375,20 @@ class BrandViewModel : ViewModel() {
 
         val targetAudienceObj = obj.optJSONObject("targetAudience")
         val targetAudience = if (targetAudienceObj != null) {
+            val locationsArray = targetAudienceObj.optJSONArray("locations")
+            val locations = if (locationsArray != null) {
+                val lList = mutableListOf<String>()
+                for (i in 0 until locationsArray.length()) {
+                    lList.add(locationsArray.getString(i))
+                }
+                lList
+            } else null
+            
             TargetAudience(
                 ageMin = if (targetAudienceObj.isNull("ageMin")) null else targetAudienceObj.optInt("ageMin"),
                 ageMax = if (targetAudienceObj.isNull("ageMax")) null else targetAudienceObj.optInt("ageMax"),
-                gender = targetAudienceObj.optString("gender", null)
+                gender = targetAudienceObj.optString("gender", null),
+                locations = locations
             )
         } else null
 
@@ -482,10 +498,10 @@ class BrandViewModel : ViewModel() {
                         _myCampaigns.postValue(emptyList())
                     }
                 } catch (e: Exception) {
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -524,7 +540,7 @@ class BrandViewModel : ViewModel() {
                     onComplete(false)
                 }
             }.onFailure {
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
                 onComplete(false)
             }
             _loading.postValue(false)
@@ -606,11 +622,11 @@ class BrandViewModel : ViewModel() {
 
                 } catch (e: Exception) {
                     Log.e("BrandViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("BrandViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -621,8 +637,8 @@ class BrandViewModel : ViewModel() {
         _error.value = null
         viewModelScope.launch {
             val mutation = """
-                mutation UpdateCollaboration(${"$"}input: UpdateCollaborationInput!) {
-                  updateCollaboration(input: ${"$"}input) {
+                mutation UpdateCollaboration(${'$'}input: UpdateCollaborationInput!) {
+                  updateCollaboration(input: ${'$'}input) {
                     id
                     status
                     message
@@ -651,7 +667,7 @@ class BrandViewModel : ViewModel() {
                     onComplete(false)
                 }
             }.onFailure {
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
                 onComplete(false)
             }
             _loading.postValue(false)
