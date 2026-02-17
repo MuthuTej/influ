@@ -318,6 +318,20 @@ fun BrandSearchPageContent(
                 }
             }
 
+            // ---------------- PAGINATION LOGIC ----------------
+            var currentPage by remember { mutableStateOf(1) }
+            val itemsPerPage = 5 // Adjust as needed
+            val totalPages = (filteredInfluencers.size + itemsPerPage - 1) / itemsPerPage
+            
+            // Reset to page 1 if filters change
+            LaunchedEffect(filteredInfluencers) {
+                currentPage = 1
+            }
+
+            val paginatedInfluencers = filteredInfluencers
+                .drop((currentPage - 1) * itemsPerPage)
+                .take(itemsPerPage)
+
             // ---------------- RESULTS SECTION ----------------
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -328,9 +342,9 @@ fun BrandSearchPageContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(bottom = 16.dp)
+                    contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
-                    items(filteredInfluencers) { influencer ->
+                    items(paginatedInfluencers) { influencer ->
                         BrandCardBrand(
                             influencer = influencer,
                             modifier = Modifier.fillMaxWidth(),
@@ -341,6 +355,42 @@ fun BrandSearchPageContent(
                         item {
                             Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
                                 Text("No influencers found.", color = Color.Gray, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    } else if (totalPages > 1) {
+                         item {
+                            // Pagination Controls
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Button(
+                                    onClick = { if (currentPage > 1) currentPage-- },
+                                    enabled = currentPage > 1,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                                ) {
+                                    Text("Previous")
+                                }
+
+                                Spacer(modifier = Modifier.width(16.dp))
+
+                                Text(
+                                    text = "Page $currentPage of $totalPages",
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.width(16.dp))
+
+                                Button(
+                                    onClick = { if (currentPage < totalPages) currentPage++ },
+                                    enabled = currentPage < totalPages,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                                ) {
+                                    Text("Next")
+                                }
                             }
                         }
                     }

@@ -142,7 +142,7 @@ fun BrandHomePage(
                     }
 
                 }
-                items(influencers) { influencer ->
+                items(influencers.take(10)) { influencer ->
                     BrandCardBrand(
                         influencer = influencer, 
                         modifier = Modifier

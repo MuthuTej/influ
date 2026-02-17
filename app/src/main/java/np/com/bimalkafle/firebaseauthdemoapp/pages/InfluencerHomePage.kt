@@ -124,7 +124,7 @@ fun InfluencerHomePage(
                     }
 
                 }
-                items(brands) { brand ->
+                items(brands.take(10)) { brand ->
                     BrandCardInfluencer(
                         brand = brand,
                         modifier = Modifier

@@ -263,6 +263,20 @@ fun InfluencerSearchPage(
                 }
             }
 
+            // ---------------- PAGINATION LOGIC ----------------
+            var currentPage by remember { mutableStateOf(1) }
+            val itemsPerPage = 5 // Adjust as needed
+            val totalPages = (filteredBrands.size + itemsPerPage - 1) / itemsPerPage
+            
+            // Reset to page 1 if filters change (filteredBrands changes)
+            LaunchedEffect(filteredBrands) {
+                currentPage = 1
+            }
+
+            val paginatedBrands = filteredBrands
+                .drop((currentPage - 1) * itemsPerPage)
+                .take(itemsPerPage)
+
             // ---------------- RESULTS SECTION ----------------
             if (isLoading) {
                  Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -273,14 +287,14 @@ fun InfluencerSearchPage(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
-                     contentPadding = PaddingValues(bottom = 16.dp)
+                     contentPadding = PaddingValues(bottom = 80.dp) // Extra padding for pagination controls
                 ) {
-                    items(filteredBrands) { brand ->
+                    items(paginatedBrands) { brand ->
                         BrandCardInfluencer(
                             brand = brand,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp), // Adjusted padding
+                                .padding(vertical = 8.dp), 
                             onCardClick = {
                                  navController.navigate("brand_detail/${brand.id}")
                             }
@@ -291,6 +305,42 @@ fun InfluencerSearchPage(
                         item {
                             Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
                                 Text("No brands found matching your search.", color = Color.Gray, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    } else if (totalPages > 1) {
+                         item {
+                            // Pagination Controls
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Button(
+                                    onClick = { if (currentPage > 1) currentPage-- },
+                                    enabled = currentPage > 1,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                                ) {
+                                    Text("Previous")
+                                }
+
+                                Spacer(modifier = Modifier.width(16.dp))
+
+                                Text(
+                                    text = "Page $currentPage of $totalPages",
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.width(16.dp))
+
+                                Button(
+                                    onClick = { if (currentPage < totalPages) currentPage++ },
+                                    enabled = currentPage < totalPages,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                                ) {
+                                    Text("Next")
+                                }
                             }
                         }
                     }
