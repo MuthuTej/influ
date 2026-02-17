@@ -94,6 +94,7 @@ fun BrandSearchPage(
         selectedFollowerRange = selectedFollowerRange,
         onFollowerRangeSelected = { selectedFollowerRange = it },
         filteredInfluencers = filteredInfluencers,
+        allInfluencers = influencers,
         isLoading = isLoading,
         onBackClick = { navController.popBackStack() },
         onInfluencerClick = { id -> navController.navigate("brand_influencer_detail/$id") },
@@ -114,6 +115,7 @@ fun BrandSearchPageContent(
     selectedFollowerRange: String,
     onFollowerRangeSelected: (String) -> Unit,
     filteredInfluencers: List<InfluencerProfile>,
+    allInfluencers: List<InfluencerProfile>,
     isLoading: Boolean,
     onBackClick: () -> Unit,
     onInfluencerClick: (String) -> Unit,
@@ -250,10 +252,38 @@ fun BrandSearchPageContent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Calculate counts for Categories
+                val categories = listOf("All", "Tech", "Fashion", "Food", "Lifestyle", "Beauty", "Sports")
+                val categoryOptions = categories.map { category ->
+                    val count = if (category == "All") {
+                        if (allInfluencers.isNotEmpty()) allInfluencers.size else 0
+                    } else {
+                        allInfluencers.count { influencer ->
+                            influencer.categories?.any { it.category.equals(category, ignoreCase = true) } == true
+                        }
+                    }
+                    category to count
+                }
+
+                // Calculate counts for Platforms
+                val platforms = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK")
+                val platformOptions = platforms.map { platform ->
+                    val count = if (platform == "All") {
+                         if (allInfluencers.isNotEmpty()) allInfluencers.size else 0
+                    } else {
+                        allInfluencers.count { influencer ->
+                             influencer.platforms?.any { it.platform.equals(platform, ignoreCase = true) } == true
+                        }
+                    }
+                    platform to count
+                }
+                
+                val followerOptions = listOf("All", "0-10K", "10K-100K", "100K-1M", "1M+").map { it to null }
+
                 FilterDropdown(
                     label = "Platform",
                     selectedOption = selectedPlatform,
-                    options = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK"),
+                    options = platformOptions,
                     onOptionSelected = onPlatformSelected,
                     modifier = Modifier.weight(1f)
                 )
@@ -261,7 +291,7 @@ fun BrandSearchPageContent(
                 FilterDropdown(
                     label = "Category",
                     selectedOption = selectedCategory,
-                    options = listOf("All", "Tech", "Fashion", "Food", "Lifestyle", "Beauty", "Sports"),
+                    options = categoryOptions,
                     onOptionSelected = onCategorySelected,
                     modifier = Modifier.weight(1f)
                 )
@@ -269,7 +299,7 @@ fun BrandSearchPageContent(
                 FilterDropdown(
                     label = "Followers",
                     selectedOption = selectedFollowerRange,
-                    options = listOf("All", "0-10K", "10K-100K", "100K-1M", "1M+"),
+                    options = followerOptions,
                     onOptionSelected = onFollowerRangeSelected,
                     modifier = Modifier.weight(1f)
                 )
@@ -324,7 +354,7 @@ fun BrandSearchPageContent(
 fun FilterDropdown(
     label: String,
     selectedOption: String,
-    options: List<String>,
+    options: List<Pair<String, Int?>>,
     onOptionSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -365,9 +395,14 @@ fun FilterDropdown(
             onDismissRequest = { expanded = false },
             modifier = Modifier.background(Color.White)
         ) {
-            options.forEach { option ->
+            options.forEach { (option, count) ->
                 DropdownMenuItem(
-                    text = { Text(option) },
+                    text = { 
+                        Text(
+                            text = if (option == "All" || count == null) option else "$option ($count)",
+                            fontWeight = if(option == selectedOption) FontWeight.Bold else FontWeight.Normal
+                        ) 
+                    },
                     onClick = {
                         onOptionSelected(option)
                         expanded = false
@@ -439,6 +474,7 @@ fun BrandSearchPagePreview() {
         selectedFollowerRange = "All",
         onFollowerRangeSelected = {},
         filteredInfluencers = listOf(sampleInfluencer),
+        allInfluencers = listOf(sampleInfluencer),
         isLoading = false,
         onBackClick = {},
         onInfluencerClick = {},

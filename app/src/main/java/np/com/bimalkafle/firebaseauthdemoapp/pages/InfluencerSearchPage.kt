@@ -198,10 +198,37 @@ fun InfluencerSearchPage(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Calculate counts for Categories
+                val categories = listOf("All", "Tech", "Fashion", "Food", "Lifestyle", "Beauty", "Sports")
+                val categoryOptions = categories.map { category ->
+                    val count = if (category == "All") {
+                        if (brands.isNotEmpty()) brands.size else 0
+                    } else {
+                        brands.count { it.brandCategory?.category.equals(category, ignoreCase = true) }
+                    }
+                    category to count
+                }
+
+                // Calculate counts for Platforms
+                val platforms = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK")
+                val platformOptions = platforms.map { platform ->
+                    val count = if (platform == "All") {
+                         if (brands.isNotEmpty()) brands.size else 0
+                    } else {
+                        brands.count { brand -> 
+                             brand.preferredPlatforms?.any { it.platform.equals(platform, ignoreCase = true) } == true
+                        }
+                    }
+                    platform to count
+                }
+                
+                // For followers, it's consistent ranges, we can just pass nulls or 0s if we don't want to count
+                 val followerOptions = listOf("All", "0-10K", "10K-100K", "100K-1M", "1M+").map { it to null }
+
                 FilterDropdown(
                     label = "Platform",
                     selectedOption = selectedPlatform,
-                    options = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK"),
+                    options = platformOptions,
                     onOptionSelected = { selectedPlatform = it },
                     modifier = Modifier.weight(1f)
                 )
@@ -209,7 +236,7 @@ fun InfluencerSearchPage(
                 FilterDropdown(
                     label = "Category",
                     selectedOption = selectedCategory,
-                    options = listOf("All", "Tech", "Fashion", "Food", "Lifestyle", "Beauty", "Sports"),
+                    options = categoryOptions,
                     onOptionSelected = { selectedCategory = it },
                     modifier = Modifier.weight(1f)
                 )
@@ -217,7 +244,7 @@ fun InfluencerSearchPage(
                 FilterDropdown(
                     label = "Followers",
                     selectedOption = selectedFollowerRange,
-                    options = listOf("All", "0-10K", "10K-100K", "100K-1M", "1M+"),
+                    options = followerOptions,
                     onOptionSelected = { selectedFollowerRange = it },
                     modifier = Modifier.weight(1f)
                 )
@@ -276,7 +303,7 @@ fun InfluencerSearchPage(
 fun FilterDropdown(
     label: String,
     selectedOption: String,
-    options: List<String>,
+    options: List<Pair<String, Int?>>,
     onOptionSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -317,9 +344,14 @@ fun FilterDropdown(
             onDismissRequest = { expanded = false },
             modifier = Modifier.background(Color.White)
         ) {
-            options.forEach { option ->
+            options.forEach { (option, count) ->
                 DropdownMenuItem(
-                    text = { Text(option) },
+                    text = { 
+                        Text(
+                            text = if (option == "All" || count == null) option else "$option ($count)",
+                            fontWeight = if(option == selectedOption) FontWeight.Bold else FontWeight.Normal
+                        ) 
+                    },
                     onClick = {
                         onOptionSelected(option)
                         expanded = false

@@ -160,19 +160,19 @@ fun CreateCampaignScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = campaignViewModel.objective,
-                onValueChange = { campaignViewModel.objective = it },
-                label = { Text("Campaign Objective") },
-                modifier = Modifier
-                    .fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFFF8383)
-                )
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
+//            OutlinedTextField(
+//                value = campaignViewModel.objective,
+//                onValueChange = { campaignViewModel.objective = it },
+//                label = { Text("Campaign Objective") },
+//                modifier = Modifier
+//                    .fillMaxWidth(),
+//                shape = RoundedCornerShape(12.dp),
+//                colors = OutlinedTextFieldDefaults.colors(
+//                    focusedBorderColor = Color(0xFFFF8383)
+//                )
+//            )
+//
+//            Spacer(modifier = Modifier.height(24.dp))
             Text("Required Platforms", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             FlowRow(
