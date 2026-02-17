@@ -22,12 +22,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -41,9 +41,13 @@ import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.graphics.vector.ImageVector
 import kotlin.math.roundToInt
+import androidx.compose.material.icons.filled.Remove
+
+val BrandThemeColor = Color(0xFFFF8383)
+val ChatBubbleSelfColor = BrandThemeColor
+val ChatBubbleOtherColor = Color(0xFFF2F2F7) // Light Gray for iOS-like feel
 
 @Composable
 fun ActionButtons(
@@ -55,48 +59,58 @@ fun ActionButtons(
 ) {
     if (status == "PENDING" && !isMe) {
         Row(
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
                 onClick = onAccept,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.height(36.dp)
             ) {
                 Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Accept", fontSize = 12.sp)
+                Text("Accept", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
 
             Button(
                 onClick = onReject,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)), // Softer Red
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.height(36.dp)
             ) {
                 Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Reject", fontSize = 12.sp)
+                Text("Reject", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
 
-            Button(
+            OutlinedButton(
                 onClick = onModify,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF42A5F5)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF42A5F5)),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.height(36.dp)
             ) {
-                Text("Modify", fontSize = 12.sp)
+                Text("Modify", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     } else if (status != "PENDING") {
-        Text(
-            text = "Status: $status",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = if (status == "ACCEPTED") Color(0xFF4CAF50) else Color(0xFFF44336),
-            modifier = Modifier.padding(top = 4.dp)
-        )
+        Surface(
+            color = if (status == "ACCEPTED") Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text(
+                text = "${status.lowercase().replaceFirstChar { it.uppercase() }}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (status == "ACCEPTED") Color(0xFF2E7D32) else Color(0xFFC62828),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            )
+        }
     }
 }
 
@@ -105,81 +119,95 @@ fun ChatListItem(
     chat: ChatItem,
     onClick: () -> Unit
 ) {
-    Row(
+    Surface(
+        color = Color.White,
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-
-        // 👤 Profile icon/image
-        Box(
+        Row(
             modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(Color.LightGray.copy(alpha = 0.3f)),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (chat.profileImageUrl != null) {
-                AsyncImage(
-                    model = chat.profileImageUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(28.dp),
-                    tint = Color.Gray
+
+            // 👤 Profile icon/image
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (chat.profileImageUrl != null) {
+                    AsyncImage(
+                        model = chat.profileImageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(30.dp),
+                        tint = Color.Gray
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // 📝 Name + last message
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = chat.name,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                        color = Color(0xFF1A1A1A)
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = chat.lastMessage,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (chat.unreadCount > 0) Color.Black else Color.Gray,
+                    fontWeight = if (chat.unreadCount > 0) FontWeight.Medium else FontWeight.Normal,
+                    fontSize = 14.sp
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.width(12.dp))
+            // ⏰ Time + unread count
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    text = chat.time,
+                    fontSize = 12.sp,
+                    color = if (chat.unreadCount > 0) BrandThemeColor else Color.Gray,
+                    fontWeight = if (chat.unreadCount > 0) FontWeight.SemiBold else FontWeight.Normal
+                )
 
-        // 📝 Name + last message
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                text = chat.name,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = chat.lastMessage,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = Color.Gray,
-                fontSize = 14.sp
-            )
-        }
+                Spacer(modifier = Modifier.height(6.dp))
 
-        // ⏰ Time + unread count
-        Column(
-            horizontalAlignment = Alignment.End
-        ) {
-            Text(
-                text = chat.time, // Note: Time formatting logic might be needed if raw timestamp
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
-
-            if (chat.unreadCount > 0) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 4.dp)
-                        .size(20.dp)
-                        .background(Color(0xFFFF8383), CircleShape), // Matching brand color
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = chat.unreadCount.toString(),
-                        color = Color.White,
-                        fontSize = 12.sp
-                    )
+                if (chat.unreadCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .background(BrandThemeColor, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = chat.unreadCount.toString(),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -192,49 +220,68 @@ fun ChatTopBar(
     onBackClick: () -> Unit,
     onProfileClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        shadowElevation = 4.dp,
+        color = Color.White,
+        modifier = Modifier.fillMaxWidth()
     ) {
-
-        // 🔙 Back button
-        IconButton(onClick = onBackClick) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back"
-            )
-        }
-
-        // 👤 Profile image (clickable)
-        Box(
+        Row(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .clickable { onProfileClick() },
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = "Profile",
-                modifier = Modifier.fillMaxSize()
-            )
-        }
 
-        Spacer(modifier = Modifier.width(10.dp))
+            // 🔙 Back button
+            IconButton(onClick = onBackClick) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.Black
+                )
+            }
 
-        // 👤 Name + status
-        Column {
-            Text(
-                text = chatName,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Online", // Static for now
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
+            // 👤 Profile image (clickable)
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray.copy(alpha = 0.2f))
+                    .clickable { onProfileClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Profile",
+                    modifier = Modifier.fillMaxSize().padding(4.dp),
+                    tint = Color.Gray
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // 👤 Name + status
+            Column {
+                Text(
+                    text = chatName,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    color = Color.Black
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(Color(0xFF4CAF50), CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Online", 
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
         }
     }
 }
@@ -257,10 +304,16 @@ fun MessageBubble(
         allMessages.find { it.id == message.replyToId }
     }
 
+    val bubbleShape = if (isMe) {
+        RoundedCornerShape(topStart = 18.dp, topEnd = 4.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
+    } else {
+        RoundedCornerShape(topStart = 4.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(6.dp)
+            .padding(vertical = 2.dp, horizontal = 12.dp)
     ) {
         if (offsetX.value > 0) {
             Icon(
@@ -270,7 +323,7 @@ fun MessageBubble(
                     .align(Alignment.CenterStart)
                     .padding(start = 16.dp)
                     .size(24.dp),
-                tint = if (offsetX.value > swipeThreshold) Color(0xFFFF8383) else Color.Gray
+                tint = if (offsetX.value > swipeThreshold) BrandThemeColor else Color.Gray
             )
         }
 
@@ -298,70 +351,82 @@ fun MessageBubble(
                 ),
             horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
         ) {
-            Column(
-                modifier = Modifier
-                    .background(
-                        if (isMe) Color(0xFFFF8383) else Color(0xFFEEEEEE),
-                        RoundedCornerShape(16.dp)
-                    )
-                    .padding(12.dp)
-                    .widthIn(max = 260.dp)
+            Surface(
+                shape = bubbleShape,
+                color = if (isMe) ChatBubbleSelfColor else ChatBubbleOtherColor,
+                shadowElevation = 1.dp,
+                modifier = Modifier.widthIn(max = 280.dp)
             ) {
-                // --- Quotation Box for Replies ---
-                if (repliedMessage != null) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .background(
-                                color = if (isMe) Color.Black.copy(alpha = 0.1f) else Color.White,
-                                shape = RoundedCornerShape(8.dp)
+                Column(
+                    modifier = Modifier.padding(12.dp)
+                ) {
+                    // --- Quotation Box for Replies ---
+                    if (repliedMessage != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                                .background(
+                                    color = if (isMe) Color.Black.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.6f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .padding(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .height(30.dp)
+                                    .background(if (isMe) Color.White.copy(alpha = 0.7f) else BrandThemeColor, CircleShape)
                             )
-                            .padding(8.dp)
-                    ) {
-                        Text(
-                            text = if (repliedMessage.isMe) "You" else "Other",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = if (isMe) Color.White else Color(0xFFFF8383)
-                        )
-                        Text(
-                            text = repliedMessage.text,
-                            fontSize = 12.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            color = if (isMe) Color.White.copy(alpha = 0.8f) else Color.Gray
-                        )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = if (repliedMessage.isMe) "You" else "Responder",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = if (isMe) Color.White.copy(alpha = 0.9f) else BrandThemeColor
+                                )
+                                Text(
+                                    text = repliedMessage.text,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = if (isMe) Color.White.copy(alpha = 0.7f) else Color.Gray
+                                )
+                            }
+                        }
                     }
-                }
-                // ---------------------------------
+                    // ---------------------------------
 
-                if (message.type == "TEXT") {
-                    Text(
-                        text = message.text,
-                        color = if (isMe) Color.White else Color.Black
-                    )
-                } else {
-                    when (message.type) {
-                        "NEGOTIATION" -> NegotiationBubble(message, isMe, onUpdateStatus) { onModify(message) }
-                        "DELIVERABLES" -> DeliverablesBubble(message, isMe, onUpdateStatus) { onModify(message) }
-                        "BRIEF" -> ActionBubble(message, "Campaign Brief", Icons.Default.Description, isMe, onUpdateStatus) { onModify(message) }
-                        "SCRIPT" -> ActionBubble(message, "Script", Icons.Default.EditNote, isMe, onUpdateStatus) { onModify(message) }
-                        "FEEDBACK" -> ActionBubble(message, "Feedback", Icons.Default.Feedback, isMe, onUpdateStatus) { onModify(message) }
-                        "UPLOAD" -> ActionBubble(message, "Upload", Icons.Default.CloudUpload, isMe, onUpdateStatus) { onModify(message) }
-                        else -> Text(
+                    if (message.type == "TEXT") {
+                        Text(
                             text = message.text,
-                            color = if (isMe) Color.White else Color.Black
+                            color = if (isMe) Color.White else Color.Black,
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp
                         )
+                    } else {
+                        when (message.type) {
+                            "NEGOTIATION" -> NegotiationBubble(message, isMe, onUpdateStatus) { onModify(message) }
+                            "DELIVERABLES" -> DeliverablesBubble(message, isMe, onUpdateStatus) { onModify(message) }
+                            "BRIEF" -> ActionBubble(message, "Campaign Brief", Icons.Default.Description, isMe, onUpdateStatus) { onModify(message) }
+                            "SCRIPT" -> ActionBubble(message, "Script", Icons.Default.EditNote, isMe, onUpdateStatus) { onModify(message) }
+                            "FEEDBACK" -> ActionBubble(message, "Feedback", Icons.Default.Feedback, isMe, onUpdateStatus) { onModify(message) }
+                            "UPLOAD" -> ActionBubble(message, "Upload", Icons.Default.CloudUpload, isMe, onUpdateStatus) { onModify(message) }
+                            else -> Text(
+                                text = message.text,
+                                color = if (isMe) Color.White else Color.Black
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = message.timeFormatted,
+                        fontSize = 10.sp,
+                        color = if (isMe) Color.White.copy(alpha = 0.7f) else Color.Gray,
+                        modifier = Modifier.align(Alignment.End)
+                    )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = message.timeFormatted,
-                    fontSize = 10.sp,
-                    color = if (isMe) Color.White.copy(alpha = 0.7f) else Color.Gray,
-                    modifier = Modifier.align(Alignment.End)
-                )
             }
         }
     }
@@ -377,101 +442,118 @@ fun MessageInputBar(
 ) {
     var text by remember { mutableStateOf("") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(12.dp)
+    Surface(
+        shadowElevation = 8.dp,
+        color = Color.White,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        AnimatedVisibility(visible = replyingTo != null) {
-            if (replyingTo != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Replying to ${if (replyingTo.isMe) "You" else chatName}",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            color = Color(0xFFFF8383)
-                        )
-                        Text(
-                            text = replyingTo.text,
-                            maxLines = 1,
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                    }
-                    IconButton(onClick = onCancelReply) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp, horizontal = 12.dp)
+        ) {
+            AnimatedVisibility(visible = replyingTo != null) {
+                if (replyingTo != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                            .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Replying to ${if (replyingTo.isMe) "You" else chatName}",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                                color = BrandThemeColor
+                            )
+                            Text(
+                                text = replyingTo.text,
+                                maxLines = 1,
+                                fontSize = 12.sp,
+                                overflow = TextOverflow.Ellipsis,
+                                color = Color.Gray
+                            )
+                        }
+                        IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = Color.Gray
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextField(
-                value = text,
-                onValueChange = { text = it },
-                placeholder = { Text("Write something...") },
-                textStyle = TextStyle(color = Color.Black),
-                modifier = Modifier.weight(1f),
-                shape = if (replyingTo != null) 
-                    RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp) 
-                else RoundedCornerShape(24.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor = Color(0xFFFF8383)
-                )
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            IconButton(
-                onClick = onCreateProposal,
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(Color(0xFFFF8383), CircleShape)
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Create Proposal",
-                    tint = Color.White
-                )
-            }
+                IconButton(
+                    onClick = onCreateProposal,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(Color(0xFFF5F5F5), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Create Proposal",
+                        tint = BrandThemeColor
+                    )
+                }
 
-            Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
-            IconButton(
-                onClick = {
-                    if (text.isNotBlank()) {
-                        onSend(text)
-                        text = ""
-                    }
-                },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(Color(0xFFFF8383), CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = null,
-                    tint = Color.White
+                TextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = { Text("Write a message...", color = Color.Gray) },
+                    textStyle = TextStyle(color = Color.Black, fontSize = 15.sp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 50.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFFF5F5F5),
+                        unfocusedContainerColor = Color(0xFFF5F5F5),
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        cursorColor = BrandThemeColor
+                    ),
+                    maxLines = 4
                 )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                val isTextEmpty = text.isBlank()
+                IconButton(
+                    onClick = {
+                        if (!isTextEmpty) {
+                            onSend(text)
+                            text = ""
+                        }
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            if (isTextEmpty) Color(0xFFE0E0E0) else BrandThemeColor,
+                            CircleShape
+                        ),
+                    enabled = !isTextEmpty
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
-            }
-        }
+    }
+}
 
 
 @Composable
@@ -482,25 +564,52 @@ fun NegotiationBubble(
     onModify: () -> Unit
 ) {
     val amount = message.metadata?.get("amount")?.toString() ?: "0"
-    Column {
-        Text(
-            text = "💰 Proposal",
-            fontWeight = FontWeight.Bold,
-            color = if (isMe) Color.White else Color.Black
-        )
-        Text(
-            text = "Budget: $$amount",
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (isMe) Color.White else Color.Black
-        )
-        
-        ActionButtons(
-            status = message.status,
-            isMe = isMe,
-            onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
-            onReject = { onUpdateStatus(message.id, "REJECTED") },
-            onModify = onModify
-        )
+    
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = if(isMe) Color.White.copy(alpha = 0.2f) else Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.AttachMoney, 
+                    contentDescription = null, 
+                    tint = if(isMe) Color.White else BrandThemeColor,
+                    modifier = Modifier.background(
+                        if(isMe) Color.Transparent else BrandThemeColor.copy(alpha = 0.1f), 
+                        CircleShape
+                    ).padding(4.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = "Proposal",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = if (isMe) Color.White else Color.Black
+                    )
+                    Text(
+                        text = "$$amount",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 20.sp,
+                        color = if (isMe) Color.White else BrandThemeColor
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = if(isMe) Color.White.copy(alpha=0.2f) else Color.LightGray.copy(alpha=0.2f))
+            
+            ActionButtons(
+                status = message.status,
+                isMe = isMe,
+                onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
+                onReject = { onUpdateStatus(message.id, "REJECTED") },
+                onModify = onModify
+            )
+        }
     }
 }
 
@@ -513,33 +622,63 @@ fun DeliverablesBubble(
 ) {
     val itemsMap = message.metadata?.get("items") as? Map<String, Any> ?: emptyMap()
     
-    // Fallback for legacy list format if needed, though we switched to map
     val displayItems = if (itemsMap.isNotEmpty()) {
-        itemsMap.entries.map { "${it.key} (x${it.value})" }
+        itemsMap.entries.map { "${it.key} k(x${it.value})" }
     } else {
         message.metadata?.get("items") as? List<String> ?: emptyList()
     }
 
-    Column {
-        Text(
-            text = "📋 Deliverables",
-            fontWeight = FontWeight.Bold,
-            color = if (isMe) Color.White else Color.Black
-        )
-        displayItems.forEach { item ->
-            Text(
-                text = "• $item",
-                color = if (isMe) Color.White else Color.Black
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = if(isMe) Color.White.copy(alpha = 0.2f) else Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.List, 
+                    contentDescription = null, 
+                    tint = if(isMe) Color.White else BrandThemeColor,
+                    modifier = Modifier.background(
+                        if(isMe) Color.Transparent else BrandThemeColor.copy(alpha = 0.1f), 
+                        CircleShape
+                    ).padding(4.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Deliverables",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = if (isMe) Color.White else Color.Black
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            displayItems.forEach { item ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                    Box(modifier = Modifier.size(6.dp).background(if(isMe) Color.White.copy(alpha=0.7f) else Color.Gray, CircleShape))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = item,
+                        color = if (isMe) Color.White.copy(alpha = 0.9f) else Color.DarkGray,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = if(isMe) Color.White.copy(alpha=0.2f) else Color.LightGray.copy(alpha=0.2f))
+
+            ActionButtons(
+                status = message.status,
+                isMe = isMe,
+                onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
+                onReject = { onUpdateStatus(message.id, "REJECTED") },
+                onModify = onModify
             )
         }
-        
-        ActionButtons(
-            status = message.status,
-            isMe = isMe,
-            onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
-            onReject = { onUpdateStatus(message.id, "REJECTED") },
-            onModify = onModify
-        )
     }
 }
 
@@ -560,33 +699,49 @@ fun ActionBubble(
     }
     val content = message.metadata?.get(contentKey)?.toString() ?: message.text
 
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isMe) Color.White else Color(0xFFFF8383),
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = if(isMe) Color.White.copy(alpha = 0.2f) else Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (isMe) Color.White else BrandThemeColor,
+                    modifier = Modifier.background(
+                        if(isMe) Color.Transparent else BrandThemeColor.copy(alpha = 0.1f), 
+                        CircleShape
+                    ).padding(4.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = if (isMe) Color.White else Color.Black
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                color = if (isMe) Color.White else Color.Black
+                text = content,
+                color = if (isMe) Color.White.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.8f),
+                fontSize = 14.sp,
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = if(isMe) Color.White.copy(alpha=0.2f) else Color.LightGray.copy(alpha=0.2f))
+            
+            ActionButtons(
+                status = message.status,
+                isMe = isMe,
+                onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
+                onReject = { onUpdateStatus(message.id, "REJECTED") },
+                onModify = onModify
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = content,
-            color = if (isMe) Color.White else Color.Black
-        )
-        
-        ActionButtons(
-            status = message.status,
-            isMe = isMe,
-            onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
-            onReject = { onUpdateStatus(message.id, "REJECTED") },
-            onModify = onModify
-        )
     }
 }
