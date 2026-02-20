@@ -50,12 +50,14 @@ fun BrandSearchPage(
 
     val influencers by brandViewModel.influencers.observeAsState(initial = emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
+    val wishlistedInfluencers by brandViewModel.wishlistedInfluencers.observeAsState(initial = emptyList())
+    var firebaseToken by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-            val firebaseToken = result.token
+            firebaseToken = result.token
             if (firebaseToken != null) {
-                brandViewModel.fetchInfluencers(firebaseToken)
+                brandViewModel.fetchInfluencers(firebaseToken!!)
             }
         }
     }
@@ -99,7 +101,13 @@ fun BrandSearchPage(
         onBackClick = { navController.popBackStack() },
         onInfluencerClick = { id -> navController.navigate("brand_influencer_detail/$id") },
         onCreateCampaignClick = { navController.navigate("create_campaign") },
-        navController = navController
+        navController = navController,
+        wishlistedInfluencers = wishlistedInfluencers,
+        onWishlistToggle = { influencer ->
+            firebaseToken?.let { token ->
+                brandViewModel.toggleWishlist(influencer, token)
+            }
+        }
     )
 }
 
@@ -120,7 +128,9 @@ fun BrandSearchPageContent(
     onBackClick: () -> Unit,
     onInfluencerClick: (String) -> Unit,
     onCreateCampaignClick: () -> Unit,
-    navController: NavController
+    navController: NavController,
+    wishlistedInfluencers: List<InfluencerProfile> = emptyList(),
+    onWishlistToggle: (InfluencerProfile) -> Unit = {}
 ) {
 
     Scaffold(
@@ -197,7 +207,11 @@ fun BrandSearchPageContent(
                         }
 
                         Row {
-                            IconBubbleSearch(Icons.Default.Favorite, Color.Red)
+                            IconBubbleSearch(
+                                icon = Icons.Default.Favorite,
+                                tint = Color.Red,
+                                onClick = { navController.navigate("brand_wishlist") }
+                            )
                             Spacer(modifier = Modifier.width(10.dp))
                             IconBubbleSearch(Icons.Default.Notifications, Color.Black)
                         }
@@ -342,11 +356,14 @@ fun BrandSearchPageContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp)
+                    contentPadding = PaddingValues(bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(paginatedInfluencers) { influencer ->
                         BrandCardBrand(
                             influencer = influencer,
+                            isWishlisted = wishlistedInfluencers.any { it.id == influencer.id },
+                            onWishlistToggle = { onWishlistToggle(influencer) },
                             modifier = Modifier.fillMaxWidth(),
                             onCardClick = { onInfluencerClick(influencer.id) }
                         )

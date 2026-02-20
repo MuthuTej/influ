@@ -48,10 +48,112 @@ class BrandViewModel : ViewModel() {
     private val _error = MutableLiveData<String?>()
     val error: LiveData<String?> = _error
 
+    private val _wishlistedInfluencers = MutableLiveData<List<InfluencerProfile>>(emptyList())
+    val wishlistedInfluencers: LiveData<List<InfluencerProfile>> = _wishlistedInfluencers
+
+    fun toggleWishlist(influencer: InfluencerProfile, token: String) {
+        viewModelScope.launch {
+            val mutation = """
+                mutation ToggleWishlist(${'$'}targetId: ID!) {
+                  toggleWishlist(targetId: ${'$'}targetId)
+                }
+            """.trimIndent()
+
+            val variables = mapOf("targetId" to influencer.id)
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null) {
+                    val isWishlistedResult = data.optBoolean("toggleWishlist")
+                    
+                    val currentList = _wishlistedInfluencers.value?.toMutableList() ?: mutableListOf()
+                    if (isWishlistedResult) {
+                        if (!currentList.any { it.id == influencer.id }) {
+                            currentList.add(influencer)
+                        }
+                    } else {
+                        currentList.removeAll { it.id == influencer.id }
+                    }
+                    _wishlistedInfluencers.postValue(currentList)
+                }
+            }.onFailure {
+                Log.e("BrandViewModel", "Error toggling wishlist", it)
+            }
+        }
+    }
+
+    fun fetchWishlist(token: String) {
+        viewModelScope.launch {
+            val query = """
+                query GetWishlist {
+                  getWishlist {
+                    ... on Influencer {
+                      id
+                      email
+                      name
+                      role
+                      profileCompleted
+                      updatedAt
+                      bio
+                      location
+                      categories {
+                        category
+                        subCategory
+                      }
+                      platforms {
+                        platform
+                        profileUrl
+                        followers
+                        avgViews
+                        engagement
+                        formats
+                        connected
+                      }
+                      strengths
+                      pricing {
+                        platform
+                        deliverable
+                        price
+                        currency
+                      }
+                      availability
+                      logoUrl
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    val wishlistArray = data?.optJSONArray("getWishlist")
+                    if (wishlistArray != null) {
+                        val list = mutableListOf<InfluencerProfile>()
+                        for (i in 0 until wishlistArray.length()) {
+                            val obj = wishlistArray.optJSONObject(i)
+                            // Brands only wishlist Influencers
+                            if (obj != null && obj.has("id") && obj.has("role") && obj.optString("role") == "INFLUENCER") {
+                                list.add(parseInfluencerProfile(obj))
+                            }
+                        }
+                        _wishlistedInfluencers.postValue(list)
+                    }
+                } catch (e: Exception) {
+                    Log.e("BrandViewModel", "Wishlist parsing error", e)
+                }
+            }.onFailure {
+                Log.e("BrandViewModel", "Wishlist network error", it)
+            }
+        }
+    }
+
     fun fetchInfluencers(token: String) {
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
+            fetchWishlist(token) // Fetch wishlist along with influencers
             val query = """
                 query GetInfluencers {
                   getInfluencers {

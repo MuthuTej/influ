@@ -122,6 +122,9 @@ fun MyAppNavigation(
         composable("brand_profile") {
             BrandProfilePage(modifier, navController, authViewModel, brandViewModel)
         }
+        composable("brand_wishlist") {
+            BrandWishlistPage(navController, brandViewModel)
+        }
 
         composable("chatList") {
             ChatListScreen(
