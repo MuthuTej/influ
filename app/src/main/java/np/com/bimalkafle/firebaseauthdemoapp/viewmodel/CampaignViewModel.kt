@@ -21,7 +21,7 @@ class CampaignViewModel : ViewModel() {
     // Screen 1 Fields
     var title by mutableStateOf("")
     var description by mutableStateOf("")
-    var objective by mutableStateOf("")
+
     var selectedPlatforms by mutableStateOf(setOf<String>())
     var startDate by mutableStateOf<Date?>(null)
     var endDate by mutableStateOf<Date?>(null)
@@ -106,7 +106,6 @@ class CampaignViewModel : ViewModel() {
                       id
                       title
                       description
-                      objective
                       status
                       createdAt
                       budgetMin
@@ -168,7 +167,6 @@ class CampaignViewModel : ViewModel() {
                     id
                     title
                     description
-                    objective
                     status
                     createdAt
                     budgetMin
@@ -230,7 +228,6 @@ class CampaignViewModel : ViewModel() {
                     id
                     title
                     description
-                    objective
                     status
                     createdAt
                     budgetMin
@@ -253,7 +250,6 @@ class CampaignViewModel : ViewModel() {
                         locations
                       }
                       name
-                      primaryObjective
                       logoUrl
                     }
                   }
@@ -271,7 +267,6 @@ class CampaignViewModel : ViewModel() {
             val input = mutableMapOf<String, Any>(
                 "title" to title,
                 "description" to description,
-                "objective" to objective,
                 "platforms" to platformsJson,
                 "budgetMin" to budgetMin,
                 "budgetMax" to budgetMax,
@@ -343,7 +338,6 @@ class CampaignViewModel : ViewModel() {
                 it.optString("name"),
                 it.optString("about"),
                 it.optString("logoUrl"),
-                it.optString("primaryObjective"),
                 category,
                 platforms,
                 audience,
@@ -355,7 +349,6 @@ class CampaignViewModel : ViewModel() {
             json.optString("id"),
             json.optString("title"),
             json.optString("description"),
-            json.optString("objective"),
             json.optString("status"),
             json.optString("createdAt"),
             json.optInt("budgetMin").takeIf { it != 0 },
@@ -370,7 +363,7 @@ class CampaignViewModel : ViewModel() {
     fun clearState() {
         title = ""
         description = ""
-        objective = ""
+
         selectedPlatforms = emptySet()
         startDate = null
         endDate = null

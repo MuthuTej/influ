@@ -158,7 +158,7 @@ fun BrandDetailsScreen(
                 ) {
                     DetailRow(label = "Brand Name", value = brandProfile?.name ?: "N/A")
                     DetailRow(label = "Category", value = brandProfile?.brandCategory?.category ?: "N/A")
-                    DetailRow(label = "Objective", value = brandProfile?.primaryObjective ?: "N/A")
+
                 }
 
                 Spacer(modifier = Modifier.weight(1f))

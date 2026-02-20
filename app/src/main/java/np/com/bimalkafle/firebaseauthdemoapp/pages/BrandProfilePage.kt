@@ -75,7 +75,6 @@ fun BrandProfilePage(
                         brandCategory = updatedBrand.brandCategory?.category ?: "",
                         subCategory = updatedBrand.brandCategory?.subCategory ?: "",
                         about = updatedBrand.about ?: "",
-                        primaryObjective = updatedBrand.primaryObjective ?: "",
                         preferredPlatforms = updatedBrand.preferredPlatforms?.map { it.platform } ?: emptyList(),
                         ageMin = updatedBrand.targetAudience?.ageMin,
                         ageMax = updatedBrand.targetAudience?.ageMax,
@@ -119,7 +118,6 @@ fun BrandProfileContent(
     var email by remember(brandProfile) { mutableStateOf(brandProfile?.email ?: "") }
     var role by remember(brandProfile) { mutableStateOf(brandProfile?.role ?: "") }
     var about by remember(brandProfile) { mutableStateOf(brandProfile?.about ?: "") }
-    var primaryObjective by remember(brandProfile) { mutableStateOf(brandProfile?.primaryObjective ?: "") }
     var category by remember(brandProfile) { mutableStateOf(brandProfile?.brandCategory?.category ?: "") }
     var subCategory by remember(brandProfile) { mutableStateOf(brandProfile?.brandCategory?.subCategory ?: "") }
     var profileUrl by remember(brandProfile) { mutableStateOf(brandProfile?.profileUrl ?: "") }
@@ -191,7 +189,6 @@ fun BrandProfileContent(
                                         email = email,
                                         role = role,
                                         about = about,
-                                        primaryObjective = primaryObjective,
                                         brandCategory = BrandCategory(category, subCategory),
                                         profileUrl = profileUrl,
                                         logoUrl = logoUrl,
@@ -352,20 +349,7 @@ fun BrandProfileContent(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
 
-                    ProfileSectionTitle("Primary Objective")
-                    if (isEditMode) {
-                        OutlinedTextField(
-                            value = primaryObjective,
-                            onValueChange = { primaryObjective = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            label = { Text("Objective") }
-                        )
-                    } else {
-                        Text(text = primaryObjective.ifEmpty { "N/A" }, color = Color.DarkGray, fontSize = 14.sp)
-                    }
 
                     Spacer(modifier = Modifier.height(24.dp))
 

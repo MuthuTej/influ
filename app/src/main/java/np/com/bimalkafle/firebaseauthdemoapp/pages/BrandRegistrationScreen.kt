@@ -47,7 +47,7 @@ fun BrandRegistrationScreen(
     var brandCategory by remember { mutableStateOf("E-commerce") }
     var subCategory by remember { mutableStateOf("Fashion") }
     var description by remember { mutableStateOf("") }
-    var campaignObjective by remember { mutableStateOf("Brand Awareness") }
+
     val platformOptions = listOf("Instagram", "YouTube", "Twitter", "Facebook")
     val selectedPlatforms = remember { mutableStateListOf<String>() }
     var ageMin by remember { mutableStateOf("18") }
@@ -222,27 +222,7 @@ fun BrandRegistrationScreen(
                 shape = RoundedCornerShape(12.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
 
-            var objectiveExpanded by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(expanded = objectiveExpanded, onExpandedChange = { objectiveExpanded = !objectiveExpanded }) {
-                OutlinedTextField(
-                    value = campaignObjective,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Primary Campaign Objective") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = objectiveExpanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                ExposedDropdownMenu(expanded = objectiveExpanded, onDismissRequest = { objectiveExpanded = false }) {
-                    DropdownMenuItem(text = { Text("Brand Awareness") }, onClick = { campaignObjective = "Brand Awareness"; objectiveExpanded = false })
-                    DropdownMenuItem(text = { Text("Lead Generation") }, onClick = { campaignObjective = "Lead Generation"; objectiveExpanded = false })
-                    DropdownMenuItem(text = { Text("Sales") }, onClick = { campaignObjective = "Sales"; objectiveExpanded = false })
-                }
-            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -333,7 +313,6 @@ fun BrandRegistrationScreen(
                                     brandCategory = brandCategory,
                                     subCategory = subCategory,
                                     about = description,
-                                    primaryObjective = campaignObjective,
                                     preferredPlatforms = selectedPlatforms,
                                     ageMin = ageMin.toIntOrNull(),
                                     ageMax = ageMax.toIntOrNull(),

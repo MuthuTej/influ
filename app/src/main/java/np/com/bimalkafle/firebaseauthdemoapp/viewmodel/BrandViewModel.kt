@@ -388,7 +388,6 @@ class BrandViewModel : ViewModel() {
                         subCategory
                       }
                       about
-                      primaryObjective
                       profileUrl
                       logoUrl
                       preferredPlatforms {
@@ -510,7 +509,6 @@ class BrandViewModel : ViewModel() {
             updatedAt = obj.optString("updatedAt", null),
             brandCategory = brandCategory,
             about = obj.optString("about", null),
-            primaryObjective = obj.optString("primaryObjective", null),
             profileUrl = obj.optString("profileUrl", null),
             logoUrl = obj.optString("logoUrl", null),
             preferredPlatforms = preferredPlatforms,
@@ -524,7 +522,6 @@ class BrandViewModel : ViewModel() {
         brandCategory: String,
         subCategory: String,
         about: String,
-        primaryObjective: String,
         preferredPlatforms: List<String>,
         ageMin: Int?,
         ageMax: Int?,
@@ -542,7 +539,6 @@ class BrandViewModel : ViewModel() {
                 brandCategory = brandCategory,
                 subCategory = subCategory,
                 about = about,
-                primaryObjective = primaryObjective,
                 preferredPlatforms = preferredPlatforms,
                 ageMin = ageMin,
                 ageMax = ageMax,
@@ -571,7 +567,6 @@ class BrandViewModel : ViewModel() {
                     brandId
                     title
                     description
-                    objective
                   }
                 }
             """.trimIndent()
@@ -591,7 +586,6 @@ class BrandViewModel : ViewModel() {
                                     brandId = obj.optString("brandId"),
                                     title = obj.optString("title"),
                                     description = obj.optString("description"),
-                                    objective = obj.optString("objective"),
                                     budgetMin = null,
                                     budgetMax = null,
                                     startDate = null,
@@ -683,7 +677,6 @@ class BrandViewModel : ViewModel() {
                       brandId
                       title
                       description
-                      objective
                       budgetMin
                       budgetMax
                       startDate
@@ -795,7 +788,7 @@ class BrandViewModel : ViewModel() {
                     brandId = campaignObj.optString("brandId"),
                     title = campaignObj.optString("title"),
                     description = campaignObj.optString("description"),
-                    objective = campaignObj.optString("objective"),
+
                     budgetMin = if (campaignObj.isNull("budgetMin")) null else campaignObj.optInt("budgetMin"),
                     budgetMax = if (campaignObj.isNull("budgetMax")) null else campaignObj.optInt("budgetMax"),
                     startDate = campaignObj.optString("startDate"),
@@ -805,7 +798,7 @@ class BrandViewModel : ViewModel() {
                     updatedAt = campaignObj.optString("updatedAt")
                 )
             } else {
-                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null, null)
+                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null)
             }
 
             val influencerObj = obj.optJSONObject("influencer")
