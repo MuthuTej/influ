@@ -106,6 +106,9 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             onSignUpClicked = {
                 navController.navigate("signup")
             },
+            onForgotPasswordClicked = {
+                navController.navigate("forgot_password")
+            },
             modifier = Modifier,
             headerTopPadding = topPadding
         )
@@ -118,6 +121,7 @@ fun LoginPageContent(
     authState: AuthState?,
     onLoginClicked: (String, String) -> Unit,
     onSignUpClicked: () -> Unit,
+    onForgotPasswordClicked: () -> Unit,
     modifier: Modifier = Modifier,
     headerTopPadding: Dp
 ) {
@@ -199,7 +203,11 @@ fun LoginPageContent(
                     Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
                     Text("Remember Me")
                 }
-                Text("Forgot Password?", color = themeColor, modifier = Modifier.clickable { /*TODO*/ })
+                Text(
+                    text = "Forgot Password?",
+                    color = themeColor,
+                    modifier = Modifier.clickable { onForgotPasswordClicked() }
+                )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -253,6 +261,7 @@ fun LoginPagePreview() {
         authState = null,
         onLoginClicked = { _, _ -> },
         onSignUpClicked = {},
+        onForgotPasswordClicked = {},
         headerTopPadding = 140.dp
     )
 }

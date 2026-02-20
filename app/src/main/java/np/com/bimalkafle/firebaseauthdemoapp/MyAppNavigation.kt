@@ -39,6 +39,9 @@ fun MyAppNavigation(
         composable("signup") {
             SignupPage(modifier, navController, authViewModel)
         }
+        composable("forgot_password") {
+            ForgotPasswordPage(modifier, navController, authViewModel)
+        }
         composable("brand_registration") {
             BrandRegistrationScreen(
                 onBack = {
