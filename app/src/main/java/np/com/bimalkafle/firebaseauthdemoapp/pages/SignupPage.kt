@@ -111,7 +111,13 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
             role = role,
             onRoleChange = { role = it },
             authState = authState.value,
-            onSignupClick = { authViewModel.signup(email, password, name, role) },
+            onSignupClick = {
+                if (password != confirmPassword) {
+                    Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                } else {
+                    authViewModel.signup(email, password, name, role)
+                }
+            },
             onLoginClick = { navController.navigate("login") },
             headerTopPadding = topPadding
         )
