@@ -147,16 +147,25 @@ fun MyAppNavigation(
 
         composable("influencer_home") {
             InfluencerHomePage(
-                modifier, navController, authViewModel,influencerViewModel)
+                modifier,
+                navController,
+                authViewModel,
+                influencerViewModel,
+                campaignViewModel
+            )
         }
         composable("influencer_search") {
-            InfluencerSearchPage(modifier, navController, influencerViewModel)
+            InfluencerSearchPage(
+                modifier,
+                navController,
+                campaignViewModel
+            )
         }
         composable("proposals") {
             ProposalPage(modifier, navController, authViewModel, brandViewModel)
         }
         composable("wishlist") {
-            WishlistScreen(navController)
+            WishlistScreen(navController, campaignViewModel)
         }
         composable("influencerProfile") {
             InfluencerProfileScreen(navController)

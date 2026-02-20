@@ -39,11 +39,12 @@ import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
-import np.com.bimalkafle.firebaseauthdemoapp.model.Brand
+import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignDetail
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import java.time.Instant
 import java.time.LocalDateTime
@@ -57,24 +58,27 @@ fun InfluencerHomePage(
     modifier: Modifier = Modifier,
     navController: NavController,
     authViewModel: AuthViewModel,
-    influencerViewModel: InfluencerViewModel
+    influencerViewModel: InfluencerViewModel,
+    campaignViewModel: CampaignViewModel
 ) {
     val authState = authViewModel.authState.observeAsState()
     val collaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
-    val brands by influencerViewModel.brands.observeAsState(initial = emptyList())
+    val campaigns by campaignViewModel.campaigns.observeAsState(initial = emptyList())
     val isLoading by influencerViewModel.loading.observeAsState(initial = false)
     val error by influencerViewModel.error.observeAsState()
     val influencerProfile by influencerViewModel.influencerProfile.observeAsState()
+    val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
+    var firebaseToken by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser
             ?.getIdToken(true)
             ?.addOnSuccessListener { result ->
-                val firebaseToken = result.token
-                if (firebaseToken != null) {
-                    influencerViewModel.fetchInfluencerDetails(firebaseToken)
-                    influencerViewModel.fetchCollaborations(firebaseToken)
-                    influencerViewModel.fetchBrands(firebaseToken)
+                firebaseToken = result.token
+                firebaseToken?.let { token ->
+                    influencerViewModel.fetchInfluencerDetails(token)
+                    influencerViewModel.fetchCollaborations(token)
+                    campaignViewModel.fetchCampaigns(token)
                 }
             }
     }
@@ -111,7 +115,7 @@ fun InfluencerHomePage(
                     .background(Color.White)
             ) {
 
-                item { InfluencerHeaderAndReachSection(influencerProfile) }
+                item { InfluencerHeaderAndReachSection(influencerProfile, navController) }
 
                 item {
                     Column(
@@ -124,15 +128,20 @@ fun InfluencerHomePage(
                     }
 
                 }
-                items(brands.take(10)) { brand ->
-                    BrandCardInfluencer(
-                        brand = brand,
+                items(campaigns.take(10)) { campaign ->
+                    CampaignCardInfluencer(
+                        campaign = campaign,
+                        isWishlisted = wishlistedCampaigns.any { it.id == campaign.id },
+                        onWishlistToggle = { 
+                            firebaseToken?.let { token ->
+                                campaignViewModel.toggleWishlist(campaign, token)
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         onCardClick = {
-                            // Navigate to brand detail if needed
-                             navController.navigate("brand_detail/${brand.id}")
+                             navController.navigate("campaign_detail/${campaign.id}")
                         }
                     )
                 }
@@ -153,7 +162,7 @@ fun InfluencerHomePage(
 }
 
 @Composable
-fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?) {
+fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navController: NavController) {
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -212,16 +221,24 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Hello!", fontSize = 14.sp, color = Color.Black.copy(alpha = 0.9f))
                     Text(
-                        "${influencerProfile?.name ?: "Guest"} 👋",
+                        "${influencerProfile?.name ?: "Guest"} \ud83d\udc4b",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
                     )
                 }
 
-                IconBubbleInfluencer(Icons.Default.Favorite, Color.Red)
+                IconBubbleInfluencer(
+                    icon = Icons.Default.Favorite,
+                    tint = Color.Red,
+                    onClick = { navController.navigate("wishlist") }
+                )
                 Spacer(modifier = Modifier.width(10.dp))
-                IconBubbleInfluencer(Icons.Default.Notifications, Color.Black)
+                IconBubbleInfluencer(
+                    icon = Icons.Default.Notifications,
+                    tint = Color.Black,
+                    onClick = { /* TODO: Navigate to Notifications */ }
+                )
             }
         }
 
@@ -229,7 +246,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?) {
         Card(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = headerHeight - (cardHeight * 0.75f)) // 🔥 dynamic overlap
+                .padding(top = headerHeight - (cardHeight * 0.75f)) // \ud83d\udd25 dynamic overlap
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
                 .height(cardHeight),
@@ -261,7 +278,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?) {
                     )
 
                     Text(
-                        "₹ 18.4K", // Mock data for now as per previous design, or can map real data if available
+                        "\u20b9 18.4K", // Mock data for now as per previous design, or can map real data if available
                         fontSize = 50.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -283,7 +300,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?) {
 
         // ---------------- FLOATING BUTTON ----------------
         Button(
-            onClick = { },
+            onClick = { navController.navigate("influencer_search") },
             shape = RoundedCornerShape(30.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFFFF5252)
@@ -296,7 +313,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?) {
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 10.dp)
         ) {
             Text(
-                "Find Brands",
+                "Find Campaigns",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -306,11 +323,13 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?) {
 }
 
 @Composable
-private fun IconBubbleInfluencer(icon: ImageVector, tint: Color) {
+private fun IconBubbleInfluencer(icon: ImageVector, tint: Color, onClick: () -> Unit = {}) {
     Surface(
         shape = CircleShape,
         color = Color(0xFFF5F5F5),
-        modifier = Modifier.size(42.dp)
+        modifier = Modifier
+            .size(42.dp)
+            .clickable { onClick() }
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
@@ -448,48 +467,9 @@ fun ActiveCollaborationsSection(collaborations: List<Collaboration>) {
                             .width(300.dp)
                             .fillMaxHeight()
                     ) {
-                        // Display Campaign and Brand info
                         CollaborationItem(
-                            brandName = collaboration.brand?.name ?: "Brand", // Ideally we fetch brand name, but for now using brandId or if available in future
-                            // Since we don't have Brand Name in Collaboration object directly (only brandId), we might check if we can get it from somewhere or just show title.
-                            // NOTE: The previous `ActiveCampaignSection` in BrandHomePage used `influencer` object. check if we have `brand` object in `Collaboration`.
-                            // In `GetCollaborations` query, we requested `campaign { brandId ... }` but not `brand { ... }`.
-                            // We might need to update query if we want brand name/logo.
-                            // REQUIRED: User asked to "show the fields in the ui that are useful for the influencer all the brand details".
-                            // I should have added brand details to the query. 
-                            // Re-reading `BrandViewModel` query: `getCollaborations` for Brand has `influencer` object.
-                            // `InfluencerViewModel` query: I added `campaign` object, but I should have added `brand` object if the schema supports it, OR `campaign { brand { name logoUrl } }`.
-                            // FOR NOW: I will use `campaign.title` and maybe updated query if needed. 
-                            // But wait, the schema likely supports `brand` on `Campaign` or `Collaboration`.
-                            // Let's assume for now I can verify this or just use what I have.
-                            // Actually, let's look at `Collaboration` model. It has `brandId`. 
-                            // Let's use `campaign.title` as primary and maybe `brandId` as secondary or static placeholder if missing.
-                            // Wait, the user provided query for `GetCollaborations` in prompt:
-                            /*
-                            query GetCollaborations {
-                              getCollaborations {
-                                ...
-                                campaign {
-                                  id
-                                  brandId
-                                  ...
-                                }
-                                ...
-                              }
-                            }
-                            */
-                            // It DOES NOT have Brand Name/Logo. 
-                            // However, strictly following the prompt's provided query, I cannot fetch Brand Name/Logo unless I modify the query to include it IF the schema allows.
-                            // But the user said "all the brand details i need to show in that part".
-                            // This implies I SHOULD have modified the query to include Brand details if possible.
-                            // Let's stick to the prompt's query first. If I can't show brand name, I'll show Campaign Title and maybe "Brand ID: ..." or just generic.
-                            // Or, maybe `campaign` has `brand` field? 
-                            // In `BrandModels.kt`, `Campaign` has `brandId`. 
-                            // In `CampaignModels.kt`, `CampaignDetail` has `brand`.
-                            // Let's check `InfluencerViewModel` query again. I used exactly what user gave. 
-                            // Okay, I will try to use `campaign.title` and `campaign.objective` or `status`.
-                            
-                            brandLogo = collaboration.brand?.logoUrl, // No logo in query
+                            brandName = collaboration.brand?.name ?: "Brand",
+                            brandLogo = collaboration.brand?.logoUrl,
                             campaignTitle = collaboration.campaign.title,
                             status = collaboration.status,
                             deliverable = pricing?.deliverable ?: "N/A",
@@ -607,7 +587,7 @@ fun CollaborationItem(
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
 
             Text(
-                text = "$deliverable • $platform",
+                text = "$deliverable \u2022 $platform",
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp
             )
@@ -681,8 +661,10 @@ fun TopPicksSectionInfluencer() {
 }
 
 @Composable
-fun BrandCardInfluencer(
-    brand: Brand,
+fun CampaignCardInfluencer(
+    campaign: CampaignDetail,
+    isWishlisted: Boolean = false,
+    onWishlistToggle: () -> Unit = {},
     modifier: Modifier = Modifier,
     onCardClick: () -> Unit
 ) {
@@ -690,223 +672,106 @@ fun BrandCardInfluencer(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = modifier
-            .clickable { onCardClick() }
+        modifier = modifier.clickable { onCardClick() }
     ) {
-        Box(modifier = Modifier.padding(16.dp)) {
-            // Verified Badge
-            if (brand.isVerified == true) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Surface(
-                    color = Color(0xFF4CAF50),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.align(Alignment.TopEnd)
+                    shape = CircleShape,
+                    color = brandThemeColor.copy(alpha = 0.1f),
+                    modifier = Modifier.size(56.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(12.dp)
+                    if (!campaign.brand?.logoUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = campaign.brand?.logoUrl,
+                            contentDescription = campaign.brand?.name,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Verified",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp
-                        )
+                    } else {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = campaign.brand?.name?.firstOrNull()?.uppercase() ?: "?",
+                                color = brandThemeColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 24.sp
+                            )
+                        }
                     }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = campaign.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = Color(0xFF1A1A1A)
+                    )
+                    Text(
+                        text = campaign.brand?.name ?: "Unknown Brand",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                }
+
+                IconButton(onClick = { onWishlistToggle() }) {
+                    Icon(
+                        imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = "Wishlist",
+                        tint = if (isWishlisted) Color.Red else Color.Gray
+                    )
                 }
             }
 
-            Column {
-                // Header: Logo, Name, Category
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(end = 60.dp), // Padding for badge
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = brandThemeColor.copy(alpha = 0.1f),
-                        modifier = Modifier.size(56.dp)
-                    ) {
-                        if (!brand.logoUrl.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = brand.logoUrl,
-                                contentDescription = brand.name,
-                                modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = brand.name.firstOrNull()?.uppercase() ?: "?",
-                                    color = brandThemeColor,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 24.sp
-                                )
-                            }
-                        }
-                    }
+            Spacer(modifier = Modifier.height(12.dp))
 
-                    Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = campaign.description,
+                fontSize = 13.sp,
+                color = Color.DarkGray,
+                lineHeight = 18.sp,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
 
-                    Column {
-                        Text(
-                            text = brand.name,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = Color(0xFF1A1A1A)
-                        )
-                        Text(
-                            text = listOfNotNull(brand.brandCategory?.category, brand.brandCategory?.subCategory)
-                                .joinToString(" • "),
-                            fontSize = 14.sp,
-                            color = Color.Gray
-                        )
-                        // Rating
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val rating = brand.averageRating ?: 0.0
-                            val reviewCount = brand.reviews?.size ?: 0
-                            Icon(
-                                Icons.Default.Star,
-                                contentDescription = "Rating",
-                                tint = Color(0xFFFFB74D),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "$rating ($reviewCount Reviews)",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.Black
-                            )
-                        }
-                    }
-                }
+            Spacer(modifier = Modifier.height(12.dp))
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // About / Bio
-                if (!brand.about.isNullOrEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
                     Text(
-                        text = brand.about,
-                        fontSize = 13.sp,
-                        color = Color.DarkGray,
-                        lineHeight = 18.sp,
-                        maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        text = "Budget",
+                        fontSize = 12.sp,
+                        color = Color.Gray
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "${campaign.budgetMin ?: '-'} - ${campaign.budgetMax ?: '-'}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
                 }
-
-                // Primary Objective
-                if (!brand.primaryObjective.isNullOrEmpty()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.AdsClick, // Or similar icon
-                            contentDescription = "Objective",
-                            tint = brandThemeColor,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Goal: ${brand.primaryObjective}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = brandThemeColor
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-                
-                // Latest Review Snippet
-                val latestReview = brand.reviews?.maxByOrNull { it.createdAt }
-                if (latestReview != null && !latestReview.comment.isNullOrEmpty()) {
-                    Surface(
-                        color = Color(0xFFF5F5F5),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    ) {
-                        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.Top) {
-                            Icon(
-                                Icons.Default.FormatQuote,
-                                contentDescription = null,
-                                tint = Color.Gray,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "\"${latestReview.comment}\"",
-                                fontSize = 12.sp,
-                                fontStyle = FontStyle.Italic,
-                                color = Color.Gray,
-                                maxLines = 2,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-
-                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Info Rows: Target Audience & Platforms
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Target Audience
-                    val ta = brand.targetAudience
-                    Column {
-                        Text(
-                            text = "Target Audience",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                        if (ta != null) {
-                            Text(
-                                text = "${ta.ageMin}-${ta.ageMax} yo • ${ta.gender}",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Black
-                            )
-                        } else {
-                            Text("N/A", fontSize = 13.sp, color = Color.Black)
-                        }
-                    }
-
-                    // Platforms
-                    val platforms = brand.preferredPlatforms
-                    if (!platforms.isNullOrEmpty()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            platforms.take(3).forEach { p ->
-                                val iconRes = when (p.platform.lowercase()) {
-                                    "youtube" -> R.drawable.ic_youtube
-                                    "instagram" -> R.drawable.ic_instagram
-                                    "facebook" -> R.drawable.ic_facebook
-                                    else -> null
-                                }
-                                if (iconRes != null) {
-                                    Icon(
-                                        painter = painterResource(id = iconRes),
-                                        contentDescription = p.platform,
-                                        modifier = Modifier.size(20.dp),
-                                        tint = Color.Unspecified
-                                    )
-                                }
-                            }
-                        }
-                    }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Objective",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                    Text(
+                        text = campaign.objective,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
                 }
             }
         }
     }
 }
-
-
-

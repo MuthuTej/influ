@@ -60,7 +60,8 @@ data class BrandResponse(
     val primaryObjective: String?,
     val brandCategory: BrandCategory?,
     val preferredPlatforms: List<CampaignPlatformInput>?,
-    val targetAudience: CampaignAudienceResponse?
+    val targetAudience: CampaignAudienceResponse?,
+    val id: String? = null
 )
 
 data class GraphQLError(

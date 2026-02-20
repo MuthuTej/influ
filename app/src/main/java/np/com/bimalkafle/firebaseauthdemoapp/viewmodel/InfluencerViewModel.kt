@@ -94,11 +94,11 @@ class InfluencerViewModel : ViewModel() {
                     }
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("InfluencerViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -189,11 +189,11 @@ class InfluencerViewModel : ViewModel() {
                     }
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("InfluencerViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -360,74 +360,8 @@ class InfluencerViewModel : ViewModel() {
                     }
                     brand {
                       id
-                      email
                       name
-                      role
-                      profileCompleted
-                      updatedAt
-                      brandCategory {
-                        category
-                        subCategory
-                      }
-                      about
-                      primaryObjective
-                      preferredPlatforms {
-                        platform
-                        profileUrl
-                        followers
-                        avgViews
-                        engagement
-                        formats
-                        connected
-                        minFollowers
-                        minEngagement
-                      }
-                      targetAudience {
-                        ageMin
-                        ageMax
-                        gender
-                        locations
-                      }
-                      profileUrl
                       logoUrl
-                      govtId
-                      isVerified
-                      reviews {
-                        id
-                        collaborationId
-                        reviewerId
-                        revieweeId
-                        reviewerRole
-                        rating
-                        comment
-                        createdAt
-                        reviewer {
-                          id
-                          email
-                          name
-                          role
-                          profileCompleted
-                          updatedAt
-                          govtId
-                          isVerified
-                          fcmToken
-                          averageRating
-                        }
-                        reviewee {
-                          id
-                          email
-                          name
-                          role
-                          profileCompleted
-                          updatedAt
-                          govtId
-                          isVerified
-                          fcmToken
-                          averageRating
-                        }
-                      }
-                      averageRating
-                      fcmToken
                     }
                     initiatedBy
                     createdAt
@@ -479,11 +413,11 @@ class InfluencerViewModel : ViewModel() {
 
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("InfluencerViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -521,16 +455,6 @@ class InfluencerViewModel : ViewModel() {
             
             val brandObj = obj.optJSONObject("brand")
             val brand = if (brandObj != null) {
-                // Reuse logic from parseBrands but tailored for single object if needed, or duplicate slightly for simplicity in this context
-                // Parse Brand Category
-                val categoryObj = brandObj.optJSONObject("brandCategory")
-                val brandCategory = if (categoryObj != null) {
-                    BrandCategory(
-                        category = categoryObj.optString("category", ""),
-                        subCategory = categoryObj.optString("subCategory", "")
-                    )
-                } else null
-
                 Brand(
                     id = brandObj.optString("id"),
                     email = brandObj.optString("email"),
@@ -538,7 +462,7 @@ class InfluencerViewModel : ViewModel() {
                     role = brandObj.optString("role"),
                     profileCompleted = if(brandObj.has("profileCompleted")) brandObj.optBoolean("profileCompleted") else null,
                     updatedAt = brandObj.optString("updatedAt"),
-                    brandCategory = brandCategory,
+                    brandCategory = null,
                     about = brandObj.optString("about"),
                     primaryObjective = brandObj.optString("primaryObjective"),
                     profileUrl = brandObj.optString("profileUrl"),
@@ -703,11 +627,11 @@ class InfluencerViewModel : ViewModel() {
                     }
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("InfluencerViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }

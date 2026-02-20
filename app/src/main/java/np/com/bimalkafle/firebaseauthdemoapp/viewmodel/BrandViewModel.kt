@@ -168,6 +168,13 @@ class BrandViewModel : ViewModel() {
             for (i in 0 until platformsArray.length()) {
                 val pObj = platformsArray.optJSONObject(i)
                 if (pObj != null) {
+                    val formatsArray = pObj.optJSONArray("formats")
+                    val formatsList = mutableListOf<String>()
+                    if (formatsArray != null) {
+                        for (j in 0 until formatsArray.length()) {
+                            formatsList.add(formatsArray.getString(j))
+                        }
+                    }
                     platforms.add(
                         Platform(
                             platform = pObj.optString("platform"),
@@ -175,7 +182,7 @@ class BrandViewModel : ViewModel() {
                             followers = pObj.optInt("followers", 0),
                             avgViews = pObj.optInt("avgViews", 0),
                             engagement = pObj.optDouble("engagement", 0.0).toFloat(),
-                            formats = null,
+                            formats = formatsList,
                             connected = pObj.optBoolean("connected")
                         )
                     )

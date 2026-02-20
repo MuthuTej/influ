@@ -46,7 +46,176 @@ class CampaignViewModel : ViewModel() {
     private val _createdCampaign = MutableLiveData<CampaignDetail?>()
     val createdCampaign: LiveData<CampaignDetail?> = _createdCampaign
 
+    private val _campaigns = MutableLiveData<List<CampaignDetail>>()
+    val campaigns: LiveData<List<CampaignDetail>> = _campaigns
+
+    private val _wishlistedCampaigns = MutableLiveData<List<CampaignDetail>>(emptyList())
+    val wishlistedCampaigns: LiveData<List<CampaignDetail>> = _wishlistedCampaigns
+
     private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    fun toggleWishlist(campaign: CampaignDetail, token: String) {
+        viewModelScope.launch {
+            val mutation = """
+                mutation ToggleWishlist(${'$'}targetId: ID!) {
+                  toggleWishlist(targetId: ${'$'}targetId)
+                }
+            """.trimIndent()
+
+            val variables = mapOf("targetId" to campaign.id)
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null) {
+                    val isWishlistedResult = data.optBoolean("toggleWishlist")
+                    
+                    val currentList = _wishlistedCampaigns.value?.toMutableList() ?: mutableListOf()
+                    if (isWishlistedResult) {
+                        if (!currentList.any { it.id == campaign.id }) {
+                            currentList.add(campaign)
+                        }
+                    } else {
+                        currentList.removeAll { it.id == campaign.id }
+                    }
+                    _wishlistedCampaigns.postValue(currentList)
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    val msg = errors?.optJSONObject(0)?.optString("message") ?: "Unknown error"
+                    Log.e("CampaignViewModel", "Toggle error: ${'$'}msg")
+                    _error.postValue(msg)
+                }
+            }.onFailure {
+                Log.e("CampaignViewModel", "Error toggling wishlist", it)
+                _error.postValue(it.message ?: "Error toggling wishlist")
+            }
+        }
+    }
+
+    fun isWishlisted(campaignId: String): Boolean {
+        return _wishlistedCampaigns.value?.any { it.id == campaignId } ?: false
+    }
+
+    fun fetchWishlist(token: String) {
+        viewModelScope.launch {
+            // Updated query to use inline fragment for 'WishlistUnion'
+            val query = """
+                query GetWishlist {
+                  getWishlist {
+                    ... on Campaign {
+                      id
+                      title
+                      description
+                      objective
+                      status
+                      createdAt
+                      budgetMin
+                      budgetMax
+                      startDate
+                      endDate
+                      brand {
+                        id
+                        name
+                        logoUrl
+                        brandCategory {
+                          category
+                          subCategory
+                        }
+                      }
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    val wishlistArray = data?.optJSONArray("getWishlist")
+                    if (wishlistArray != null) {
+                        val list = mutableListOf<CampaignDetail>()
+                        for (i in 0 until wishlistArray.length()) {
+                            val obj = wishlistArray.optJSONObject(i)
+                            // Only add if it's a Campaign (has an id and title)
+                            if (obj != null && obj.has("id") && obj.has("title")) {
+                                list.add(parseCampaignDetail(obj))
+                            }
+                        }
+                        _wishlistedCampaigns.postValue(list)
+                    } else {
+                         _wishlistedCampaigns.postValue(emptyList())
+                    }
+                } catch (e: Exception) {
+                    Log.e("CampaignViewModel", "Wishlist parsing error", e)
+                    _error.postValue("Error processing wishlist: ${'$'}{e.message}")
+                }
+            }.onFailure {
+                Log.e("CampaignViewModel", "Wishlist network error", it)
+                 _error.postValue("Network error fetching wishlist: ${'$'}{it.message}")
+            }
+        }
+    }
+
+    fun fetchCampaigns(token: String) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            fetchWishlist(token)
+
+            val query = """
+                query GetCampaigns {
+                  getCampaigns {
+                    id
+                    title
+                    description
+                    objective
+                    status
+                    createdAt
+                    budgetMin
+                    budgetMax
+                    startDate
+                    endDate
+                    brand {
+                      id
+                      name
+                      logoUrl
+                      brandCategory {
+                        category
+                        subCategory
+                      }
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    val campaignsArray = data?.optJSONArray("getCampaigns")
+                    if (campaignsArray != null) {
+                        val list = mutableListOf<CampaignDetail>()
+                        for (i in 0 until campaignsArray.length()) {
+                            val obj = campaignsArray.optJSONObject(i)
+                            if (obj != null) {
+                                list.add(parseCampaignDetail(obj))
+                            }
+                        }
+                        _campaigns.postValue(list)
+                    } else {
+                        _campaigns.postValue(emptyList())
+                    }
+                } catch (e: Exception) {
+                    Log.e("CampaignViewModel", "Parsing error", e)
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
+                }
+            }.onFailure {
+                Log.e("CampaignViewModel", "Network error", it)
+                _error.postValue("Network error: ${'$'}{it.message}")
+            }
+            _loading.postValue(false)
+        }
+    }
 
     fun createCampaign(token: String) {
         _loading.value = true
@@ -120,7 +289,6 @@ class CampaignViewModel : ViewModel() {
                 val data = jsonObject.optJSONObject("data")
                 val createCampaignJson = data?.optJSONObject("createCampaign")
                 if (createCampaignJson != null) {
-                    // Manual parsing to CampaignDetail
                     val campaign = parseCampaignDetail(createCampaignJson)
                     _createdCampaign.postValue(campaign)
                     _createCampaignSuccess.postValue(true)
@@ -178,7 +346,8 @@ class CampaignViewModel : ViewModel() {
                 it.optString("primaryObjective"),
                 category,
                 platforms,
-                audience
+                audience,
+                it.optString("id")
             )
         }
 
@@ -193,7 +362,7 @@ class CampaignViewModel : ViewModel() {
             json.optInt("budgetMax").takeIf { it != 0 },
             json.optString("startDate"),
             json.optString("endDate"),
-            null, // targetAudience in root not requested in this mutation yet, but can be added if needed
+            null,
             brand
         )
     }
