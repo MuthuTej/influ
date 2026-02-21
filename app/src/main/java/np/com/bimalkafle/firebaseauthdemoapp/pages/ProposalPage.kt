@@ -75,9 +75,15 @@ data class Proposal(
     val paymentStatus: String
 )
 
-fun Collaboration.toProposal(currentUserId: String): Proposal {
+fun Collaboration.toProposal(isBrand: Boolean): Proposal {
     val pricing = this.pricing?.firstOrNull()
     
+    val proposalType = if (isBrand) {
+        if (this.initiatedBy == "BRAND") ProposalType.SENT else ProposalType.RECEIVED
+    } else {
+        if (this.initiatedBy == "INFLUENCER") ProposalType.SENT else ProposalType.RECEIVED
+    }
+
     return Proposal(
         id = this.id,
         influencerName = this.influencer.name,
@@ -92,7 +98,7 @@ fun Collaboration.toProposal(currentUserId: String): Proposal {
         } catch (e: Exception) {
             ProposalStatus.PENDING
         },
-        type = if (this.initiatedBy == "BRAND") ProposalType.SENT else ProposalType.RECEIVED,
+        type = proposalType,
         logoUrl = this.influencer.logoUrl,
         date = this.createdAt.take(10),
         totalAmount = if (this.totalAmount != null) "₹${this.totalAmount}" else "N/A",
@@ -113,7 +119,16 @@ fun ProposalPage(
     val collaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
     val error by brandViewModel.error.observeAsState()
-    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    
+    val authState = authViewModel.authState.observeAsState()
+    var isBrand by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(authState.value) {
+        if (authState.value is np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated) {
+             val role = (authState.value as np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated).role
+             isBrand = role.equals("BRAND", ignoreCase = true)
+        }
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -132,22 +147,12 @@ fun ProposalPage(
         }
     }
 
-    val proposals = collaborations.map { it.toProposal(currentUserId) }
+    val proposals = collaborations.map { it.toProposal(isBrand) }
         .filter { it.type == selectedTab && (selectedStatus == null || it.status == selectedStatus) }
 
     val configuration = LocalConfiguration.current
     val headerHeight = 120.dp
     val contentPaddingTop = headerHeight - 20.dp
-
-    val authState = authViewModel.authState.observeAsState()
-    var isBrand by remember { mutableStateOf(false) }
-    
-    LaunchedEffect(authState.value) {
-        if (authState.value is np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated) {
-             val role = (authState.value as np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated).role
-             isBrand = role.equals("BRAND", ignoreCase = true)
-        }
-    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -160,22 +165,25 @@ fun ProposalPage(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate("create_campaign") },
-                containerColor = Color(0xFFFF8383),
-                shape = CircleShape
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "Create Campaign",
-                    tint = Color.White
-                )
+            if (isBrand) {
+                FloatingActionButton(
+                    onClick = { navController.navigate("create_campaign") },
+                    containerColor = Color(0xFFFF8383),
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Create Campaign",
+                        tint = Color.White
+                    )
+                }
             }
         }
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(paddingValues)
                 .background(Color(0xFFFF8383))
         ) {
             // Header
