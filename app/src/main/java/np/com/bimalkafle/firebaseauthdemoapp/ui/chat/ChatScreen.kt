@@ -385,6 +385,16 @@ fun ChatScreen(
                             isBrand = isBrand,
                             onSend = { text, type, metadata ->
                                 viewModel.sendMessage(text, type, metadata)
+                            },
+                            onStatusUpdate = { newStatus ->
+                                FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                    val token = result.token ?: return@addOnSuccessListener
+                                    if (isBrand) {
+                                        brandViewModel.updateCollaborationStatus(token, collaborationId, newStatus) { }
+                                    } else {
+                                        influencerViewModel.updateCollaborationStatus(token, collaborationId, newStatus) { }
+                                    }
+                                }
                             }
                         )
                     }
