@@ -17,7 +17,6 @@ object BrandRepository {
         brandCategory: String,
         subCategory: String,
         about: String,
-        primaryObjective: String,
         preferredPlatforms: List<String>,
         ageMin: Int?,
         ageMax: Int?,
@@ -50,7 +49,6 @@ object BrandRepository {
                 put("profileUrl", profileUrl)
                 put("logoUrl" , logoUrl)
                 put("about", about)
-                put("primaryObjective", primaryObjective)
 
                 put("brandCategory", JSONObject().apply {
                     put("category", brandCategory)
