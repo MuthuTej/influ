@@ -17,10 +17,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 
 @Composable
 fun RestrictedActionPanel(
+    status: String?,
+    isBrand: Boolean,
     onSend: (String, String, Map<String, Any>) -> Unit
 ) {
     var showNegotiation by remember { mutableStateOf(false) }
@@ -30,6 +33,8 @@ fun RestrictedActionPanel(
     var showFeedback by remember { mutableStateOf(false) }
     var showUpload by remember { mutableStateOf(false) }
 
+    if (status == null) return // No collaboration selected, no actions shown
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -37,7 +42,7 @@ fun RestrictedActionPanel(
             .background(Color.White)
     ) {
         Text(
-            text = "Actions",
+            text = "Workflow Actions (${status})",
             style = MaterialTheme.typography.labelMedium,
             color = Color.Gray,
             modifier = Modifier.padding(bottom = 8.dp, start = 4.dp)
@@ -45,22 +50,31 @@ fun RestrictedActionPanel(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.Start
         ) {
-            ActionIcon("Negotiate", Icons.Default.AttachMoney) { showNegotiation = true }
-            ActionIcon("Deliverables", Icons.Default.List) { showDeliverables = true }
-            ActionIcon("Brief", Icons.Default.Description) { showBrief = true }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            ActionIcon("Script", Icons.Default.EditNote) { showScript = true }
+            // Pending/Negotiation - Both can negotiate price and deliverables
+            if (status == "PENDING" || status == "NEGOTIATION") {
+                ActionIcon("Negotiate", Icons.Default.AttachMoney) { showNegotiation = true }
+                ActionIcon("Deliverables", Icons.Default.List) { showDeliverables = true }
+            }
+
+            // Accepted - Brand sends brief
+            if (status == "ACCEPTED" && isBrand) {
+                ActionIcon("Send Brief", Icons.Default.Description) { showBrief = true }
+            }
+
+            // Brief Sent - Influencer sends script
+            if (status == "BRIEF_SENT" && !isBrand) {
+                ActionIcon("Submit Script", Icons.Default.EditNote) { showScript = true }
+            }
+            
+            // In Progress - Influencer uploads content
+            if (status == "IN_PROGRESS" && !isBrand) {
+                ActionIcon("Upload", Icons.Default.CloudUpload) { showUpload = true }
+            }
+
+            // Feedback - Always show
             ActionIcon("Feedback", Icons.Default.Feedback) { showFeedback = true }
-            ActionIcon("Upload", Icons.Default.CloudUpload) { showUpload = true }
         }
     }
 
@@ -88,7 +102,7 @@ fun RestrictedActionPanel(
     if (showBrief) {
         TextInputDialog(
             title = "Share Campaign Brief",
-            label = "Brief Link",
+            label = "Brief Link (Google Doc/Drive)",
             onDismiss = { showBrief = false },
             onSend = { link ->
                 onSend("Campaign Brief Shared", "BRIEF", mapOf("link" to link))
@@ -100,7 +114,7 @@ fun RestrictedActionPanel(
     if (showScript) {
         TextInputDialog(
             title = "Submit Script",
-            label = "Script Content",
+            label = "Script Content or Link",
             multiline = true,
             onDismiss = { showScript = false },
             onSend = { content ->
@@ -112,8 +126,8 @@ fun RestrictedActionPanel(
 
     if (showFeedback) {
         TextInputDialog(
-            title = "Video Feedback",
-            label = "Feedback",
+            title = "Feedback",
+            label = "Enter your feedback",
             multiline = true,
             onDismiss = { showFeedback = false },
             onSend = { feedback ->
@@ -126,7 +140,7 @@ fun RestrictedActionPanel(
     if (showUpload) {
         TextInputDialog(
             title = "Upload Content",
-            label = "Drive/Cloud Link",
+            label = "Final Content Link",
             onDismiss = { showUpload = false },
             onSend = { link ->
                 onSend("Content Uploaded", "UPLOAD", mapOf("link" to link))
@@ -146,18 +160,19 @@ fun ActionIcon(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(4.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
             tint = Color(0xFFFF8383),
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier.size(28.dp)
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.Black
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.Black,
+            fontSize = 10.sp
         )
     }
 }

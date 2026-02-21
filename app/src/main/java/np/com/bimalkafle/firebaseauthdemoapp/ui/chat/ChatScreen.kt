@@ -381,6 +381,8 @@ fun ChatScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         RestrictedActionPanel(
+                            status = currentCollaboration?.status,
+                            isBrand = isBrand,
                             onSend = { text, type, metadata ->
                                 viewModel.sendMessage(text, type, metadata)
                             }
