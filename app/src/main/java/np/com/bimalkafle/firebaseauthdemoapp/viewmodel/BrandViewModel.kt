@@ -797,7 +797,7 @@ class BrandViewModel : ViewModel() {
                     updatedAt = campaignObj.optString("updatedAt")
                 )
             } else {
-                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null, null)
+                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null)
             }
 
             val influencerObj = obj.optJSONObject("influencer")
