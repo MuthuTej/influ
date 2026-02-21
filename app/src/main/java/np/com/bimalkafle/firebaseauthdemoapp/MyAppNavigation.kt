@@ -144,6 +144,8 @@ fun MyAppNavigation(
             ChatScreen(
                 chatId = chatId,
                 chatNameParam = chatName,
+                navController = navController,
+                authViewModel = authViewModel,
                 onBack = { navController.popBackStack() },
                 onCreateProposal = { id -> 
                     navController.navigate("influencer_create_proposal/$id")

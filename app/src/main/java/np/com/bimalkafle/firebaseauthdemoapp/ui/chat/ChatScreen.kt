@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import np.com.bimalkafle.firebaseauthdemoapp.AuthState
+import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatMessage
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.ChatViewModel
 import java.text.SimpleDateFormat
@@ -34,10 +39,22 @@ import java.util.*
 fun ChatScreen(
     chatId: String?,
     chatNameParam: String?,
+    navController: NavController,
+    authViewModel: AuthViewModel,
     viewModel: ChatViewModel = viewModel(),
     onBack: () -> Unit = {},
     onCreateProposal: (String) -> Unit = {}
 ) {
+    val authState = authViewModel.authState.observeAsState()
+    var isBrand by remember { mutableStateOf(false) }
+
+    LaunchedEffect(authState.value) {
+        if (authState.value is AuthState.Authenticated) {
+            val role = (authState.value as AuthState.Authenticated).role
+            isBrand = role.equals("BRAND", ignoreCase = true)
+        }
+    }
+
     LaunchedEffect(chatId) {
         chatId?.let { 
             viewModel.initChat(it, chatNameParam ?: "Chat") 
@@ -97,78 +114,91 @@ fun ChatScreen(
         }
     }
 
-
-
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF2F2F7))) {
-        Column(
+    Scaffold(
+        bottomBar = {
+            CmnBottomNavigationBar(
+                selectedItem = "Connect",
+                onItemSelected = { /* Handled in component */ },
+                navController = navController,
+                isBrand = isBrand
+            )
+        }
+    ) { innerPadding ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .imePadding()
+                .padding(innerPadding)
+                .background(Color(0xFFF2F2F7))
         ) {
-            ChatTopBar(
-                chatName = chatName,
-                onBackClick = onBack,
-                onProfileClick = {
-                    isProfileExpanded = true
-                }
-            )
-
-            MessagesList(
-                messages = messages,
-                onReply = { message ->
-                    viewModel.setReplyingTo(message)
-                },
-                onUpdateStatus = { messageId, status ->
-                    viewModel.updateMessageStatus(messageId, status)
-                },
-                onModify = { message ->
-                    modificationMessage = message
-                },
-                modifier = Modifier.weight(1f)
-            )
-
-            Surface(
-                shadowElevation = 8.dp,
-                color = Color.White,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                RestrictedActionPanel(
-                    onSend = { text, type, metadata ->
-                        viewModel.sendMessage(text, type, metadata)
-                    }
-                )
-            }
-        }
-
-        AnimatedVisibility(
-            visible = isProfileExpanded,
-            enter = fadeIn() + scaleIn(),
-            exit = fadeOut() + scaleOut()
-        ) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { isProfileExpanded = false },
-                contentAlignment = Alignment.Center
+                    .statusBarsPadding()
+                    .imePadding()
             ) {
+                ChatTopBar(
+                    chatName = chatName,
+                    onBackClick = onBack,
+                    onProfileClick = {
+                        isProfileExpanded = true
+                    }
+                )
+
+                MessagesList(
+                    messages = messages,
+                    onReply = { message ->
+                        viewModel.setReplyingTo(message)
+                    },
+                    onUpdateStatus = { messageId, status ->
+                        viewModel.updateMessageStatus(messageId, status)
+                    },
+                    onModify = { message ->
+                        modificationMessage = message
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
                 Surface(
-                    modifier = Modifier
-                        .size(300.dp)
-                        .clip(CircleShape),
-                    color = MaterialTheme.colorScheme.surface
+                    shadowElevation = 8.dp,
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Profile",
-                        modifier = Modifier.fillMaxSize(),
-                        tint = Color.Gray
+                    RestrictedActionPanel(
+                        onSend = { text, type, metadata ->
+                            viewModel.sendMessage(text, type, metadata)
+                        }
                     )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = isProfileExpanded,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { isProfileExpanded = false },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .size(300.dp)
+                            .clip(CircleShape),
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Profile",
+                            modifier = Modifier.fillMaxSize(),
+                            tint = Color.Gray
+                        )
+                    }
                 }
             }
         }
