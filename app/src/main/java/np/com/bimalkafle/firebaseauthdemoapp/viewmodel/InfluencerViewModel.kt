@@ -371,7 +371,6 @@ class InfluencerViewModel : ViewModel() {
                       brandId
                       title
                       description
-                      objective
                       budgetMin
                       budgetMax
                       startDate
@@ -435,7 +434,6 @@ class InfluencerViewModel : ViewModel() {
                     brandId = campaignObj.optString("brandId"),
                     title = campaignObj.optString("title"),
                     description = campaignObj.optString("description"),
-                    objective = campaignObj.optString("objective"),
                     budgetMin = if (campaignObj.isNull("budgetMin")) null else campaignObj.optInt("budgetMin"),
                     budgetMax = if (campaignObj.isNull("budgetMax")) null else campaignObj.optInt("budgetMax"),
                     startDate = campaignObj.optString("startDate"),
@@ -445,7 +443,7 @@ class InfluencerViewModel : ViewModel() {
                     updatedAt = campaignObj.optString("updatedAt")
                 )
             } else {
-                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null, null)
+                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null)
             }
 
             // Influencer object is not returned in this query based on user request, creating a dummy or handling nulls if needed.
@@ -464,7 +462,6 @@ class InfluencerViewModel : ViewModel() {
                     updatedAt = brandObj.optString("updatedAt"),
                     brandCategory = null,
                     about = brandObj.optString("about"),
-                    primaryObjective = brandObj.optString("primaryObjective"),
                     profileUrl = brandObj.optString("profileUrl"),
                     logoUrl = brandObj.optString("logoUrl"),
                     govtId = brandObj.optString("govtId"),
@@ -542,7 +539,6 @@ class InfluencerViewModel : ViewModel() {
                       subCategory
                     }
                     about
-                    primaryObjective
                     preferredPlatforms {
                       platform
                       profileUrl
@@ -768,7 +764,6 @@ class InfluencerViewModel : ViewModel() {
                     updatedAt = obj.optString("updatedAt"),
                     brandCategory = brandCategory,
                     about = obj.optString("about"),
-                    primaryObjective = obj.optString("primaryObjective"),
                     profileUrl = obj.optString("profileUrl"),
                     logoUrl = obj.optString("logoUrl"),
                     govtId = obj.optString("govtId"),
