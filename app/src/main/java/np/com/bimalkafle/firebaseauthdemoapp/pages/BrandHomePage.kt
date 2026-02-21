@@ -735,12 +735,41 @@ fun BrandCardBrand(
 
                 // Name, Location, Bio, Category
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = influencer.name,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = Color.Black
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = influencer.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = Color.Black
+                        )
+                        if (influencer.isVerified == true) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Verified",
+                                tint = Color(0xFF2196F3),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        if (influencer.averageRating != null) {
+                            Spacer(modifier = Modifier.weight(1f))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFC107),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = String.format("%.1f", influencer.averageRating),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                            }
+                        }
+                    }
                     Text(
                         text = influencer.location ?: "Unknown Location",
                         fontSize = 14.sp,
@@ -805,7 +834,35 @@ fun BrandCardBrand(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Strengths Chips
+            influencer.strengths?.let { strengths ->
+                if (strengths.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        strengths.take(3).forEach { strength ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFFE3F2FD),
+                                border = BorderStroke(1.dp, Color(0xFF90CAF9))
+                            ) {
+                                Text(
+                                    text = strength,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF1976D2),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -816,6 +873,14 @@ fun BrandCardBrand(
             ) {
                 // Followers
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    val firstPlatform = influencer.platforms?.firstOrNull()
+                    val platformIcon = when(firstPlatform?.platform?.uppercase()) {
+                        "YOUTUBE" -> R.drawable.ic_youtube
+                        "INSTAGRAM" -> R.drawable.ic_instagram
+                        "FACEBOOK" -> R.drawable.ic_facebook
+                        else -> R.drawable.ic_instagram 
+                    }
+
                     Surface(
                         shape = CircleShape,
                         color = brandThemeColor,
@@ -823,7 +888,7 @@ fun BrandCardBrand(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                painter = painterResource(id = R.drawable.ic_youtube),
+                                painter = painterResource(id = platformIcon),
                                 contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(14.dp)
@@ -832,7 +897,7 @@ fun BrandCardBrand(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "${formatCount(influencer.platforms?.firstOrNull()?.followers ?: 0)} Followers",
+                        text = "${formatCount(firstPlatform?.followers ?: 0)} Followers",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black

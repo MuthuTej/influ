@@ -119,6 +119,8 @@ class BrandViewModel : ViewModel() {
                       }
                       availability
                       logoUrl
+                      averageRating
+                      isVerified
                     }
                   }
                 }
@@ -204,6 +206,8 @@ class BrandViewModel : ViewModel() {
                     }
                     availability
                     logoUrl
+                    averageRating
+                    isVerified
                   }
                 }
             """.trimIndent()
@@ -365,7 +369,9 @@ class BrandViewModel : ViewModel() {
             strengths = strengths,
             pricing = pricing,
             availability = obj.optBoolean("availability"),
-            logoUrl = obj.optString("logoUrl")
+            logoUrl = obj.optString("logoUrl"),
+            averageRating = if (obj.has("averageRating") && !obj.isNull("averageRating")) obj.optDouble("averageRating").toFloat() else null,
+            isVerified = obj.optBoolean("isVerified", false)
         )
     }
 
