@@ -22,6 +22,7 @@ class ChatViewModel : ViewModel() {
 
     private val repository = ChatRepository()
     private var currentOtherUserId: String? = null
+    private var currentCollaborationId: String? = null
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages
@@ -37,7 +38,6 @@ class ChatViewModel : ViewModel() {
 
     init {
         repository.ensureUserExistsInFirestore()
-        // We will load chat list manually or when role is available
     }
 
     fun loadChatList(currentUserRole: String) {
@@ -48,27 +48,22 @@ class ChatViewModel : ViewModel() {
             ) { users, messages ->
                 val currentUserId = getCurrentUserId()
                 
-                // Identify users we have interacted with (sent or received messages)
                 val interactedUserIds = messages.flatMap { listOf(it.senderId, it.receiverId) }
                     .filter { it != currentUserId }
                     .toSet()
 
-                // Filter the list of users to only include those we have interacted with
                 val activeUsers = users.filter { it.uid in interactedUserIds }
 
                 activeUsers.map { user ->
-                    // Get all messages between me and this user
                     val conversationMessages = messages.filter { 
                         (it.senderId == user.uid && it.receiverId == currentUserId) ||
                         (it.senderId == currentUserId && it.receiverId == user.uid)
                     }
                     
-                    // Count unread messages (received from them and not read)
                     val unreadCount = conversationMessages.count { 
                          it.senderId == user.uid && !it.isRead 
                     }
                     
-                    // Get the very last message in the conversation for the preview
                     val lastMsgObj = conversationMessages.maxByOrNull { it.timestamp }
                     val lastMessageText = lastMsgObj?.text ?: ""
 
@@ -84,16 +79,16 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    fun initChat(otherUserId: String, otherUserName: String = "Chat") {
+    fun initChat(otherUserId: String, otherUserName: String = "Chat", collaborationId: String? = null) {
         currentOtherUserId = otherUserId
+        currentCollaborationId = collaborationId
         _chatName.value = otherUserName
         
         viewModelScope.launch {
             val currentUserId = getCurrentUserId()
-            repository.getMessages(otherUserId).collectLatest { list ->
+            repository.getMessages(otherUserId, collaborationId).collectLatest { list ->
                 _messages.value = list.map { it.copy(isMe = it.senderId == currentUserId) }
-                // Mark messages as read whenever the list updates and we're in the chat
-                repository.markMessagesAsRead(otherUserId)
+                repository.markMessagesAsRead(otherUserId, collaborationId)
             }
         }
     }
@@ -108,14 +103,15 @@ class ChatViewModel : ViewModel() {
         metadata: Map<String, Any> = emptyMap()
     ) {
         val otherUserId = currentOtherUserId ?: return
-        if (text.isBlank() && type == "TEXT") return // Allow non-text messages to be "blank" text if needed, or handle text requirement
+        if (text.isBlank() && type == "TEXT") return
 
         repository.sendMessage(
             receiverId = otherUserId,
             text = text,
             replyToId = _replyingTo.value?.id,
             type = type,
-            metadata = metadata
+            metadata = metadata,
+            collaborationId = currentCollaborationId
         )
         _replyingTo.value = null
     }

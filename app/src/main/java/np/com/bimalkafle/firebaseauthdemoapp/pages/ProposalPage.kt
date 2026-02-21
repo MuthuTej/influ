@@ -61,6 +61,8 @@ enum class ProposalType {
 data class Proposal(
     val id: String,
     val influencerName: String,
+    val influencerId: String,
+    val brandId: String,
     val campaignTitle: String,
     val budget: String,
     val deliverable: String,
@@ -75,15 +77,12 @@ data class Proposal(
 
 fun Collaboration.toProposal(currentUserId: String): Proposal {
     val pricing = this.pricing?.firstOrNull()
-    val isBrandInitiated = this.initiatedBy == "BRAND"
-    // Assuming if brand is current user, and "BRAND" initiated, then it's SENT.
-    // If brand is current user, and "INFLUENCER" initiated, then it's RECEIVED.
-    // This logic might need adjustment based on how initiatedBy is stored (UID or Role)
-    // The example says BRAND or INFLUENCER strings.
     
     return Proposal(
         id = this.id,
         influencerName = this.influencer.name,
+        influencerId = this.influencerId,
+        brandId = this.brandId,
         campaignTitle = this.campaign.title,
         budget = if (pricing != null) "${pricing.currency} ${pricing.price}" else "N/A",
         deliverable = pricing?.deliverable ?: "N/A",
@@ -108,7 +107,7 @@ fun ProposalPage(
     authViewModel: AuthViewModel,
     brandViewModel: BrandViewModel
 ) {
-    var selectedTab by remember { mutableStateOf(ProposalType.RECEIVED) } // Set RECEIVED as default for Brand
+    var selectedTab by remember { mutableStateOf(ProposalType.RECEIVED) }
     var selectedStatus by remember { mutableStateOf<ProposalStatus?>(null) }
 
     val collaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
@@ -137,8 +136,6 @@ fun ProposalPage(
         .filter { it.type == selectedTab && (selectedStatus == null || it.status == selectedStatus) }
 
     val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
-
     val headerHeight = 120.dp
     val contentPaddingTop = headerHeight - 20.dp
 
@@ -258,13 +255,17 @@ fun ProposalPage(
                             items(proposals) { proposal ->
                                 PremiumProposalCard(
                                     proposal = proposal,
+                                    isBrand = isBrand,
+                                    onChat = {
+                                        val otherUserId = if (isBrand) proposal.influencerId else proposal.brandId
+                                        val otherUserName = proposal.influencerName
+                                        navController.navigate("chat/$otherUserId/$otherUserName?collaborationId=${proposal.id}")
+                                    },
                                     onAction = { status ->
                                         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                                             val token = result.token
                                             if (token != null) {
-                                                brandViewModel.updateCollaborationStatus(token, proposal.id, status) { success ->
-                                                     // Refresh handled by ViewModel
-                                                }
+                                                brandViewModel.updateCollaborationStatus(token, proposal.id, status) { success -> }
                                             }
                                         }
                                     }
@@ -345,7 +346,12 @@ fun StatusFilterRow(selectedStatus: ProposalStatus?, onStatusSelected: (Proposal
 }
 
 @Composable
-fun PremiumProposalCard(proposal: Proposal, onAction: (String) -> Unit) {
+fun PremiumProposalCard(
+    proposal: Proposal, 
+    isBrand: Boolean,
+    onChat: () -> Unit,
+    onAction: (String) -> Unit
+) {
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -353,7 +359,6 @@ fun PremiumProposalCard(proposal: Proposal, onAction: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
-            .clickable { /* Detail View? */ }
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -404,12 +409,26 @@ fun PremiumProposalCard(proposal: Proposal, onAction: (String) -> Unit) {
                 InfoItem("Date", proposal.date, Icons.Default.CalendarToday)
             }
 
-            if (proposal.type == ProposalType.RECEIVED && proposal.status == ProposalStatus.PENDING) {
-                Spacer(modifier = Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Chat Button is always available for active/pending collaborations
+                OutlinedButton(
+                    onClick = onChat,
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8383)),
+                    border = BorderStroke(1.dp, Color(0xFFFF8383)),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
+                    Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Chat", fontWeight = FontWeight.Bold)
+                }
+
+                if (proposal.type == ProposalType.RECEIVED && proposal.status == ProposalStatus.PENDING) {
                     Button(
                         onClick = { onAction("ACCEPTED") },
                         modifier = Modifier.weight(1f).height(48.dp),
@@ -418,25 +437,15 @@ fun PremiumProposalCard(proposal: Proposal, onAction: (String) -> Unit) {
                     ) {
                         Text("Accept", fontWeight = FontWeight.Bold)
                     }
-                    OutlinedButton(
-                        onClick = { onAction("REJECTED") },
+                } else if (proposal.type == ProposalType.SENT && proposal.status == ProposalStatus.PENDING) {
+                    Button(
+                        onClick = { onAction("REVOKED") },
                         modifier = Modifier.weight(1f).height(48.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF44336)),
-                        border = BorderStroke(1.dp, Color(0xFFF44336)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D1D1F)),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text("Reject", fontWeight = FontWeight.Bold)
+                        Text("Revoke", fontWeight = FontWeight.Bold)
                     }
-                }
-            } else if (proposal.type == ProposalType.SENT && proposal.status == ProposalStatus.PENDING) {
-                 Spacer(modifier = Modifier.height(20.dp))
-                 Button(
-                    onClick = { onAction("REVOKED") },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D1D1F)),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text("Withdraw Proposal", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }

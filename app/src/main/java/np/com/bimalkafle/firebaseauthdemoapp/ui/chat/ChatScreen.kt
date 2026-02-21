@@ -39,6 +39,7 @@ import java.util.*
 fun ChatScreen(
     chatId: String?,
     chatNameParam: String?,
+    collaborationId: String? = null,
     navController: NavController,
     authViewModel: AuthViewModel,
     viewModel: ChatViewModel = viewModel(),
@@ -55,9 +56,9 @@ fun ChatScreen(
         }
     }
 
-    LaunchedEffect(chatId) {
+    LaunchedEffect(chatId, collaborationId) {
         chatId?.let { 
-            viewModel.initChat(it, chatNameParam ?: "Chat") 
+            viewModel.initChat(it, chatNameParam ?: "Chat", collaborationId)
         }
     }
 

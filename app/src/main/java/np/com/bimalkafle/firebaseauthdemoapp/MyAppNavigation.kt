@@ -3,9 +3,11 @@ package np.com.bimalkafle.firebaseauthdemoapp
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import np.com.bimalkafle.firebaseauthdemoapp.pages.*
 import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatListScreen
 import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatScreen
@@ -98,7 +100,7 @@ fun MyAppNavigation(
             InfluencerCreateProposal(
                 influencerId = influencerId,
                 onBack = { navController.popBackStack() },
-                onCreateProposal = { navController.navigate("brand_home") }, // Navigate to home or proposals
+                onCreateProposal = { navController.navigate("brand_home") }, 
                 brandViewModel = brandViewModel,
                 authViewModel = authViewModel
             )
@@ -138,12 +140,25 @@ fun MyAppNavigation(
             )
         }
 
-        composable("chat/{chatId}/{chatName}") { backStackEntry ->
+        composable(
+            route = "chat/{chatId}/{chatName}?collaborationId={collaborationId}",
+            arguments = listOf(
+                navArgument("chatId") { type = NavType.StringType },
+                navArgument("chatName") { type = NavType.StringType },
+                navArgument("collaborationId") { 
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null 
+                }
+            )
+        ) { backStackEntry ->
             val chatId = backStackEntry.arguments?.getString("chatId")
             val chatName = backStackEntry.arguments?.getString("chatName")
+            val collaborationId = backStackEntry.arguments?.getString("collaborationId")
             ChatScreen(
                 chatId = chatId,
                 chatNameParam = chatName,
+                collaborationId = collaborationId,
                 navController = navController,
                 authViewModel = authViewModel,
                 onBack = { navController.popBackStack() },

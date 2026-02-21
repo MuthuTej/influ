@@ -23,6 +23,7 @@ data class ChatMessage(
     val type: String = "TEXT",
     val metadata: Map<String, Any> = emptyMap(),
     val status: String = "PENDING", // PENDING, ACCEPTED, REJECTED
+    val collaborationId: String? = null, // <-- ADDED THIS LINE
     
     @get:Exclude
     val isMe: Boolean = false,
