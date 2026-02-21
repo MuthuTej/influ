@@ -36,6 +36,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatMessage
+import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.ChatViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
@@ -363,6 +364,8 @@ fun ChatScreen(
                     // Collaboration Messages
                     MessagesList(
                         messages = messages,
+                        collaboration = currentCollaboration,
+                        isBrand = isBrand,
                         onReply = { message ->
                             viewModel.setReplyingTo(message)
                         },
@@ -371,6 +374,16 @@ fun ChatScreen(
                         },
                         onModify = { message ->
                             modificationMessage = message
+                        },
+                        onCollaborationStatusUpdate = { newStatus ->
+                            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                val token = result.token ?: return@addOnSuccessListener
+                                if (isBrand) {
+                                    brandViewModel.updateCollaborationStatus(token, collaborationId, newStatus) { }
+                                } else {
+                                    influencerViewModel.updateCollaborationStatus(token, collaborationId, newStatus) { }
+                                }
+                            }
                         },
                         modifier = Modifier.weight(1f)
                     )
@@ -439,33 +452,35 @@ fun ChatScreen(
 private sealed interface ChatUiItem {
     data class MessageItem(val message: ChatMessage) : ChatUiItem
     data class DateHeader(val date: String) : ChatUiItem
+    data class ProposalHeader(val collaboration: Collaboration) : ChatUiItem
 }
 
 @Composable
 fun MessagesList(
     messages: List<ChatMessage>,
+    collaboration: Collaboration?,
+    isBrand: Boolean,
     onReply: (ChatMessage) -> Unit,
     onUpdateStatus: (String, String) -> Unit,
     onModify: (ChatMessage) -> Unit,
+    onCollaborationStatusUpdate: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
 
-    // Process messages to add headers
-    val uiItems = remember(messages) {
+    // Process items to add proposal header and date headers
+    val uiItems = remember(messages, collaboration) {
         val items = mutableListOf<ChatUiItem>()
+        
+        // 1. Add Initial Proposal at the very top
+        collaboration?.let {
+            items.add(ChatUiItem.ProposalHeader(it))
+        }
+
         var lastDate = ""
         val dateFormat = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
 
         messages.forEach { message ->
-            val date = try {
-                val dateObj = Date(message.timestamp) // Assuming timestamp is millis
-                dateFormat.format(dateObj)
-            } catch (e: Exception) {
-                ""
-            }
-
-            // Check for specific readable dates like Today/Yesterday
             val readableDate = calculateReadableDate(message.timestamp)
             
             if (readableDate != lastDate) {
@@ -491,6 +506,13 @@ fun MessagesList(
     ) {
         items(uiItems) { item ->
             when (item) {
+                is ChatUiItem.ProposalHeader -> {
+                    ProposalSummaryCard(
+                        collaboration = item.collaboration,
+                        isBrand = isBrand,
+                        onAction = onCollaborationStatusUpdate
+                    )
+                }
                 is ChatUiItem.DateHeader -> {
                     Box(
                         modifier = Modifier
@@ -520,6 +542,109 @@ fun MessagesList(
                         onUpdateStatus = onUpdateStatus,
                         onModify = onModify
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProposalSummaryCard(
+    collaboration: Collaboration,
+    isBrand: Boolean,
+    onAction: (String) -> Unit
+) {
+    val pricing = collaboration.pricing?.firstOrNull()
+    val status = collaboration.status
+    val initiatedByMe = if (isBrand) collaboration.initiatedBy == "BRAND" else collaboration.initiatedBy == "INFLUENCER"
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    color = Color(0xFFFF8383).copy(alpha = 0.1f),
+                    shape = CircleShape,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.WorkOutline, null, tint = Color(0xFFFF8383), modifier = Modifier.size(20.dp))
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Initial Proposal", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text(collaboration.campaign.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+                
+                Surface(
+                    color = Color(0xFFF5F5F5),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = status,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.DarkGray
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Divider(color = Color(0xFFF5F5F5))
+            Spacer(Modifier.height(12.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("Deliverable", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text(pricing?.deliverable ?: "N/A", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("Budget", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text("${pricing?.currency ?: "INR"} ${pricing?.price ?: 0}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFFFF8383))
+                }
+            }
+
+            // CTAs for PENDING status
+            if (status == "PENDING") {
+                Spacer(Modifier.height(16.dp))
+                if (!initiatedByMe) {
+                    // I am the receiver - show Accept/Reject
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { onAction("ACCEPTED") },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Accept", fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = { onAction("REJECTED") },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF44336)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Reject", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    // I am the sender - show Revoke
+                    Button(
+                        onClick = { onAction("REVOKED") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Withdraw Proposal", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
