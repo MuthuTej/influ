@@ -48,6 +48,9 @@ class CampaignViewModel : ViewModel() {
     private val _campaigns = MutableLiveData<List<CampaignDetail>>()
     val campaigns: LiveData<List<CampaignDetail>> = _campaigns
 
+    private val _campaign = MutableLiveData<CampaignDetail?>()
+    val campaign: LiveData<CampaignDetail?> = _campaign
+
     private val _wishlistedCampaigns = MutableLiveData<List<CampaignDetail>>(emptyList())
     val wishlistedCampaigns: LiveData<List<CampaignDetail>> = _wishlistedCampaigns
 
@@ -97,7 +100,6 @@ class CampaignViewModel : ViewModel() {
 
     fun fetchWishlist(token: String) {
         viewModelScope.launch {
-            // Updated query to use inline fragment for 'WishlistUnion'
             val query = """
                 query GetWishlist {
                   getWishlist {
@@ -115,9 +117,20 @@ class CampaignViewModel : ViewModel() {
                         id
                         name
                         logoUrl
+                        isVerified
+                        averageRating
                         brandCategory {
                           category
                           subCategory
+                        }
+                        preferredPlatforms {
+                            platform
+                        }
+                        targetAudience {
+                            ageMin
+                            ageMax
+                            gender
+                            locations
                         }
                       }
                     }
@@ -134,7 +147,6 @@ class CampaignViewModel : ViewModel() {
                         val list = mutableListOf<CampaignDetail>()
                         for (i in 0 until wishlistArray.length()) {
                             val obj = wishlistArray.optJSONObject(i)
-                            // Only add if it's a Campaign (has an id and title)
                             if (obj != null && obj.has("id") && obj.has("title")) {
                                 list.add(parseCampaignDetail(obj))
                             }
@@ -176,9 +188,20 @@ class CampaignViewModel : ViewModel() {
                       id
                       name
                       logoUrl
+                      isVerified
+                      averageRating
                       brandCategory {
                         category
                         subCategory
+                      }
+                      preferredPlatforms {
+                          platform
+                      }
+                      targetAudience {
+                          ageMin
+                          ageMax
+                          gender
+                          locations
                       }
                     }
                   }
@@ -201,6 +224,69 @@ class CampaignViewModel : ViewModel() {
                         _campaigns.postValue(list)
                     } else {
                         _campaigns.postValue(emptyList())
+                    }
+                } catch (e: Exception) {
+                    Log.e("CampaignViewModel", "Parsing error", e)
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
+                }
+            }.onFailure {
+                Log.e("CampaignViewModel", "Network error", it)
+                _error.postValue("Network error: ${'$'}{it.message}")
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun fetchCampaignById(id: String, token: String) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val query = """
+                query GetCampaignById(${'$'}id: ID!) {
+                  getCampaignById(id: ${'$'}id) {
+                    id
+                    title
+                    description
+                    status
+                    createdAt
+                    budgetMin
+                    budgetMax
+                    startDate
+                    endDate
+                    brand {
+                      id
+                      name
+                      logoUrl
+                      isVerified
+                      averageRating
+                      brandCategory {
+                        category
+                        subCategory
+                      }
+                      preferredPlatforms {
+                          platform
+                      }
+                      targetAudience {
+                          ageMin
+                          ageMax
+                          gender
+                          locations
+                      }
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf("id" to id)
+            val result = GraphQLClient.query(query = query, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    val campaignObj = data?.optJSONObject("getCampaignById")
+                    if (campaignObj != null) {
+                        _campaign.postValue(parseCampaignDetail(campaignObj))
+                    } else {
+                        _error.postValue("Campaign not found")
                     }
                 } catch (e: Exception) {
                     Log.e("CampaignViewModel", "Parsing error", e)
@@ -250,6 +336,8 @@ class CampaignViewModel : ViewModel() {
                       }
                       name
                       logoUrl
+                      isVerified
+                      averageRating
                     }
                   }
                 }
@@ -308,11 +396,11 @@ class CampaignViewModel : ViewModel() {
             }
             
             val platformsArray = it.optJSONArray("preferredPlatforms")
-            val platforms = mutableListOf<CampaignPlatformInput>()
+            val platforms = mutableListOf<PreferredPlatform>()
             if (platformsArray != null) {
                 for (i in 0 until platformsArray.length()) {
                     val p = platformsArray.getJSONObject(i)
-                    platforms.add(CampaignPlatformInput(p.optString("platform")))
+                    platforms.add(PreferredPlatform(p.optString("platform"), null, null, null, null, null, null, null, null))
                 }
             }
 
@@ -325,7 +413,7 @@ class CampaignViewModel : ViewModel() {
                         locations.add(locationsArray.getString(i))
                     }
                 }
-                CampaignAudienceResponse(
+                TargetAudience(
                     aud.optInt("ageMin").takeIf { it != 0 },
                     aud.optInt("ageMax").takeIf { it != 0 },
                     aud.optString("gender"),
@@ -333,14 +421,24 @@ class CampaignViewModel : ViewModel() {
                 )
             }
 
-            BrandResponse(
+            Brand(
+                it.optString("id"),
+                it.optString("email"),
                 it.optString("name"),
-                it.optString("about"),
-                it.optString("logoUrl"),
+                it.optString("role"),
+                it.optBoolean("profileCompleted"),
+                it.optString("updatedAt"),
                 category,
+                it.optString("about"),
+                it.optString("profileUrl"),
+                it.optString("logoUrl"),
+                it.optString("govtId"),
+                it.optBoolean("isVerified"),
+                null,
+                it.optDouble("averageRating").takeIf { it != 0.0 },
+                it.optString("fcmToken"),
                 platforms,
-                audience,
-                it.optString("id")
+                audience
             )
         }
 

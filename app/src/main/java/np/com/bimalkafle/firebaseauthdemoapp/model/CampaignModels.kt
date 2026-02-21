@@ -41,7 +41,7 @@ data class CampaignDetail(
     val startDate: String?,
     val endDate: String?,
     val targetAudience: CampaignAudienceResponse?,
-    val brand: BrandResponse?
+    val brand: Brand?
 )
 
 data class CampaignAudienceResponse(

@@ -199,5 +199,16 @@ fun MyAppNavigation(
         composable("campaign_analytics") {
             CampaignAnalyticsPage(navController)
         }
+        composable(
+            route = "campaign_detail/{campaignId}",
+            arguments = listOf(navArgument("campaignId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val campaignId = backStackEntry.arguments?.getString("campaignId") ?: ""
+            InfluencerBrandDetailScreen(
+                navController = navController,
+                campaignId = campaignId,
+                campaignViewModel = campaignViewModel
+            )
+        }
     })
 }
