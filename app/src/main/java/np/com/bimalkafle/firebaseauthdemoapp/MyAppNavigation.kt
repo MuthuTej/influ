@@ -120,7 +120,7 @@ fun MyAppNavigation(
             BrandSearchPage(modifier, navController, authViewModel, brandViewModel)
         }
         composable("brand_history") {
-            ProposalPage (modifier, navController, authViewModel, brandViewModel)
+            ProposalPage (modifier, navController, authViewModel, brandViewModel, influencerViewModel)
         }
         composable("brand_profile") {
             BrandProfilePage(modifier, navController, authViewModel, brandViewModel)
@@ -168,7 +168,7 @@ fun MyAppNavigation(
             )
         }
         composable("proposals") {
-            ProposalPage(modifier, navController, authViewModel, brandViewModel)
+            ProposalPage(modifier, navController, authViewModel, brandViewModel, influencerViewModel)
         }
         composable("wishlist") {
             WishlistScreen(navController, campaignViewModel)

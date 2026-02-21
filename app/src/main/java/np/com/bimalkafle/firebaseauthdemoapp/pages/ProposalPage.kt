@@ -39,6 +39,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 
@@ -60,7 +61,7 @@ enum class ProposalType {
 
 data class Proposal(
     val id: String,
-    val influencerName: String,
+    val otherPartyName: String,
     val campaignTitle: String,
     val budget: String,
     val deliverable: String,
@@ -73,17 +74,22 @@ data class Proposal(
     val paymentStatus: String
 )
 
-fun Collaboration.toProposal(currentUserId: String): Proposal {
+fun Collaboration.toProposal(isBrandView: Boolean): Proposal {
     val pricing = this.pricing?.firstOrNull()
-    val isBrandInitiated = this.initiatedBy == "BRAND"
-    // Assuming if brand is current user, and "BRAND" initiated, then it's SENT.
-    // If brand is current user, and "INFLUENCER" initiated, then it's RECEIVED.
-    // This logic might need adjustment based on how initiatedBy is stored (UID or Role)
-    // The example says BRAND or INFLUENCER strings.
+    val isInitiatedByBrand = this.initiatedBy == "BRAND"
     
+    val proposalType = if (isBrandView) {
+        if (isInitiatedByBrand) ProposalType.SENT else ProposalType.RECEIVED
+    } else {
+        if (isInitiatedByBrand) ProposalType.RECEIVED else ProposalType.SENT
+    }
+
+    val otherPartyName = if (isBrandView) this.influencer.name else this.brand?.name ?: "Unknown Brand"
+    val otherPartyLogo = if (isBrandView) this.influencer.logoUrl else this.brand?.logoUrl
+
     return Proposal(
         id = this.id,
-        influencerName = this.influencer.name,
+        otherPartyName = otherPartyName,
         campaignTitle = this.campaign.title,
         budget = if (pricing != null) "${pricing.currency} ${pricing.price}" else "N/A",
         deliverable = pricing?.deliverable ?: "N/A",
@@ -93,8 +99,8 @@ fun Collaboration.toProposal(currentUserId: String): Proposal {
         } catch (e: Exception) {
             ProposalStatus.PENDING
         },
-        type = if (this.initiatedBy == "BRAND") ProposalType.SENT else ProposalType.RECEIVED,
-        logoUrl = this.influencer.logoUrl,
+        type = proposalType,
+        logoUrl = otherPartyLogo,
         date = this.createdAt.take(10),
         totalAmount = if (this.totalAmount != null) "₹${this.totalAmount}" else "N/A",
         paymentStatus = this.paymentStatus ?: "pending"
@@ -106,23 +112,37 @@ fun ProposalPage(
     modifier: Modifier = Modifier,
     navController: NavController,
     authViewModel: AuthViewModel,
-    brandViewModel: BrandViewModel
+    brandViewModel: BrandViewModel,
+    influencerViewModel: InfluencerViewModel
 ) {
-    var selectedTab by remember { mutableStateOf(ProposalType.RECEIVED) } // Set RECEIVED as default for Brand
+    val authState by authViewModel.authState.observeAsState()
+    var isBrand by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(authState) {
+        if (authState is np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated) {
+             val role = (authState as np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated).role
+             isBrand = role.equals("BRAND", ignoreCase = true)
+        }
+    }
+
+    var selectedTab by remember { mutableStateOf(ProposalType.RECEIVED) }
     var selectedStatus by remember { mutableStateOf<ProposalStatus?>(null) }
 
-    val collaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
-    val isLoading by brandViewModel.loading.observeAsState(initial = false)
-    val error by brandViewModel.error.observeAsState()
-    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    val brandCollaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
+    val influencerCollaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
+    
+    val collaborations = if (isBrand) brandCollaborations else influencerCollaborations
+    val isLoading = if (isBrand) brandViewModel.loading.observeAsState(false).value else influencerViewModel.loading.observeAsState(false).value
+    val error = if (isBrand) brandViewModel.error.observeAsState().value else influencerViewModel.error.observeAsState().value
 
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isBrand) {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
             val firebaseToken = result.token
             if (firebaseToken != null) {
-                brandViewModel.fetchCollaborations(firebaseToken)
+                if (isBrand) brandViewModel.fetchCollaborations(firebaseToken)
+                else influencerViewModel.fetchCollaborations(firebaseToken)
             }
         }
     }
@@ -133,84 +153,60 @@ fun ProposalPage(
         }
     }
 
-    val proposals = collaborations.map { it.toProposal(currentUserId) }
+    val proposals = collaborations.map { it.toProposal(isBrandView = isBrand) }
         .filter { it.type == selectedTab && (selectedStatus == null || it.status == selectedStatus) }
-
-    val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
 
     val headerHeight = 120.dp
     val contentPaddingTop = headerHeight - 20.dp
-
-    val authState = authViewModel.authState.observeAsState()
-    var isBrand by remember { mutableStateOf(false) }
-    
-    LaunchedEffect(authState.value) {
-        if (authState.value is np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated) {
-             val role = (authState.value as np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated).role
-             isBrand = role.equals("BRAND", ignoreCase = true)
-        }
-    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             CmnBottomNavigationBar(
                 selectedItem = "History",
-                onItemSelected = { /* Handled in the component */ },
+                onItemSelected = { /* Handled in component */ },
                 navController = navController,
                 isBrand = isBrand
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate("create_campaign") },
-                containerColor = Color(0xFFFF8383),
-                shape = CircleShape
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "Create Campaign",
-                    tint = Color.White
-                )
+            if (isBrand) {
+                FloatingActionButton(
+                    onClick = { navController.navigate("create_campaign") },
+                    containerColor = Color(0xFFFF8383),
+                    shape = CircleShape
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White)
+                }
             }
         }
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(paddingValues)
                 .background(Color(0xFFFF8383))
         ) {
             // Header
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(headerHeight)
+                modifier = Modifier.fillMaxWidth().height(headerHeight)
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.vector),
                     contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .alpha(0.15f),
+                    modifier = Modifier.fillMaxSize().alpha(0.15f),
                     contentScale = ContentScale.Crop
                 )
 
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 24.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = { navController.popBackStack() },
                             modifier = Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape)
                         ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = Color.White
-                            )
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
@@ -262,8 +258,10 @@ fun ProposalPage(
                                         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                                             val token = result.token
                                             if (token != null) {
-                                                brandViewModel.updateCollaborationStatus(token, proposal.id, status) { success ->
-                                                     // Refresh handled by ViewModel
+                                                if (isBrand) {
+                                                    brandViewModel.updateCollaborationStatus(token, proposal.id, status) { /* Refresh in VM */ }
+                                                } else {
+                                                    influencerViewModel.updateCollaborationStatus(token, proposal.id, status) { /* Refresh in VM */ }
                                                 }
                                             }
                                         }
@@ -353,7 +351,6 @@ fun PremiumProposalCard(proposal: Proposal, onAction: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
-            .clickable { /* Detail View? */ }
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -367,7 +364,8 @@ fun PremiumProposalCard(proposal: Proposal, onAction: (String) -> Unit) {
                         AsyncImage(
                             model = proposal.logoUrl,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
                         )
                     } else {
                         Image(
@@ -380,7 +378,7 @@ fun PremiumProposalCard(proposal: Proposal, onAction: (String) -> Unit) {
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = proposal.influencerName,
+                        text = proposal.otherPartyName,
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
                         color = Color(0xFF1D1D1F)
@@ -508,10 +506,4 @@ fun EmptyState(isLoading: Boolean) {
             }
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ProposalPagePreview() {
-    // Preview with dummy data
 }

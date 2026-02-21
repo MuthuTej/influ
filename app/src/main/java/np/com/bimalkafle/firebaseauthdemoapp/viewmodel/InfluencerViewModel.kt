@@ -422,6 +422,48 @@ class InfluencerViewModel : ViewModel() {
         }
     }
 
+    fun updateCollaborationStatus(token: String, collaborationId: String, status: String, message: String? = null, onComplete: (Boolean) -> Unit) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val mutation = """
+                mutation UpdateCollaboration(${'$'}input: UpdateCollaborationInput!) {
+                  updateCollaboration(input: ${'$'}input) {
+                    id
+                    status
+                    message
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "input" to mapOf(
+                    "collaborationId" to collaborationId,
+                    "status" to status,
+                    "message" to message
+                )
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("updateCollaboration") != null) {
+                    fetchCollaborations(token) // Refresh the list
+                    onComplete(true)
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Update failed"
+                    _error.postValue(errorMsg)
+                    onComplete(false)
+                }
+            }.onFailure {
+                _error.postValue("Network error: ${'$'}{it.message}")
+                onComplete(false)
+            }
+            _loading.postValue(false)
+        }
+    }
+
     private fun parseCollaborations(jsonArray: JSONArray): List<Collaboration> {
         val list = mutableListOf<Collaboration>()
         for (i in 0 until jsonArray.length()) {
@@ -446,9 +488,6 @@ class InfluencerViewModel : ViewModel() {
                 Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null)
             }
 
-            // Influencer object is not returned in this query based on user request, creating a dummy or handling nulls if needed.
-            // Actually the query in user request DOES NOT have influencer field in GetCollaborations for InfluencerHomePage.
-            // But Collaboration model needs it. We can create a partial one or empty one.
             val influencer = Influencer("Me", null, null, null)
             
             val brandObj = obj.optJSONObject("brand")
