@@ -246,6 +246,10 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                     )
                 }
 
+                IconBubble(Icons.Default.Campaign, Color.Blue) {
+                    navController.navigate("all_campaigns")
+                }
+                Spacer(modifier = Modifier.width(10.dp))
                 IconBubble(Icons.Default.Favorite, Color.Red) {
                     navController.navigate("brand_wishlist")
                 }

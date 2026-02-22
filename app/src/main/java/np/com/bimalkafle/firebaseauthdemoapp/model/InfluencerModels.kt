@@ -49,7 +49,7 @@ data class Category(
 
 data class Platform(
     val platform: String,
-    val profileUrl: String,
+    val profileUrl: String?,
     val followers: Int?,
     val avgViews: Int?,
     val engagement: Float?,

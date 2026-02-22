@@ -457,6 +457,47 @@ class InfluencerViewModel : ViewModel() {
                     onComplete(false)
                 }
             }.onFailure {
+                Log.e("InfluencerViewModel", "Network error", it)
+                _error.postValue("Network error: ${'$'}{it.message}")
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun applyToCampaign(token: String, campaignId: String, message: String, pricing: List<Map<String, Any>>, onComplete: (Boolean) -> Unit) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val mutation = """
+                mutation ApplyToCampaign(${'$'}input: CreateProposalInput!) {
+                  applyToCampaign(input: ${'$'}input) {
+                    id
+                    status
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "input" to mapOf(
+                    "campaignId" to campaignId,
+                    "message" to message,
+                    "pricing" to pricing
+                )
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("applyToCampaign") != null) {
+                    onComplete(true)
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Application failed"
+                    _error.postValue(errorMsg)
+                    onComplete(false)
+                }
+            }.onFailure {
+                Log.e("InfluencerViewModel", "Network error", it)
                 _error.postValue("Network error: ${'$'}{it.message}")
                 onComplete(false)
             }

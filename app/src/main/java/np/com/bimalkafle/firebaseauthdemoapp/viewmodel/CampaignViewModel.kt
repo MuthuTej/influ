@@ -125,6 +125,7 @@ class CampaignViewModel : ViewModel() {
                         }
                         preferredPlatforms {
                             platform
+                            formats
                         }
                         targetAudience {
                             ageMin
@@ -196,6 +197,7 @@ class CampaignViewModel : ViewModel() {
                       }
                       preferredPlatforms {
                           platform
+                          formats
                       }
                       targetAudience {
                           ageMin
@@ -265,6 +267,7 @@ class CampaignViewModel : ViewModel() {
                       }
                       preferredPlatforms {
                           platform
+                          formats
                       }
                       targetAudience {
                           ageMin
@@ -327,6 +330,7 @@ class CampaignViewModel : ViewModel() {
                       about
                       preferredPlatforms {
                         platform
+                        formats
                       }
                       targetAudience {
                         ageMin
@@ -400,7 +404,28 @@ class CampaignViewModel : ViewModel() {
             if (platformsArray != null) {
                 for (i in 0 until platformsArray.length()) {
                     val p = platformsArray.getJSONObject(i)
-                    platforms.add(PreferredPlatform(p.optString("platform"), null, null, null, null, null, null, null, null))
+                    val formatsArray = p.optJSONArray("formats")
+                    val formats = if (formatsArray != null) {
+                        val fList = mutableListOf<String>()
+                        for (j in 0 until formatsArray.length()) {
+                            fList.add(formatsArray.getString(j))
+                        }
+                        fList
+                    } else null
+                    
+                    platforms.add(
+                        PreferredPlatform(
+                            platform = p.optString("platform"),
+                            profileUrl = null,
+                            followers = null,
+                            avgViews = null,
+                            engagement = null,
+                            formats = formats,
+                            connected = null,
+                            minFollowers = null,
+                            minEngagement = null
+                        )
+                    )
                 }
             }
 

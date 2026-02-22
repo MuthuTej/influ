@@ -40,7 +40,8 @@ data class Campaign(
     val endDate: String?,
     val status: String?,
     val createdAt: String?,
-    val updatedAt: String?
+    val updatedAt: String?,
+    val platforms: List<Platform>? = null
 )
 
 data class Pricing(

@@ -78,7 +78,7 @@ fun InfluencerBrandDetailScreen(
     Scaffold(
         bottomBar = {
             if (campaign != null) {
-                CollaborateButton(campaign = campaign!!)
+                CollaborateButton(campaign = campaign!!, navController = navController)
             }
         }
     ) { padding ->
@@ -443,7 +443,48 @@ fun BrandInfoSection(brand: Brand?) {
                 BrandDetailRow(Icons.Default.Category, "CATEGORY", categoryValue)
                 Divider(modifier = Modifier.padding(vertical = 8.dp), color = softGray)
                 
-                BrandDetailRow(Icons.Default.Language, "PREFERRED PLATFORMS", brand.preferredPlatforms?.joinToString(", ") { it.platform } ?: "N/A")
+                // PREFERRED PLATFORMS with FORMATS
+                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                    BrandDetailRowHeader(Icons.Default.Language, "PREFERRED PLATFORMS")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    brand.preferredPlatforms?.forEach { platform ->
+                        Surface(
+                            modifier = Modifier.padding(bottom = 8.dp, start = 52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = themeColor.copy(alpha = 0.05f),
+                            border = BorderStroke(1.dp, themeColor.copy(alpha = 0.1f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = platform.platform,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = Color.Black
+                                )
+                                if (!platform.formats.isNullOrEmpty()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        platform.formats.forEach { format ->
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = themeColor.copy(alpha = 0.1f)
+                                            ) {
+                                                Text(
+                                                    text = format,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                    fontSize = 10.sp,
+                                                    color = themeColor,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 Divider(modifier = Modifier.padding(vertical = 8.dp), color = softGray)
                 
                 val target = brand.targetAudience?.let { "${it.ageMin}-${it.ageMax} yrs, ${it.gender}" } ?: "N/A"
@@ -453,6 +494,23 @@ fun BrandInfoSection(brand: Brand?) {
                 BrandDetailRow(Icons.Default.LocationOn, "LOCATIONS", brand.targetAudience?.locations?.joinToString(", ") ?: "N/A")
             }
         }
+    }
+}
+
+@Composable
+fun BrandDetailRowHeader(icon: ImageVector, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = themeColor.copy(alpha = 0.1f),
+            modifier = Modifier.size(36.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = themeColor, modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(label, fontSize = 10.sp, color = darkerGray, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -477,14 +535,14 @@ fun BrandDetailRow(icon: ImageVector, label: String, value: String) {
 }
 
 @Composable
-fun CollaborateButton(campaign: CampaignDetail) {
+fun CollaborateButton(campaign: CampaignDetail, navController: NavController) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
     ) {
         Button(
-            onClick = { /* TODO: Implement collaboration action */ },
+            onClick = { navController.navigate("influencer_apply_campaign/${campaign.id}") },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp)

@@ -108,6 +108,9 @@ fun MyAppNavigation(
         composable("brand_home") {
             BrandHomePage(modifier, navController, authViewModel, brandViewModel)
         }
+        composable("all_campaigns") {
+            AllCampaignPage(navController, brandViewModel)
+        }
         composable("brand_influencer_detail/{influencerId}") { backStackEntry ->
             val influencerId = backStackEntry.arguments?.getString("influencerId") ?: ""
             BrandInfluencerDetailScreen(
@@ -168,6 +171,7 @@ fun MyAppNavigation(
             )
         }
 
+        @Suppress("UnusedMaterial3ScaffoldPaddingParameter")
         composable("influencer_home") {
             InfluencerHomePage(
                 modifier,
@@ -208,6 +212,23 @@ fun MyAppNavigation(
                 navController = navController,
                 campaignId = campaignId,
                 campaignViewModel = campaignViewModel
+            )
+        }
+        composable(
+            route = "influencer_apply_campaign/{campaignId}",
+            arguments = listOf(navArgument("campaignId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val campaignId = backStackEntry.arguments?.getString("campaignId") ?: ""
+            InfluencerApplyCampaignScreen(
+                campaignId = campaignId,
+                onBack = { navController.popBackStack() },
+                onApplySuccess = { 
+                    navController.navigate("influencer_home") {
+                        popUpTo("influencer_home") { inclusive = true }
+                    }
+                },
+                campaignViewModel = campaignViewModel,
+                influencerViewModel = influencerViewModel
             )
         }
     })
