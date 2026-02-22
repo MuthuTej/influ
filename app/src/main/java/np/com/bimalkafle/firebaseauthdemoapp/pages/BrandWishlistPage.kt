@@ -47,7 +47,21 @@ fun BrandWishlistPage(navController: NavController, brandViewModel: BrandViewMod
     }
 
     Scaffold(
-        topBar = {
+        bottomBar = {
+            CmnBottomNavigationBar(
+                selectedItem = "Wishlist",
+                onItemSelected = { },
+                navController = navController,
+                isBrand = true
+            )
+        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) { paddingValues ->
+        Column(modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = paddingValues.calculateBottomPadding())) {
+            
+            // Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -61,18 +75,16 @@ fun BrandWishlistPage(navController: NavController, brandViewModel: BrandViewMod
                         .alpha(0.2f),
                     contentScale = ContentScale.Crop
                 )
-                Column {
-                    TopAppBar(
-                        title = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { navController.popBackStack() }) {
-                                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-                                }
-                                Text("Wishlist", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                            }
-                        },
-                        colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.Transparent)
-                    )
+                Column(modifier = Modifier.padding(top = 40.dp)) { // Top padding for status bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        }
+                        Text("Wishlist", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         "Influencers you've saved for potential collaborations",
@@ -101,56 +113,46 @@ fun BrandWishlistPage(navController: NavController, brandViewModel: BrandViewMod
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
-        },
-        bottomBar = {
-            CmnBottomNavigationBar(
-                selectedItem = "Wishlist",
-                onItemSelected = { },
-                navController = navController,
-                isBrand = true
-            )
-        }
-    ) { paddingValues ->
-        if (wishlistedInfluencers.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.FavoriteBorder,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("No wishlisted influencers yet", color = Color.Gray)
+
+            // List
+            if (wishlistedInfluencers.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("No wishlisted influencers yet", color = Color.Gray)
+                    }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize()
-                    .background(Color(0xFFF5F5F5)),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(wishlistedInfluencers) { influencer ->
-                    BrandCardBrand(
-                        influencer = influencer,
-                        isWishlisted = true,
-                        onWishlistToggle = {
-                            firebaseToken?.let { token ->
-                                brandViewModel.toggleWishlist(influencer, token)
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFF5F5F5)),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(wishlistedInfluencers) { influencer ->
+                        BrandCardBrand(
+                            influencer = influencer,
+                            isWishlisted = true,
+                            onWishlistToggle = {
+                                firebaseToken?.let { token ->
+                                    brandViewModel.toggleWishlist(influencer, token)
+                                }
+                            },
+                            onCardClick = {
+                                navController.navigate("brand_influencer_detail/${influencer.id}")
                             }
-                        },
-                        onCardClick = {
-                            navController.navigate("brand_influencer_detail/${influencer.id}")
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }

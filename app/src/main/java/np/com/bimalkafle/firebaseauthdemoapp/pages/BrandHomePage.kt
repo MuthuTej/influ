@@ -117,7 +117,8 @@ fun BrandHomePage(
                     tint = Color.White
                 )
             }
-        }
+        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0) // Allow content to flow into status bar
     ) { padding ->
 
         if (isLoading) {
@@ -128,7 +129,7 @@ fun BrandHomePage(
             LazyColumn(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(bottom = padding.calculateBottomPadding()) // Only apply bottom padding
                     .background(Color.White)
             ) {
 
@@ -198,13 +199,14 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
+                .background(brandThemeColor) // Added background color to the header box
                 .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
         ) {
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 28.dp, start = 16.dp, end = 16.dp),
+                    .padding(top = 40.dp, start = 16.dp, end = 16.dp), // Increased top padding for status bar
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
@@ -237,12 +239,12 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Hello!", fontSize = 14.sp, color = Color.Black.copy(alpha = 0.9f))
+                    Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
                     Text(
                         "${brandProfile?.name ?: "Guest"} 👋",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = Color.White
                     )
                 }
 

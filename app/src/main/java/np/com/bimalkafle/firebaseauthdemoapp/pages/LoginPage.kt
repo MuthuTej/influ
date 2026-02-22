@@ -94,6 +94,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     Box(
         modifier = modifier
             .fillMaxSize()
+            .background(Color.White)
             .offset(y = offset)
             .verticalScroll(rememberScrollState())
             .imePadding()
@@ -143,7 +144,7 @@ fun LoginPageContent(
                 contentDescription = "Header background",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.4f),
+                    .height(280.dp), // Fixed height for immersive feel
                 contentScale = ContentScale.FillBounds
             )
             Text(
@@ -252,16 +253,4 @@ fun LoginPageContent(
             )
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun LoginPagePreview() {
-    LoginPageContent(
-        authState = null,
-        onLoginClicked = { _, _ -> },
-        onSignUpClicked = {},
-        onForgotPasswordClicked = {},
-        headerTopPadding = 140.dp
-    )
 }

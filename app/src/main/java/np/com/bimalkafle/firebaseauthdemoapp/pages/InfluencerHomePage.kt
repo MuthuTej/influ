@@ -51,7 +51,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-private val brandThemeColor = Color(0xFFFF8383) // Reusing the same color variable name from BrandHomePage for consistency
+private val brandThemeColor = Color(0xFFFF8383)
 
 @Composable
 fun InfluencerHomePage(
@@ -100,7 +100,8 @@ fun InfluencerHomePage(
                 onItemSelected = { selectedBottomNavItem = it },
                 navController = navController
             )
-        }
+        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
 
         if (isLoading) {
@@ -111,7 +112,7 @@ fun InfluencerHomePage(
             LazyColumn(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(bottom = padding.calculateBottomPadding())
                     .background(Color.White)
             ) {
 
@@ -173,7 +174,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(headerHeight + cardHeight * 0.6f) // dynamic total height
+            .height(headerHeight + cardHeight * 0.6f)
     ) {
 
         // ---------------- HEADER ----------------
@@ -181,13 +182,14 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
+                .background(brandThemeColor)
                 .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
         ) {
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 28.dp, start = 16.dp, end = 16.dp),
+                    .padding(top = 40.dp, start = 16.dp, end = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
@@ -207,7 +209,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                         )
                     } else {
                         Image(
-                            painter = painterResource(id = R.drawable.brand_profile), // Fallback image
+                            painter = painterResource(id = R.drawable.brand_profile),
                             contentDescription = null,
                             modifier = Modifier
                                 .padding(6.dp)
@@ -219,12 +221,12 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Hello!", fontSize = 14.sp, color = Color.Black.copy(alpha = 0.9f))
+                    Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
                     Text(
-                        "${influencerProfile?.name ?: "Guest"} \ud83d\udc4b",
+                        "${influencerProfile?.name ?: "Guest"} 👋",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = Color.White
                     )
                 }
 
@@ -246,7 +248,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
         Card(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = headerHeight - (cardHeight * 0.75f)) // \ud83d\udd25 dynamic overlap
+                .padding(top = headerHeight - (cardHeight * 0.75f))
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
                 .height(cardHeight),
@@ -278,7 +280,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                     )
 
                     Text(
-                        "\u20b9 18.4K", // Mock data for now as per previous design, or can map real data if available
+                        "₹ 18.4K",
                         fontSize = 50.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -555,13 +557,13 @@ fun CollaborationItem(
 
                     Column {
                         Text(
-                            text = brandName, // Showing Brand Name as main text
+                            text = brandName,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
                             color = Color.Black
                         )
                         Text(
-                            text = campaignTitle, // Campaign Title as subtext
+                            text = campaignTitle,
                             fontSize = 13.sp,
                             color = Color.Gray
                         )
@@ -587,7 +589,7 @@ fun CollaborationItem(
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
 
             Text(
-                text = "$deliverable \u2022 $platform",
+                text = "$deliverable • $platform",
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp
             )
@@ -752,13 +754,11 @@ fun CampaignCardInfluencer(
                         color = Color.Gray
                     )
                     Text(
-                        text = "${campaign.budgetMin ?: '-'} - ${campaign.budgetMax ?: '-'}",
+                        text = "${campaign.budgetMin ?: "-"} - ${campaign.budgetMax ?: "-"}",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
                     )
-                }
-                Column(horizontalAlignment = Alignment.End) {
                 }
             }
         }
