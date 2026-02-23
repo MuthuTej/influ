@@ -77,7 +77,6 @@ fun BrandProfilePage(
                         brandCategory = updatedBrand.brandCategory?.category ?: "",
                         subCategory = updatedBrand.brandCategory?.subCategory ?: "",
                         about = updatedBrand.about ?: "",
-                        primaryObjective = updatedBrand.primaryObjective ?: "",
                         preferredPlatforms = updatedBrand.preferredPlatforms?.map { it.platform } ?: emptyList(),
                         ageMin = updatedBrand.targetAudience?.ageMin,
                         ageMax = updatedBrand.targetAudience?.ageMax,
@@ -121,7 +120,6 @@ fun BrandProfileContent(
     var email by remember(brandProfile) { mutableStateOf(brandProfile?.email ?: "") }
     var role by remember(brandProfile) { mutableStateOf(brandProfile?.role ?: "") }
     var about by remember(brandProfile) { mutableStateOf(brandProfile?.about ?: "") }
-    var primaryObjective by remember(brandProfile) { mutableStateOf(brandProfile?.primaryObjective ?: "") }
     var category by remember(brandProfile) { mutableStateOf(brandProfile?.brandCategory?.category ?: "") }
     var subCategory by remember(brandProfile) { mutableStateOf(brandProfile?.brandCategory?.subCategory ?: "") }
     var profileUrl by remember(brandProfile) { mutableStateOf(brandProfile?.profileUrl ?: "") }
@@ -185,6 +183,64 @@ fun BrandProfileContent(
                             .alpha(0.15f),
                         contentScale = ContentScale.Crop
                     )
+
+                    // Edit/Save Toggle with Text and Icon
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(16.dp)
+                            .clickable {
+                                if (isEditMode) {
+                                    val updatedBrand = brandProfile?.copy(
+                                        name = name,
+                                        email = email,
+                                        role = role,
+                                        about = about,
+                                        brandCategory = BrandCategory(category, subCategory),
+                                        profileUrl = profileUrl,
+                                        logoUrl = logoUrl,
+                                        targetAudience = TargetAudience(
+                                            ageMin = ageMin.toIntOrNull(),
+                                            ageMax = ageMax.toIntOrNull(),
+                                            gender = gender,
+                                            locations = brandProfile.targetAudience?.locations
+                                        ),
+                                        preferredPlatforms = selectedPlatforms.map { platformName ->
+                                            PreferredPlatform(
+                                                platform = platformName,
+                                                profileUrl = null,
+                                                followers = null,
+                                                avgViews = null,
+                                                engagement = null,
+                                                formats = null,
+                                                connected = null,
+                                                minFollowers = null,
+                                                minEngagement = null
+                                            )
+                                        }
+                                    )
+                                    if (updatedBrand != null) {
+                                        onUpdateProfile(updatedBrand)
+                                    }
+                                }
+                                isEditMode = !isEditMode
+                            },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isEditMode) "Save" else "Edit",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            if (isEditMode) Icons.Default.Save else Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,

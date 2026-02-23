@@ -3,9 +3,6 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -14,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -23,19 +21,31 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WishlistScreen(navController: NavController) {
+fun WishlistScreen(navController: NavController, campaignViewModel: CampaignViewModel) {
     val themeColor = Color(0xFFFF8383)
-    var selectedBottomNavItem by remember { mutableStateOf("Home") }
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    var selectedBottomNavItem by remember { mutableStateOf("History") }
+    val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
+    var firebaseToken by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        FirebaseAuth.getInstance().currentUser
+            ?.getIdToken(true)
+            ?.addOnSuccessListener { result ->
+                firebaseToken = result.token
+                firebaseToken?.let { token ->
+                    campaignViewModel.fetchWishlist(token)
+                }
+            }
+    }
 
     Scaffold(
         topBar = {
@@ -71,7 +81,7 @@ fun WishlistScreen(navController: NavController) {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "Saved brands you're interested in collaborating with",
+                        "Saved campaigns you're interested in collaborating with",
                         color = Color.White,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
@@ -87,14 +97,7 @@ fun WishlistScreen(navController: NavController) {
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                             shape = RoundedCornerShape(16.dp)
                         ) {
-                            Text("Saved 14", color = themeColor)
-                        }
-                        Button(
-                            onClick = { /*TODO*/ },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.5f)),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Recently viewed 13", color = Color.White)
+                            Text("Saved ${wishlistedCampaigns.size}", color = themeColor)
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
@@ -118,7 +121,7 @@ fun WishlistScreen(navController: NavController) {
                 items.forEach { item ->
                     if (item.isEmpty()) {
                         FloatingActionButton(
-                            onClick = { navController.navigate("influencer_create_proposal") },
+                            onClick = { /* Navigate to create proposal or similar */ },
                             containerColor = themeColor,
                             shape = CircleShape,
                             modifier = Modifier.offset(y = (-16).dp)
@@ -153,67 +156,48 @@ fun WishlistScreen(navController: NavController) {
             }
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .background(Color(0xFFF5F5F5))
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "Recently viewed",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    repeat(5) {
-                        Image(
-                            painter = painterResource(id = R.drawable.splash1),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
+        if (wishlistedCampaigns.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.FavoriteBorder,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("No wishlisted campaigns yet", color = Color.Gray)
                 }
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "Saved brands ❤️",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
             }
-            item {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = screenWidth / 2 - 24.dp),
-                    modifier = Modifier
-                        .height(600.dp) // Adjust height as needed
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(discoverBrands) { brand ->
-                        BrandDiscoverCard(brand = brand, navController = navController)
-                    }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize()
+                    .background(Color(0xFFF5F5F5)),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(wishlistedCampaigns) { campaign ->
+                    CampaignCardInfluencer(
+                        campaign = campaign,
+                        isWishlisted = true,
+                        onWishlistToggle = { 
+                            firebaseToken?.let { token ->
+                                campaignViewModel.toggleWishlist(campaign, token)
+                            }
+                        },
+                        onCardClick = {
+                            navController.navigate("campaign_detail/${campaign.id}")
+                        }
+                    )
                 }
             }
         }
     }
-}
-
-@Preview(showBackground = true, device = "spec:width=411dp,height=891dp")
-@Composable
-fun WishlistScreenPreview() {
-    WishlistScreen(navController = rememberNavController())
 }

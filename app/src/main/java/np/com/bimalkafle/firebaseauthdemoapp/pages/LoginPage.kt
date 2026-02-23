@@ -94,6 +94,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     Box(
         modifier = modifier
             .fillMaxSize()
+            .background(Color.White)
             .offset(y = offset)
             .verticalScroll(rememberScrollState())
             .imePadding()
@@ -105,6 +106,9 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             },
             onSignUpClicked = {
                 navController.navigate("signup")
+            },
+            onForgotPasswordClicked = {
+                navController.navigate("forgot_password")
             },
             modifier = Modifier,
             headerTopPadding = topPadding
@@ -118,6 +122,7 @@ fun LoginPageContent(
     authState: AuthState?,
     onLoginClicked: (String, String) -> Unit,
     onSignUpClicked: () -> Unit,
+    onForgotPasswordClicked: () -> Unit,
     modifier: Modifier = Modifier,
     headerTopPadding: Dp
 ) {
@@ -139,7 +144,7 @@ fun LoginPageContent(
                 contentDescription = "Header background",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.4f),
+                    .height(280.dp), // Fixed height for immersive feel
                 contentScale = ContentScale.FillBounds
             )
             Text(
@@ -199,7 +204,11 @@ fun LoginPageContent(
                     Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
                     Text("Remember Me")
                 }
-                Text("Forgot Password?", color = themeColor, modifier = Modifier.clickable { /*TODO*/ })
+                Text(
+                    text = "Forgot Password?",
+                    color = themeColor,
+                    modifier = Modifier.clickable { onForgotPasswordClicked() }
+                )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -244,15 +253,4 @@ fun LoginPageContent(
             )
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun LoginPagePreview() {
-    LoginPageContent(
-        authState = null,
-        onLoginClicked = { _, _ -> },
-        onSignUpClicked = {},
-        headerTopPadding = 140.dp
-    )
 }

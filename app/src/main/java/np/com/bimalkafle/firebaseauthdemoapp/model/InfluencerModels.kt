@@ -15,7 +15,9 @@ data class InfluencerProfile(
     val strengths: List<String>?,
     val pricing: List<PricingInfo>?,
     val availability: Boolean?,
-    val logoUrl: String?
+    val logoUrl: String?,
+    val averageRating: Float? = null,
+    val isVerified: Boolean? = false
 )
 
 data class AudienceInsights(
@@ -47,7 +49,7 @@ data class Category(
 
 data class Platform(
     val platform: String,
-    val profileUrl: String,
+    val profileUrl: String?,
     val followers: Int?,
     val avgViews: Int?,
     val engagement: Float?,

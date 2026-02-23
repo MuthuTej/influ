@@ -27,56 +27,61 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
-import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.FilterDropdown
+import np.com.bimalkafle.firebaseauthdemoapp.components.IconBubbleSearch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InfluencerSearchPage(
     modifier: Modifier = Modifier,
     navController: NavController,
-    influencerViewModel: InfluencerViewModel
+    campaignViewModel: CampaignViewModel
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val brands by influencerViewModel.brands.observeAsState(initial = emptyList())
-    val isLoading by influencerViewModel.loading.observeAsState(initial = false)
+    val campaigns by campaignViewModel.campaigns.observeAsState(initial = emptyList())
+    val isLoading by campaignViewModel.loading.observeAsState(initial = false)
+    val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
+    var firebaseToken by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser
             ?.getIdToken(true)
             ?.addOnSuccessListener { result ->
-                val firebaseToken = result.token
+                firebaseToken = result.token
                 if (firebaseToken != null) {
-                    influencerViewModel.fetchBrands(firebaseToken)
+                    campaignViewModel.fetchCampaigns(firebaseToken!!)
                 }
             }
     }
 
     var selectedPlatform by remember { mutableStateOf("All") }
     var selectedCategory by remember { mutableStateOf("All") }
-    var selectedFollowerRange by remember { mutableStateOf("All") }
+    var selectedBudgetRange by remember { mutableStateOf("All") }
 
-    // Filter brands based on search query and selected filters
-    val filteredBrands = brands.filter { brand ->
-        val matchesSearch = brand.name.contains(searchQuery, ignoreCase = true) ||
-                (brand.brandCategory?.category?.contains(searchQuery, ignoreCase = true) == true)
+    // Filter campaigns based on search query and selected filters
+    val filteredCampaigns = campaigns.filter { campaign ->
+        val matchesSearch = campaign.title.contains(searchQuery, ignoreCase = true) ||
+                campaign.description.contains(searchQuery, ignoreCase = true) ||
+                (campaign.brand?.name?.contains(searchQuery, ignoreCase = true) == true)
 
         val matchesPlatform = selectedPlatform == "All" ||
-                brand.preferredPlatforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
+                campaign.brand?.preferredPlatforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
 
         val matchesCategory = selectedCategory == "All" ||
-                brand.brandCategory?.category.equals(selectedCategory, ignoreCase = true)
+                campaign.brand?.brandCategory?.category.equals(selectedCategory, ignoreCase = true)
 
-        val matchesFollowers = when (selectedFollowerRange) {
+        val matchesBudget = when (selectedBudgetRange) {
             "All" -> true
-            "0-10K" -> brand.preferredPlatforms?.any { (it.followers ?: 0) < 10000 } == true
-            "10K-100K" -> brand.preferredPlatforms?.any { (it.followers ?: 0) in 10000..100000 } == true
-            "100K-1M" -> brand.preferredPlatforms?.any { (it.followers ?: 0) in 100000..1000000 } == true
-            "1M+" -> brand.preferredPlatforms?.any { (it.followers ?: 0) > 1000000 } == true
+            "0-100" -> (campaign.budgetMax ?: 0) <= 100
+            "100-500" -> (campaign.budgetMin ?: 0) >= 100 && (campaign.budgetMax ?: 0) <= 500
+            "500-1000" -> (campaign.budgetMin ?: 0) >= 500 && (campaign.budgetMax ?: 0) <= 1000
+            "1000+" -> (campaign.budgetMin ?: 0) >= 1000
             else -> true
         }
 
-        matchesSearch && matchesPlatform && matchesCategory && matchesFollowers
+        matchesSearch && matchesPlatform && matchesCategory && matchesBudget
     }
     
     var selectedBottomNavItem by remember { mutableStateOf("Search") }
@@ -143,7 +148,11 @@ fun InfluencerSearchPage(
                         }
 
                         Row {
-                            IconBubbleSearch(Icons.Default.Favorite, Color.Red)
+                            IconBubbleSearch(
+                                icon = Icons.Default.Favorite,
+                                tint = Color.Red,
+                                onClick = { navController.navigate("wishlist") }
+                            )
                             Spacer(modifier = Modifier.width(10.dp))
                             IconBubbleSearch(Icons.Default.Notifications, Color.Black)
                         }
@@ -152,13 +161,13 @@ fun InfluencerSearchPage(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Text(
-                        text = "Discover Brands",
+                        text = "Discover Campaigns",
                         color = Color.White,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Find brands to collaborate with",
+                        text = "Find active campaigns to collaborate with",
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium
@@ -174,7 +183,7 @@ fun InfluencerSearchPage(
                             .fillMaxWidth()
                             .height(56.dp)
                             .shadow(8.dp, RoundedCornerShape(28.dp)),
-                        placeholder = { Text("Search Brands", color = Color.Gray) },
+                        placeholder = { Text("Search Campaigns", color = Color.Gray) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
                         shape = RoundedCornerShape(28.dp),
                         colors = TextFieldDefaults.colors(
@@ -198,32 +207,29 @@ fun InfluencerSearchPage(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Calculate counts for Categories
                 val categories = listOf("All", "Tech", "Fashion", "Food", "Lifestyle", "Beauty", "Sports")
                 val categoryOptions = categories.map { category ->
                     val count = if (category == "All") {
-                        if (brands.isNotEmpty()) brands.size else 0
+                        campaigns.size
                     } else {
-                        brands.count { it.brandCategory?.category.equals(category, ignoreCase = true) }
+                        campaigns.count { it.brand?.brandCategory?.category.equals(category, ignoreCase = true) }
                     }
                     category to count
                 }
 
-                // Calculate counts for Platforms
                 val platforms = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK")
                 val platformOptions = platforms.map { platform ->
                     val count = if (platform == "All") {
-                         if (brands.isNotEmpty()) brands.size else 0
+                         campaigns.size
                     } else {
-                        brands.count { brand -> 
-                             brand.preferredPlatforms?.any { it.platform.equals(platform, ignoreCase = true) } == true
+                        campaigns.count { campaign -> 
+                             campaign.brand?.preferredPlatforms?.any { it.platform.equals(platform, ignoreCase = true) } == true
                         }
                     }
                     platform to count
                 }
                 
-                // For followers, it's consistent ranges, we can just pass nulls or 0s if we don't want to count
-                 val followerOptions = listOf("All", "0-10K", "10K-100K", "100K-1M", "1M+").map { it to null }
+                val budgetOptions = listOf("All", "0-100", "100-500", "500-1000", "1000+").map { it to null }
 
                 FilterDropdown(
                     label = "Platform",
@@ -242,10 +248,10 @@ fun InfluencerSearchPage(
                 )
 
                 FilterDropdown(
-                    label = "Followers",
-                    selectedOption = selectedFollowerRange,
-                    options = followerOptions,
-                    onOptionSelected = { selectedFollowerRange = it },
+                    label = "Budget",
+                    selectedOption = selectedBudgetRange,
+                    options = budgetOptions,
+                    onOptionSelected = { selectedBudgetRange = it },
                     modifier = Modifier.weight(1f)
                 )
 
@@ -265,15 +271,14 @@ fun InfluencerSearchPage(
 
             // ---------------- PAGINATION LOGIC ----------------
             var currentPage by remember { mutableStateOf(1) }
-            val itemsPerPage = 5 // Adjust as needed
-            val totalPages = (filteredBrands.size + itemsPerPage - 1) / itemsPerPage
+            val itemsPerPage = 5
+            val totalPages = (filteredCampaigns.size + itemsPerPage - 1) / itemsPerPage
             
-            // Reset to page 1 if filters change (filteredBrands changes)
-            LaunchedEffect(filteredBrands) {
+            LaunchedEffect(filteredCampaigns) {
                 currentPage = 1
             }
 
-            val paginatedBrands = filteredBrands
+            val paginatedCampaigns = filteredCampaigns
                 .drop((currentPage - 1) * itemsPerPage)
                 .take(itemsPerPage)
 
@@ -287,29 +292,34 @@ fun InfluencerSearchPage(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
-                     contentPadding = PaddingValues(bottom = 80.dp) // Extra padding for pagination controls
+                     contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
-                    items(paginatedBrands) { brand ->
-                        BrandCardInfluencer(
-                            brand = brand,
+                    items(paginatedCampaigns) { campaign ->
+                        CampaignCardInfluencer(
+                            campaign = campaign,
+                            isWishlisted = wishlistedCampaigns.any { it.id == campaign.id },
+                            onWishlistToggle = { 
+                                if (firebaseToken != null) {
+                                    campaignViewModel.toggleWishlist(campaign, firebaseToken!!)
+                                } 
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 8.dp), 
                             onCardClick = {
-                                 navController.navigate("brand_detail/${brand.id}")
+                                 navController.navigate("campaign_detail/${campaign.id}")
                             }
                         )
                     }
                     
-                    if (filteredBrands.isEmpty()) {
+                    if (filteredCampaigns.isEmpty()) {
                         item {
                             Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                                Text("No brands found matching your search.", color = Color.Gray, fontWeight = FontWeight.Medium)
+                                Text("No campaigns found matching your search.", color = Color.Gray, fontWeight = FontWeight.Medium)
                             }
                         }
                     } else if (totalPages > 1) {
                          item {
-                            // Pagination Controls
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -348,79 +358,4 @@ fun InfluencerSearchPage(
             }
         }
     }
-
-@Composable
-fun FilterDropdown(
-    label: String,
-    selectedOption: String,
-    options: List<Pair<String, Int?>>,
-    onOptionSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = modifier) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = Color(0xFFFFEAEA), // Light pinkish for the chip
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clickable { expanded = true }
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = if (selectedOption == "All") label else selectedOption,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    maxLines = 1
-                )
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = Color.Black
-                )
-            }
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(Color.White)
-        ) {
-            options.forEach { (option, count) ->
-                DropdownMenuItem(
-                    text = { 
-                        Text(
-                            text = if (option == "All" || count == null) option else "$option ($count)",
-                            fontWeight = if(option == selectedOption) FontWeight.Bold else FontWeight.Normal
-                        ) 
-                    },
-                    onClick = {
-                        onOptionSelected(option)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
 }
-
-@Composable
-fun IconBubbleSearch(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color) {
-    Surface(
-        shape = CircleShape,
-        color = Color.White.copy(alpha = 0.9f),
-        modifier = Modifier.size(42.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-        }
-    }
-}}

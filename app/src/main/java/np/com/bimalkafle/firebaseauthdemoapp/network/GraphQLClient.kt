@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.network
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -11,7 +12,7 @@ import java.net.URL
 
 object GraphQLClient {
 
-    private const val BASE_URL = "https://connect-backend-e22a.onrender.com/graphql" // Emulator localhost
+    private const val BASE_URL = "https://connect-backend-e22a.onrender.com/graphql"
 
     suspend fun query(query: String, variables: Map<String, Any>? = null, token: String? = null): Result<JSONObject> {
         return withContext(Dispatchers.IO) {
@@ -39,17 +40,26 @@ object GraphQLClient {
                 writer.close()
 
                 val responseCode = connection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                val stream = if (responseCode == HttpURLConnection.HTTP_OK) connection.inputStream else connection.errorStream
+                
+                if (stream != null) {
+                    val reader = BufferedReader(InputStreamReader(stream))
                     val response = StringBuilder()
                     var line: String?
                     while (reader.readLine().also { line = it } != null) {
                         response.append(line)
                     }
                     reader.close()
-                    Result.success(JSONObject(response.toString()))
+                    val jsonResponse = JSONObject(response.toString())
+                    
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        Result.success(jsonResponse)
+                    } else {
+                        Log.e("GraphQLClient", "Server Error Body: $response")
+                        Result.failure(Exception("HTTP Error: $responseCode - $response"))
+                    }
                 } else {
-                    Result.failure(Exception("HTTP Error: $responseCode"))
+                    Result.failure(Exception("HTTP Error: $responseCode (No error body)"))
                 }
             } catch (e: Exception) {
                 Result.failure(e)

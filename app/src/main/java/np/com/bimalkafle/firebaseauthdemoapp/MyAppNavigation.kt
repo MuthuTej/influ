@@ -3,9 +3,11 @@ package np.com.bimalkafle.firebaseauthdemoapp
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import np.com.bimalkafle.firebaseauthdemoapp.pages.*
 import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatListScreen
 import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatScreen
@@ -38,6 +40,9 @@ fun MyAppNavigation(
         }
         composable("signup") {
             SignupPage(modifier, navController, authViewModel)
+        }
+        composable("forgot_password") {
+            ForgotPasswordPage(modifier, navController, authViewModel)
         }
         composable("brand_registration") {
             BrandRegistrationScreen(
@@ -95,13 +100,16 @@ fun MyAppNavigation(
             InfluencerCreateProposal(
                 influencerId = influencerId,
                 onBack = { navController.popBackStack() },
-                onCreateProposal = { navController.navigate("brand_home") }, // Navigate to home or proposals
+                onCreateProposal = { navController.navigate("brand_home") }, 
                 brandViewModel = brandViewModel,
                 authViewModel = authViewModel
             )
         }
         composable("brand_home") {
             BrandHomePage(modifier, navController, authViewModel, brandViewModel)
+        }
+        composable("all_campaigns") {
+            AllCampaignPage(navController, brandViewModel)
         }
         composable("brand_influencer_detail/{influencerId}") { backStackEntry ->
             val influencerId = backStackEntry.arguments?.getString("influencerId") ?: ""
@@ -122,6 +130,9 @@ fun MyAppNavigation(
         composable("brand_profile") {
             BrandProfilePage(modifier, navController, authViewModel, brandViewModel)
         }
+        composable("brand_wishlist") {
+            BrandWishlistPage(navController, brandViewModel)
+        }
 
         composable("chatList") {
             ChatListScreen(
@@ -132,12 +143,27 @@ fun MyAppNavigation(
             )
         }
 
-        composable("chat/{chatId}/{chatName}") { backStackEntry ->
+        composable(
+            route = "chat/{chatId}/{chatName}?collaborationId={collaborationId}",
+            arguments = listOf(
+                navArgument("chatId") { type = NavType.StringType },
+                navArgument("chatName") { type = NavType.StringType },
+                navArgument("collaborationId") { 
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null 
+                }
+            )
+        ) { backStackEntry ->
             val chatId = backStackEntry.arguments?.getString("chatId")
             val chatName = backStackEntry.arguments?.getString("chatName")
+            val collaborationId = backStackEntry.arguments?.getString("collaborationId")
             ChatScreen(
                 chatId = chatId,
                 chatNameParam = chatName,
+                collaborationId = collaborationId,
+                navController = navController,
+                authViewModel = authViewModel,
                 onBack = { navController.popBackStack() },
                 onCreateProposal = { id -> 
                     navController.navigate("influencer_create_proposal/$id")
@@ -145,18 +171,28 @@ fun MyAppNavigation(
             )
         }
 
+        @Suppress("UnusedMaterial3ScaffoldPaddingParameter")
         composable("influencer_home") {
             InfluencerHomePage(
-                modifier, navController, authViewModel,influencerViewModel)
+                modifier,
+                navController,
+                authViewModel,
+                influencerViewModel,
+                campaignViewModel
+            )
         }
         composable("influencer_search") {
-            InfluencerSearchPage(modifier, navController, influencerViewModel)
+            InfluencerSearchPage(
+                modifier,
+                navController,
+                campaignViewModel
+            )
         }
         composable("proposals") {
             ProposalPage(modifier, navController, authViewModel, brandViewModel)
         }
         composable("wishlist") {
-            WishlistScreen(navController)
+            WishlistScreen(navController, campaignViewModel)
         }
         composable("influencerProfile") {
             InfluencerProfileScreen(modifier, navController, authViewModel, influencerViewModel)
@@ -166,6 +202,34 @@ fun MyAppNavigation(
         }
         composable("campaign_analytics") {
             CampaignAnalyticsPage(navController)
+        }
+        composable(
+            route = "campaign_detail/{campaignId}",
+            arguments = listOf(navArgument("campaignId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val campaignId = backStackEntry.arguments?.getString("campaignId") ?: ""
+            InfluencerBrandDetailScreen(
+                navController = navController,
+                campaignId = campaignId,
+                campaignViewModel = campaignViewModel
+            )
+        }
+        composable(
+            route = "influencer_apply_campaign/{campaignId}",
+            arguments = listOf(navArgument("campaignId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val campaignId = backStackEntry.arguments?.getString("campaignId") ?: ""
+            InfluencerApplyCampaignScreen(
+                campaignId = campaignId,
+                onBack = { navController.popBackStack() },
+                onApplySuccess = { 
+                    navController.navigate("influencer_home") {
+                        popUpTo("influencer_home") { inclusive = true }
+                    }
+                },
+                campaignViewModel = campaignViewModel,
+                influencerViewModel = influencerViewModel
+            )
         }
     })
 }

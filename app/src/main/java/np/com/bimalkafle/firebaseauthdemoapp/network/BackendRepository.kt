@@ -225,4 +225,56 @@ object BackendRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun requestPasswordReset(email: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+
+            val query = """
+                mutation RequestPasswordReset(${'$'}email: String!) {
+                    requestPasswordReset(email: ${'$'}email) {
+                        success
+                        message
+                    }
+                }
+            """.trimIndent()
+
+            val variables = JSONObject().apply {
+                put("email", email)
+            }
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+                put("variables", variables)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    val data = jsonResponse.getJSONObject("data").getJSONObject("requestPasswordReset")
+                    if (data.getBoolean("success")) {
+                        Result.success(data.getString("message"))
+                    } else {
+                        Result.failure(Exception(data.getString("message")))
+                    }
+                }
+            } else {
+                Result.failure(Exception("Server returned code $responseCode"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

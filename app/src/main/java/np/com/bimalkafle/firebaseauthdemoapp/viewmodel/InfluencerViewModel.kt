@@ -95,11 +95,11 @@ class InfluencerViewModel : ViewModel() {
                     }
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("InfluencerViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -210,11 +210,11 @@ class InfluencerViewModel : ViewModel() {
                     }
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("InfluencerViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -381,74 +381,8 @@ class InfluencerViewModel : ViewModel() {
                     }
                     brand {
                       id
-                      email
                       name
-                      role
-                      profileCompleted
-                      updatedAt
-                      brandCategory {
-                        category
-                        subCategory
-                      }
-                      about
-                      primaryObjective
-                      preferredPlatforms {
-                        platform
-                        profileUrl
-                        followers
-                        avgViews
-                        engagement
-                        formats
-                        connected
-                        minFollowers
-                        minEngagement
-                      }
-                      targetAudience {
-                        ageMin
-                        ageMax
-                        gender
-                        locations
-                      }
-                      profileUrl
                       logoUrl
-                      govtId
-                      isVerified
-                      reviews {
-                        id
-                        collaborationId
-                        reviewerId
-                        revieweeId
-                        reviewerRole
-                        rating
-                        comment
-                        createdAt
-                        reviewer {
-                          id
-                          email
-                          name
-                          role
-                          profileCompleted
-                          updatedAt
-                          govtId
-                          isVerified
-                          fcmToken
-                          averageRating
-                        }
-                        reviewee {
-                          id
-                          email
-                          name
-                          role
-                          profileCompleted
-                          updatedAt
-                          govtId
-                          isVerified
-                          fcmToken
-                          averageRating
-                        }
-                      }
-                      averageRating
-                      fcmToken
                     }
                     initiatedBy
                     createdAt
@@ -458,7 +392,6 @@ class InfluencerViewModel : ViewModel() {
                       brandId
                       title
                       description
-                      objective
                       budgetMin
                       budgetMax
                       startDate
@@ -500,11 +433,94 @@ class InfluencerViewModel : ViewModel() {
 
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("InfluencerViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun updateCollaborationStatus(token: String, collaborationId: String, status: String, message: String? = null, onComplete: (Boolean) -> Unit) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val mutation = """
+                mutation UpdateCollaboration(${'$'}input: UpdateCollaborationInput!) {
+                  updateCollaboration(input: ${'$'}input) {
+                    id
+                    status
+                    message
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "input" to mapOf(
+                    "collaborationId" to collaborationId,
+                    "status" to status,
+                    "message" to message
+                )
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("updateCollaboration") != null) {
+                    fetchCollaborations(token) // Refresh the list
+                    onComplete(true)
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Update failed"
+                    _error.postValue(errorMsg)
+                    onComplete(false)
+                }
+            }.onFailure {
+                Log.e("InfluencerViewModel", "Network error", it)
+                _error.postValue("Network error: ${'$'}{it.message}")
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun applyToCampaign(token: String, campaignId: String, message: String, pricing: List<Map<String, Any>>, onComplete: (Boolean) -> Unit) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val mutation = """
+                mutation ApplyToCampaign(${'$'}input: CreateProposalInput!) {
+                  applyToCampaign(input: ${'$'}input) {
+                    id
+                    status
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "input" to mapOf(
+                    "campaignId" to campaignId,
+                    "message" to message,
+                    "pricing" to pricing
+                )
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("applyToCampaign") != null) {
+                    onComplete(true)
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Application failed"
+                    _error.postValue(errorMsg)
+                    onComplete(false)
+                }
+            }.onFailure {
+                Log.e("InfluencerViewModel", "Network error", it)
+                _error.postValue("Network error: ${'$'}{it.message}")
+                onComplete(false)
             }
             _loading.postValue(false)
         }
@@ -522,7 +538,6 @@ class InfluencerViewModel : ViewModel() {
                     brandId = campaignObj.optString("brandId"),
                     title = campaignObj.optString("title"),
                     description = campaignObj.optString("description"),
-                    objective = campaignObj.optString("objective"),
                     budgetMin = if (campaignObj.isNull("budgetMin")) null else campaignObj.optInt("budgetMin"),
                     budgetMax = if (campaignObj.isNull("budgetMax")) null else campaignObj.optInt("budgetMax"),
                     startDate = campaignObj.optString("startDate"),
@@ -532,7 +547,7 @@ class InfluencerViewModel : ViewModel() {
                     updatedAt = campaignObj.optString("updatedAt")
                 )
             } else {
-                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null, null)
+                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null)
             }
 
             // Influencer object is not returned in this query based on user request, creating a dummy or handling nulls if needed.
@@ -542,16 +557,6 @@ class InfluencerViewModel : ViewModel() {
             
             val brandObj = obj.optJSONObject("brand")
             val brand = if (brandObj != null) {
-                // Reuse logic from parseBrands but tailored for single object if needed, or duplicate slightly for simplicity in this context
-                // Parse Brand Category
-                val categoryObj = brandObj.optJSONObject("brandCategory")
-                val brandCategory = if (categoryObj != null) {
-                    BrandCategory(
-                        category = categoryObj.optString("category", ""),
-                        subCategory = categoryObj.optString("subCategory", "")
-                    )
-                } else null
-
                 Brand(
                     id = brandObj.optString("id"),
                     email = brandObj.optString("email"),
@@ -559,9 +564,8 @@ class InfluencerViewModel : ViewModel() {
                     role = brandObj.optString("role"),
                     profileCompleted = if(brandObj.has("profileCompleted")) brandObj.optBoolean("profileCompleted") else null,
                     updatedAt = brandObj.optString("updatedAt"),
-                    brandCategory = brandCategory,
+                    brandCategory = null,
                     about = brandObj.optString("about"),
-                    primaryObjective = brandObj.optString("primaryObjective"),
                     profileUrl = brandObj.optString("profileUrl"),
                     logoUrl = brandObj.optString("logoUrl"),
                     govtId = brandObj.optString("govtId"),
@@ -639,7 +643,6 @@ class InfluencerViewModel : ViewModel() {
                       subCategory
                     }
                     about
-                    primaryObjective
                     preferredPlatforms {
                       platform
                       profileUrl
@@ -724,11 +727,11 @@ class InfluencerViewModel : ViewModel() {
                     }
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${e.message}")
+                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
             }.onFailure {
                 Log.e("InfluencerViewModel", "Network error", it)
-                _error.postValue("Network error: ${it.message}")
+                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -865,7 +868,6 @@ class InfluencerViewModel : ViewModel() {
                     updatedAt = obj.optString("updatedAt"),
                     brandCategory = brandCategory,
                     about = obj.optString("about"),
-                    primaryObjective = obj.optString("primaryObjective"),
                     profileUrl = obj.optString("profileUrl"),
                     logoUrl = obj.optString("logoUrl"),
                     govtId = obj.optString("govtId"),

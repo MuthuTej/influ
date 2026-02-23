@@ -108,6 +108,22 @@ class AuthViewModel : ViewModel() {
             }
     }
 
+    fun forgotPassword(email: String) {
+        if (email.isEmpty()) {
+            _authState.value = AuthState.Error("Email can't be empty")
+            return
+        }
+        _authState.value = AuthState.Loading
+        viewModelScope.launch {
+            val result = BackendRepository.requestPasswordReset(email)
+            result.onSuccess {
+                _authState.value = AuthState.PasswordResetSent
+            }.onFailure {
+                _authState.value = AuthState.Error(it.message ?: "Failed to send reset link")
+            }
+        }
+    }
+
     fun signout(){
         auth.signOut()
         _authState.value = AuthState.Unauthenticated
@@ -123,4 +139,5 @@ sealed class AuthState {
     object Unauthenticated : AuthState()
     object Loading : AuthState()
     data class Error(val message: String) : AuthState()
+    object PasswordResetSent : AuthState()
 }

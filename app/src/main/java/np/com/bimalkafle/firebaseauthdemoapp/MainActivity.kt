@@ -16,7 +16,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -52,16 +51,15 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             FirebaseAuthDemoAppTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MyAppNavigation(
-                        modifier = Modifier, // Remove padding to allow content to draw behind system bars
-                        authViewModel = authViewModel,
-                        splashViewModel = splashViewModel,
-                        brandViewModel = brandViewModel,
-                        influencerViewModel = influencerViewModel,
-                        campaignViewModel = campaignViewModel
-                    )
-                }
+                // Removed outer Scaffold to prevent double-inset handling
+                MyAppNavigation(
+                    modifier = Modifier.fillMaxSize(),
+                    authViewModel = authViewModel,
+                    splashViewModel = splashViewModel,
+                    brandViewModel = brandViewModel,
+                    influencerViewModel = influencerViewModel,
+                    campaignViewModel = campaignViewModel
+                )
             }
         }
         

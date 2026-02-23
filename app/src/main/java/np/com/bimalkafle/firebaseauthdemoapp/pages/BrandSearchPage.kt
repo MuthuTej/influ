@@ -6,10 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -35,6 +33,8 @@ import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.FilterDropdown
+import np.com.bimalkafle.firebaseauthdemoapp.components.IconBubbleSearch
 
 @Composable
 fun BrandSearchPage(
@@ -50,12 +50,14 @@ fun BrandSearchPage(
 
     val influencers by brandViewModel.influencers.observeAsState(initial = emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
+    val wishlistedInfluencers by brandViewModel.wishlistedInfluencers.observeAsState(initial = emptyList())
+    var firebaseToken by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-            val firebaseToken = result.token
+            firebaseToken = result.token
             if (firebaseToken != null) {
-                brandViewModel.fetchInfluencers(firebaseToken)
+                brandViewModel.fetchInfluencers(firebaseToken!!)
             }
         }
     }
@@ -99,7 +101,13 @@ fun BrandSearchPage(
         onBackClick = { navController.popBackStack() },
         onInfluencerClick = { id -> navController.navigate("brand_influencer_detail/$id") },
         onCreateCampaignClick = { navController.navigate("create_campaign") },
-        navController = navController
+        navController = navController,
+        wishlistedInfluencers = wishlistedInfluencers,
+        onWishlistToggle = { influencer ->
+            firebaseToken?.let { token ->
+                brandViewModel.toggleWishlist(influencer, token)
+            }
+        }
     )
 }
 
@@ -120,7 +128,9 @@ fun BrandSearchPageContent(
     onBackClick: () -> Unit,
     onInfluencerClick: (String) -> Unit,
     onCreateCampaignClick: () -> Unit,
-    navController: NavController
+    navController: NavController,
+    wishlistedInfluencers: List<InfluencerProfile> = emptyList(),
+    onWishlistToggle: (InfluencerProfile) -> Unit = {}
 ) {
 
     Scaffold(
@@ -197,7 +207,11 @@ fun BrandSearchPageContent(
                         }
 
                         Row {
-                            IconBubbleSearch(Icons.Default.Favorite, Color.Red)
+                            IconBubbleSearch(
+                                icon = Icons.Default.Favorite,
+                                tint = Color.Red,
+                                onClick = { navController.navigate("brand_wishlist") }
+                            )
                             Spacer(modifier = Modifier.width(10.dp))
                             IconBubbleSearch(Icons.Default.Notifications, Color.Black)
                         }
@@ -342,11 +356,14 @@ fun BrandSearchPageContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp)
+                    contentPadding = PaddingValues(bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(paginatedInfluencers) { influencer ->
                         BrandCardBrand(
                             influencer = influencer,
+                            isWishlisted = wishlistedInfluencers.any { it.id == influencer.id },
+                            onWishlistToggle = { onWishlistToggle(influencer) },
                             modifier = Modifier.fillMaxWidth(),
                             onCardClick = { onInfluencerClick(influencer.id) }
                         )
@@ -396,82 +413,6 @@ fun BrandSearchPageContent(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun FilterDropdown(
-    label: String,
-    selectedOption: String,
-    options: List<Pair<String, Int?>>,
-    onOptionSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = modifier) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = Color(0xFFFFEAEA), // Light pinkish for the chip
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clickable { expanded = true }
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = if (selectedOption == "All") label else selectedOption,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    maxLines = 1
-                )
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = Color.Black
-                )
-            }
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(Color.White)
-        ) {
-            options.forEach { (option, count) ->
-                DropdownMenuItem(
-                    text = { 
-                        Text(
-                            text = if (option == "All" || count == null) option else "$option ($count)",
-                            fontWeight = if(option == selectedOption) FontWeight.Bold else FontWeight.Normal
-                        ) 
-                    },
-                    onClick = {
-                        onOptionSelected(option)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun IconBubbleSearch(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color) {
-    Surface(
-        shape = CircleShape,
-        color = Color.White.copy(alpha = 0.9f),
-        modifier = Modifier.size(42.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
         }
     }
 }

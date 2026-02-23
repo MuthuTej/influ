@@ -34,14 +34,14 @@ data class Campaign(
     val brandId: String?,
     val title: String,
     val description: String?,
-    val objective: String?,
     val budgetMin: Int?,
     val budgetMax: Int?,
     val startDate: String?,
     val endDate: String?,
     val status: String?,
     val createdAt: String?,
-    val updatedAt: String?
+    val updatedAt: String?,
+    val platforms: List<Platform>? = null
 )
 
 data class Pricing(
@@ -117,7 +117,6 @@ data class Brand(
     val updatedAt: String?,
     val brandCategory: BrandCategory?,
     val about: String?,
-    val primaryObjective: String?,
     val profileUrl: String?,
     val logoUrl: String?,
     val govtId: String? = null,

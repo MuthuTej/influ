@@ -17,9 +17,6 @@ class ChatRepository {
     fun getUsers(currentUserRole: String): Flow<List<ChatUser>> = callbackFlow {
         val currentUserId = auth.currentUser?.uid
         
-        // Determine target collection based on role
-        // If I am BRAND, I want to see INFLUENCERS
-        // If I am INFLUENCER, I want to see BRANDS
         val targetCollection = if (currentUserRole.equals("BRAND", ignoreCase = true)) {
             "influencers"
         } else {
@@ -35,15 +32,12 @@ class ChatRepository {
                 }
                 
                 val users = snapshot?.documents?.mapNotNull { doc ->
-                    // Manually map fields because document ID is 'id' not 'uid' in these collections
-                    // and we need to map to ChatUser
                     try {
                         val uid = doc.getString("id") ?: doc.id
                         val name = doc.getString("name") ?: "Unknown"
                         val email = doc.getString("email") ?: ""
                         val photoUrl = doc.getString("logoUrl")
                         
-                        // Don't include self if for some reason we are in the target list (unlikely but safe)
                         if (uid != currentUserId) {
                             ChatUser(
                                 uid = uid,
@@ -65,7 +59,7 @@ class ChatRepository {
         awaitClose { subscription.remove() }
     }
 
-    fun getMessages(otherUserId: String): Flow<List<ChatMessage>> = callbackFlow {
+    fun getMessages(otherUserId: String, collaborationId: String? = null): Flow<List<ChatMessage>> = callbackFlow {
         val currentUserId = auth.currentUser?.uid ?: run {
             trySend(emptyList())
             return@callbackFlow
@@ -82,8 +76,12 @@ class ChatRepository {
                 
                 val messages = snapshot?.documents?.mapNotNull { it.toObject(ChatMessage::class.java) }
                     ?.filter {
-                        (it.senderId == currentUserId && it.receiverId == otherUserId) ||
-                        (it.senderId == otherUserId && it.receiverId == currentUserId)
+                        val isBetweenUsers = (it.senderId == currentUserId && it.receiverId == otherUserId) ||
+                                           (it.senderId == otherUserId && it.receiverId == currentUserId)
+                        
+                        val isSameCollaboration = it.collaborationId == collaborationId
+                        
+                        isBetweenUsers && isSameCollaboration
                     } ?: emptyList()
                 
                 trySend(messages)
@@ -91,7 +89,6 @@ class ChatRepository {
         awaitClose { subscription.remove() }
     }
 
-    // Function to get ALL messages (sent and received) to determine active chats and unread counts
     fun getAllMyMessages(): Flow<List<ChatMessage>> = callbackFlow {
         val currentUserId = auth.currentUser?.uid ?: run {
             trySend(emptyList())
@@ -102,7 +99,6 @@ class ChatRepository {
         var receivedMessages: List<ChatMessage> = emptyList()
 
         fun emitCombined() {
-            // Sort by timestamp descending so latest messages are first (or handle sorting in ViewModel)
             val allMessages = (sentMessages + receivedMessages).sortedByDescending { it.timestamp }
             trySend(allMessages)
         }
@@ -135,12 +131,13 @@ class ChatRepository {
         }
     }
 
-    fun markMessagesAsRead(senderId: String) {
+    fun markMessagesAsRead(senderId: String, collaborationId: String? = null) {
         val currentUserId = auth.currentUser?.uid ?: return
         db.collection("messages")
             .whereEqualTo("senderId", senderId)
             .whereEqualTo("receiverId", currentUserId)
             .whereEqualTo("isRead", false)
+            .whereEqualTo("collaborationId", collaborationId)
             .get()
             .addOnSuccessListener { snapshot ->
                 for (doc in snapshot.documents) {
@@ -154,7 +151,8 @@ class ChatRepository {
         text: String, 
         replyToId: String? = null,
         type: String = "TEXT",
-        metadata: Map<String, Any> = emptyMap()
+        metadata: Map<String, Any> = emptyMap(),
+        collaborationId: String? = null
     ) {
         val currentUserId = auth.currentUser?.uid ?: return
         val messageId = db.collection("messages").document().id
@@ -170,7 +168,8 @@ class ChatRepository {
             replyToId = replyToId,
             isRead = false,
             type = type,
-            metadata = metadata
+            metadata = metadata,
+            collaborationId = collaborationId
         )
 
         db.collection("messages").document(messageId).set(message)

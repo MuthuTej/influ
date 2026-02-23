@@ -48,10 +48,114 @@ class BrandViewModel : ViewModel() {
     private val _error = MutableLiveData<String?>()
     val error: LiveData<String?> = _error
 
+    private val _wishlistedInfluencers = MutableLiveData<List<InfluencerProfile>>(emptyList())
+    val wishlistedInfluencers: LiveData<List<InfluencerProfile>> = _wishlistedInfluencers
+
+    fun toggleWishlist(influencer: InfluencerProfile, token: String) {
+        viewModelScope.launch {
+            val mutation = """
+                mutation ToggleWishlist(${'$'}targetId: ID!) {
+                  toggleWishlist(targetId: ${'$'}targetId)
+                }
+            """.trimIndent()
+
+            val variables = mapOf("targetId" to influencer.id)
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null) {
+                    val isWishlistedResult = data.optBoolean("toggleWishlist")
+                    
+                    val currentList = _wishlistedInfluencers.value?.toMutableList() ?: mutableListOf()
+                    if (isWishlistedResult) {
+                        if (!currentList.any { it.id == influencer.id }) {
+                            currentList.add(influencer)
+                        }
+                    } else {
+                        currentList.removeAll { it.id == influencer.id }
+                    }
+                    _wishlistedInfluencers.postValue(currentList)
+                }
+            }.onFailure {
+                Log.e("BrandViewModel", "Error toggling wishlist", it)
+            }
+        }
+    }
+
+    fun fetchWishlist(token: String) {
+        viewModelScope.launch {
+            val query = """
+                query GetWishlist {
+                  getWishlist {
+                    ... on Influencer {
+                      id
+                      email
+                      name
+                      role
+                      profileCompleted
+                      updatedAt
+                      bio
+                      location
+                      categories {
+                        category
+                        subCategory
+                      }
+                      platforms {
+                        platform
+                        profileUrl
+                        followers
+                        avgViews
+                        engagement
+                        formats
+                        connected
+                      }
+                      strengths
+                      pricing {
+                        platform
+                        deliverable
+                        price
+                        currency
+                      }
+                      availability
+                      logoUrl
+                      averageRating
+                      isVerified
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    val wishlistArray = data?.optJSONArray("getWishlist")
+                    if (wishlistArray != null) {
+                        val list = mutableListOf<InfluencerProfile>()
+                        for (i in 0 until wishlistArray.length()) {
+                            val obj = wishlistArray.optJSONObject(i)
+                            // Brands only wishlist Influencers
+                            if (obj != null && obj.has("id") && obj.has("role") && obj.optString("role") == "INFLUENCER") {
+                                list.add(parseInfluencerProfile(obj))
+                            }
+                        }
+                        _wishlistedInfluencers.postValue(list)
+                    }
+                } catch (e: Exception) {
+                    Log.e("BrandViewModel", "Wishlist parsing error", e)
+                }
+            }.onFailure {
+                Log.e("BrandViewModel", "Wishlist network error", it)
+            }
+        }
+    }
+
     fun fetchInfluencers(token: String) {
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
+            fetchWishlist(token) // Fetch wishlist along with influencers
             val query = """
                 query GetInfluencers {
                   getInfluencers {
@@ -102,6 +206,8 @@ class BrandViewModel : ViewModel() {
                     }
                     availability
                     logoUrl
+                    averageRating
+                    isVerified
                   }
                 }
             """.trimIndent()
@@ -168,15 +274,22 @@ class BrandViewModel : ViewModel() {
             for (i in 0 until platformsArray.length()) {
                 val pObj = platformsArray.optJSONObject(i)
                 if (pObj != null) {
+                    val formatsArray = pObj.optJSONArray("formats")
+                    val formatsList = mutableListOf<String>()
+                    if (formatsArray != null) {
+                        for (j in 0 until formatsArray.length()) {
+                            formatsList.add(formatsArray.getString(j))
+                        }
+                    }
                     platforms.add(
                         Platform(
                             platform = pObj.optString("platform"),
-                            profileUrl = pObj.optString("profileUrl"),
-                            followers = pObj.optInt("followers", 0),
-                            avgViews = pObj.optInt("avgViews", 0),
-                            engagement = pObj.optDouble("engagement", 0.0).toFloat(),
-                            formats = null,
-                            connected = pObj.optBoolean("connected")
+                            profileUrl = pObj.optString("profileUrl", ""),
+                            followers = if (pObj.has("followers")) pObj.optInt("followers") else null,
+                            avgViews = if (pObj.has("avgViews")) pObj.optInt("avgViews") else null,
+                            engagement = if (pObj.has("engagement")) pObj.optDouble("engagement").toFloat() else null,
+                            formats = formatsList,
+                            connected = if (pObj.has("connected")) pObj.optBoolean("connected") else null
                         )
                     )
                 }
@@ -246,7 +359,7 @@ class BrandViewModel : ViewModel() {
             email = obj.optString("email"),
             name = obj.optString("name"),
             role = obj.optString("role"),
-            profileCompleted = obj.optBoolean("profileCompleted"),
+            profileCompleted = if (obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
             updatedAt = obj.optString("updatedAt"),
             bio = obj.optString("bio"),
             location = obj.optString("location"),
@@ -255,8 +368,10 @@ class BrandViewModel : ViewModel() {
             audienceInsights = audienceInsights,
             strengths = strengths,
             pricing = pricing,
-            availability = obj.optBoolean("availability"),
-            logoUrl = obj.optString("logoUrl")
+            availability = if (obj.has("availability")) obj.optBoolean("availability") else null,
+            logoUrl = obj.optString("logoUrl"),
+            averageRating = if (obj.has("averageRating") && !obj.isNull("averageRating")) obj.optDouble("averageRating").toFloat() else null,
+            isVerified = obj.optBoolean("isVerified", false)
         )
     }
 
@@ -279,7 +394,6 @@ class BrandViewModel : ViewModel() {
                         subCategory
                       }
                       about
-                      primaryObjective
                       profileUrl
                       logoUrl
                       preferredPlatforms {
@@ -397,11 +511,10 @@ class BrandViewModel : ViewModel() {
             email = obj.optString("email", ""),
             name = obj.optString("name", ""),
             role = obj.optString("role", ""),
-            profileCompleted = obj.optBoolean("profileCompleted"),
+            profileCompleted = if (obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
             updatedAt = obj.optString("updatedAt", null),
             brandCategory = brandCategory,
             about = obj.optString("about", null),
-            primaryObjective = obj.optString("primaryObjective", null),
             profileUrl = obj.optString("profileUrl", null),
             logoUrl = obj.optString("logoUrl", null),
             preferredPlatforms = preferredPlatforms,
@@ -415,7 +528,6 @@ class BrandViewModel : ViewModel() {
         brandCategory: String,
         subCategory: String,
         about: String,
-        primaryObjective: String,
         preferredPlatforms: List<String>,
         ageMin: Int?,
         ageMax: Int?,
@@ -433,7 +545,6 @@ class BrandViewModel : ViewModel() {
                 brandCategory = brandCategory,
                 subCategory = subCategory,
                 about = about,
-                primaryObjective = primaryObjective,
                 preferredPlatforms = preferredPlatforms,
                 ageMin = ageMin,
                 ageMax = ageMax,
@@ -462,7 +573,17 @@ class BrandViewModel : ViewModel() {
                     brandId
                     title
                     description
-                    objective
+                    budgetMin
+                    budgetMax
+                    startDate
+                    endDate
+                    status
+                    createdAt
+                    updatedAt
+                    platforms {
+                      platform
+                      formats
+                    }
                   }
                 }
             """.trimIndent()
@@ -476,20 +597,49 @@ class BrandViewModel : ViewModel() {
                         val list = mutableListOf<Campaign>()
                         for (i in 0 until campaignsArray.length()) {
                             val obj = campaignsArray.getJSONObject(i)
+                            
+                            val platformsArray = obj.optJSONArray("platforms")
+                            val platforms = mutableListOf<Platform>()
+                            if (platformsArray != null) {
+                                for (j in 0 until platformsArray.length()) {
+                                    val pObj = platformsArray.optJSONObject(j)
+                                    if (pObj != null) {
+                                        val formatsArray = pObj.optJSONArray("formats")
+                                        val formatsList = mutableListOf<String>()
+                                        if (formatsArray != null) {
+                                            for (k in 0 until formatsArray.length()) {
+                                                formatsList.add(formatsArray.getString(k))
+                                            }
+                                        }
+                                        platforms.add(
+                                            Platform(
+                                                platform = pObj.optString("platform"),
+                                                profileUrl = "",
+                                                followers = null,
+                                                avgViews = null,
+                                                engagement = null,
+                                                formats = formatsList,
+                                                connected = null
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
                             list.add(
                                 Campaign(
                                     id = obj.optString("id"),
                                     brandId = obj.optString("brandId"),
                                     title = obj.optString("title"),
                                     description = obj.optString("description"),
-                                    objective = obj.optString("objective"),
-                                    budgetMin = null,
-                                    budgetMax = null,
-                                    startDate = null,
-                                    endDate = null,
-                                    status = null,
-                                    createdAt = null,
-                                    updatedAt = null
+                                    budgetMin = if (obj.isNull("budgetMin")) null else obj.optInt("budgetMin"),
+                                    budgetMax = if (obj.isNull("budgetMax")) null else obj.optInt("budgetMax"),
+                                    startDate = obj.optString("startDate"),
+                                    endDate = obj.optString("endDate"),
+                                    status = obj.optString("status"),
+                                    createdAt = obj.optString("createdAt"),
+                                    updatedAt = obj.optString("updatedAt"),
+                                    platforms = platforms
                                 )
                             )
                         }
@@ -574,7 +724,6 @@ class BrandViewModel : ViewModel() {
                       brandId
                       title
                       description
-                      objective
                       budgetMin
                       budgetMax
                       startDate
@@ -686,7 +835,6 @@ class BrandViewModel : ViewModel() {
                     brandId = campaignObj.optString("brandId"),
                     title = campaignObj.optString("title"),
                     description = campaignObj.optString("description"),
-                    objective = campaignObj.optString("objective"),
                     budgetMin = if (campaignObj.isNull("budgetMin")) null else campaignObj.optInt("budgetMin"),
                     budgetMax = if (campaignObj.isNull("budgetMax")) null else campaignObj.optInt("budgetMax"),
                     startDate = campaignObj.optString("startDate"),
@@ -696,7 +844,7 @@ class BrandViewModel : ViewModel() {
                     updatedAt = campaignObj.optString("updatedAt")
                 )
             } else {
-                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null, null)
+                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null)
             }
 
             val influencerObj = obj.optJSONObject("influencer")
