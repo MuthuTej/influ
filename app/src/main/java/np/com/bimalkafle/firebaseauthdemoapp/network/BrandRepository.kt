@@ -1,13 +1,10 @@
 package np.com.bimalkafle.firebaseauthdemoapp.network
 
 import android.util.Log
-
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
 
 object BrandRepository {
 
@@ -25,14 +22,6 @@ object BrandRepository {
         logoUrl: String
     ): Boolean = withContext(Dispatchers.IO) {
 
-        val url = URL("https://connect-backend-e22a.onrender.com/graphql")
-        val connection = url.openConnection() as HttpURLConnection
-
-        connection.requestMethod = "POST"
-        connection.setRequestProperty("Content-Type", "application/json")
-        connection.setRequestProperty("Authorization", "Bearer $token")
-        connection.doOutput = true
-
         val mutation = """
             mutation SetupBrandProfile(${'$'}input: BrandProfileInput!) {
               setupBrandProfile(input: ${'$'}input) {
@@ -43,66 +32,63 @@ object BrandRepository {
             }
         """.trimIndent()
 
-        val variables = JSONObject().apply {
-            put("input", JSONObject().apply {
-                put("name", name)
-                put("profileUrl", profileUrl)
-                put("logoUrl" , logoUrl)
-                put("about", about)
+        val platformsArray = JSONArray()
+        preferredPlatforms.forEach { platformName ->
+            val platformObj = JSONObject()
+            val formatsArray = JSONArray()
+            formatsArray.put("Reels")
 
-                put("brandCategory", JSONObject().apply {
-                    put("category", brandCategory)
-                    put("subCategory", subCategory)
-                })
-
-                val platformsArray = org.json.JSONArray()
-
-                preferredPlatforms.forEach { platformName ->
-                    val platformObj = JSONObject()
-
-                    val formatsArray = org.json.JSONArray()
-                    formatsArray.put("Reels") // this is now a real JSON array
-
-                    platformObj.put("platform", platformName)
-                    platformObj.put("formats", formatsArray)
-                    platformObj.put("minFollowers", 1000)
-                    platformObj.put("minEngagement", 2.5)
-
-                    platformsArray.put(platformObj)
-                }
-
-                put("preferredPlatforms", platformsArray)
-                put("targetAudience", JSONObject().apply {
-                    put("ageMin", ageMin)
-                    put("ageMax", ageMax)
-                    put("gender", gender)
-                })
-            })
+            platformObj.put("platform", platformName)
+            platformObj.put("formats", formatsArray)
+            platformObj.put("minFollowers", 1000)
+            platformObj.put("minEngagement", 2.5)
+            platformsArray.put(platformObj)
         }
 
-        val body = JSONObject().apply {
-            put("query", mutation)
-            put("variables", variables)
+        val inputVariables = mutableMapOf<String, Any>(
+            "name" to name,
+            "profileUrl" to (profileUrl ?: ""),
+            "logoUrl" to logoUrl,
+            "about" to about,
+            "brandCategory" to mapOf(
+                "category" to brandCategory,
+                "subCategory" to subCategory
+            ),
+            "preferredPlatforms" to parsePlatformsToMapList(platformsArray),
+            "targetAudience" to mutableMapOf<String, Any>(
+                "gender" to gender
+            )
+        )
+        
+        (inputVariables["targetAudience"] as MutableMap<String, Any>).apply {
+            if (ageMin != null) put("ageMin", ageMin)
+            if (ageMax != null) put("ageMax", ageMax)
         }
 
-        OutputStreamWriter(connection.outputStream).use {
-            it.write(body.toString())
-            it.flush()
+        val variables = mapOf("input" to inputVariables)
+
+        val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+        
+        result.isSuccess && result.getOrNull()?.optJSONObject("data")?.optJSONObject("setupBrandProfile") != null
+    }
+
+    private fun parsePlatformsToMapList(jsonArray: JSONArray): List<Map<String, Any>> {
+        val list = mutableListOf<Map<String, Any>>()
+        for (i in 0 until jsonArray.length()) {
+            val obj = jsonArray.getJSONObject(i)
+            val map = mutableMapOf<String, Any>()
+            map["platform"] = obj.getString("platform")
+            
+            val formatsJson = obj.getJSONArray("formats")
+            val formatsList = mutableListOf<String>()
+            for (j in 0 until formatsJson.length()) {
+                formatsList.add(formatsJson.getString(j))
+            }
+            map["formats"] = formatsList
+            map["minFollowers"] = obj.getInt("minFollowers")
+            map["minEngagement"] = obj.getDouble("minEngagement")
+            list.add(map)
         }
-
-        val responseCode = connection.responseCode
-
-        Log.d("BRAND_API", "HTTP Response Code: $responseCode")
-
-        val responseStream = if (responseCode in 200..299) {
-            connection.inputStream
-        } else {
-            connection.errorStream
-        }
-
-        val responseText = responseStream?.bufferedReader()?.use { it.readText() }
-        Log.d("BRAND_API", "Raw Response: $responseText")
-
-        return@withContext responseCode == 200
+        return list
     }
 }

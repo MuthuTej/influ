@@ -351,7 +351,6 @@ fun BrandProfileContent(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    Spacer(modifier = Modifier.height(24.dp))
 
                     ProfileSectionTitle("Category")
                     if (isEditMode) {
@@ -444,6 +443,64 @@ fun BrandProfileContent(
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
+
+                    // Edit/Save Button (Moved to bottom)
+                    Button(
+                        onClick = {
+                            if (isEditMode) {
+                                val updatedBrand = brandProfile?.copy(
+                                    name = name,
+                                    email = email,
+                                    role = role,
+                                    about = about,
+
+                                    brandCategory = BrandCategory(category, subCategory),
+                                    profileUrl = profileUrl,
+                                    logoUrl = logoUrl,
+                                    targetAudience = TargetAudience(
+                                        ageMin = ageMin.toIntOrNull(),
+                                        ageMax = ageMax.toIntOrNull(),
+                                        gender = gender,
+                                        locations = brandProfile.targetAudience?.locations
+                                    ),
+                                    preferredPlatforms = selectedPlatforms.map { platformName ->
+                                        PreferredPlatform(
+                                            platform = platformName,
+                                            profileUrl = null,
+                                            followers = null,
+                                            avgViews = null,
+                                            engagement = null,
+                                            formats = null,
+                                            connected = null,
+                                            minFollowers = null,
+                                            minEngagement = null
+                                        )
+                                    }
+                                )
+                                if (updatedBrand != null) {
+                                    onUpdateProfile(updatedBrand)
+                                }
+                            }
+                            isEditMode = !isEditMode
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isEditMode) Color(0xFF4CAF50) else Color(0xFFFF8383))
+                    ) {
+                        Icon(
+                            if (isEditMode) Icons.Default.Save else Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isEditMode) stringResource(id = R.string.btn_save) else stringResource(id = R.string.btn_edit),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Log Out Button
                     Button(
