@@ -20,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -40,7 +39,6 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.PreferredPlatform
 import np.com.bimalkafle.firebaseauthdemoapp.model.TargetAudience
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
-import np.com.bimalkafle.firebaseauthdemoapp.components.ProfileSectionTitle
 
 @Composable
 fun BrandProfilePage(
@@ -66,7 +64,7 @@ fun BrandProfilePage(
         brandProfile = brandProfile,
         isLoading = isLoading,
         onSignOut = { authViewModel.signout() },
-        onNavigateToCreateCampaign = { navController.navigate(navController.context.getString(R.string.create_campaign_route)) },
+        onNavigateToCreateCampaign = { navController.navigate("create_campaign") },
         onUpdateProfile = { updatedBrand ->
             FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                 val firebaseToken = result.token
@@ -93,7 +91,7 @@ fun BrandProfilePage(
         },
         bottomBar = {
             CmnBottomNavigationBar(
-                selectedItem = stringResource(id = R.string.nav_profile),
+                selectedItem = "Profile",
                 onItemSelected = { /* Handled in the component */ },
                 navController = navController,
                 isBrand = true
@@ -134,12 +132,7 @@ fun BrandProfileContent(
         }
     }
 
-    val platformOptions = listOf(
-        stringResource(id = R.string.platform_instagram),
-        stringResource(id = R.string.platform_youtube),
-        stringResource(id = R.string.platform_twitter),
-        stringResource(id = R.string.platform_facebook)
-    )
+    val platformOptions = listOf("Instagram", "YouTube", "Twitter", "Facebook")
 
     Scaffold(
         bottomBar = bottomBar,
@@ -150,7 +143,7 @@ fun BrandProfileContent(
                     containerColor = Color(0xFFFF8383),
                     shape = CircleShape
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(id = R.string.cd_create_campaign), tint = Color.White)
+                    Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White)
                 }
             }
         }
@@ -167,7 +160,7 @@ fun BrandProfileContent(
                     .verticalScroll(rememberScrollState())
                     .padding(padding)
             ) {
-                // Profile Header
+                // Profile Header (Editable)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -286,25 +279,35 @@ fun BrandProfileContent(
                                     focusedLabelColor = Color.White,
                                     unfocusedLabelColor = Color.White.copy(alpha = 0.7f)
                                 ),
-                                label = { Text(stringResource(id = R.string.label_brand_name)) },
+                                label = { Text("Brand Name") },
                                 textStyle = TextStyle(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            // Role is no longer editable as requested
-                            Text(
-                                text = role.ifEmpty { stringResource(id = R.string.default_role) },
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 14.sp
+                            OutlinedTextField(
+                                value = role,
+                                onValueChange = { role = it },
+                                modifier = Modifier.padding(horizontal = 64.dp).height(50.dp).fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.White,
+                                    unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = Color.White,
+                                    focusedLabelColor = Color.White,
+                                    unfocusedLabelColor = Color.White.copy(alpha = 0.7f)
+                                ),
+                                label = { Text("Role") },
+                                textStyle = TextStyle(textAlign = TextAlign.Center, fontSize = 12.sp)
                             )
                         } else {
                             Text(
-                                text = name.ifEmpty { stringResource(id = R.string.label_brand_name) },
+                                text = name.ifEmpty { "Brand Name" },
                                 color = Color.White,
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = role.ifEmpty { stringResource(id = R.string.default_role) },
+                                text = role.ifEmpty { "BRAND" },
                                 color = Color.White.copy(alpha = 0.8f),
                                 fontSize = 14.sp
                             )
@@ -314,33 +317,33 @@ fun BrandProfileContent(
 
                 // Profile Details (All Editable)
                 Column(modifier = Modifier.padding(16.dp)) {
-                    ProfileSectionTitle(stringResource(id = R.string.section_email_address))
+                    ProfileSectionTitle("Email Address")
                     if (isEditMode) {
                         OutlinedTextField(
                             value = email,
                             onValueChange = { email = it },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            label = { Text(stringResource(id = R.string.label_email)) }
+                            label = { Text("Email") }
                         )
                     } else {
-                        Text(text = email.ifEmpty { stringResource(id = R.string.not_available) }, color = Color.DarkGray, fontSize = 14.sp)
+                        Text(text = email.ifEmpty { "N/A" }, color = Color.DarkGray, fontSize = 14.sp)
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    ProfileSectionTitle(stringResource(id = R.string.section_about_brand))
+                    ProfileSectionTitle("About Brand")
                     if (isEditMode) {
                         OutlinedTextField(
                             value = about,
                             onValueChange = { about = it },
                             modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
                             shape = RoundedCornerShape(12.dp),
-                            label = { Text(stringResource(id = R.string.label_brand_description)) }
+                            label = { Text("Brand Description") }
                         )
                     } else {
                         Text(
-                            text = about.ifEmpty { stringResource(id = R.string.msg_no_info_available) },
+                            text = about.ifEmpty { "No information available." },
                             color = Color.DarkGray,
                             fontSize = 14.sp
                         )
@@ -348,22 +351,9 @@ fun BrandProfileContent(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    ProfileSectionTitle(stringResource(id = R.string.section_primary_objective))
-                    if (isEditMode) {
-                        OutlinedTextField(
-                            value = primaryObjective,
-                            onValueChange = { primaryObjective = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            label = { Text(stringResource(id = R.string.label_objective)) }
-                        )
-                    } else {
-                        Text(text = primaryObjective.ifEmpty { stringResource(id = R.string.not_available) }, color = Color.DarkGray, fontSize = 14.sp)
-                    }
-
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    ProfileSectionTitle(stringResource(id = R.string.section_category))
+                    ProfileSectionTitle("Category")
                     if (isEditMode) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(
@@ -371,23 +361,23 @@ fun BrandProfileContent(
                                 onValueChange = { category = it },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp),
-                                label = { Text(stringResource(id = R.string.label_category)) }
+                                label = { Text("Category") }
                             )
                             OutlinedTextField(
                                 value = subCategory,
                                 onValueChange = { subCategory = it },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp),
-                                label = { Text(stringResource(id = R.string.label_sub_category)) }
+                                label = { Text("Sub-Category") }
                             )
                         }
                     } else {
-                        Text(text = "${category.ifEmpty { stringResource(id = R.string.not_available) }} - ${subCategory.ifEmpty { stringResource(id = R.string.not_available) }}", color = Color.DarkGray, fontSize = 14.sp)
+                        Text(text = "${category.ifEmpty { "N/A" }} - ${subCategory.ifEmpty { "N/A" }}", color = Color.DarkGray, fontSize = 14.sp)
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    ProfileSectionTitle(stringResource(id = R.string.section_target_audience))
+                    ProfileSectionTitle("Target Audience")
                     if (isEditMode) {
                         Column {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -396,14 +386,14 @@ fun BrandProfileContent(
                                     onValueChange = { ageMin = it },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(12.dp),
-                                    label = { Text(stringResource(id = R.string.label_min_age)) }
+                                    label = { Text("Min Age") }
                                 )
                                 OutlinedTextField(
                                     value = ageMax,
                                     onValueChange = { ageMax = it },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(12.dp),
-                                    label = { Text(stringResource(id = R.string.label_max_age)) }
+                                    label = { Text("Max Age") }
                                 )
                             }
                             Spacer(modifier = Modifier.height(8.dp))
@@ -412,25 +402,16 @@ fun BrandProfileContent(
                                 onValueChange = { gender = it },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
-                                label = { Text(stringResource(id = R.string.label_target_gender)) }
+                                label = { Text("Target Gender") }
                             )
                         }
                     } else {
-                        Text(
-                            text = stringResource(
-                                id = R.string.text_age_gender,
-                                ageMin.ifEmpty { stringResource(id = R.string.not_available) },
-                                ageMax.ifEmpty { stringResource(id = R.string.not_available) },
-                                gender.ifEmpty { stringResource(id = R.string.not_available) }
-                            ),
-                            color = Color.DarkGray,
-                            fontSize = 14.sp
-                        )
+                        Text(text = "Age: ${ageMin.ifEmpty { "N/A" }} - ${ageMax.ifEmpty { "N/A" }} | Gender: ${gender.ifEmpty { "N/A" }}", color = Color.DarkGray, fontSize = 14.sp)
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    ProfileSectionTitle(stringResource(id = R.string.section_preferred_platforms))
+                    ProfileSectionTitle("Preferred Platforms")
                     if (isEditMode) {
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
@@ -456,71 +437,13 @@ fun BrandProfileContent(
                         }
                     } else {
                         if (selectedPlatforms.isEmpty()) {
-                            Text(text = stringResource(id = R.string.msg_no_platforms_selected), color = Color.DarkGray, fontSize = 14.sp)
+                            Text(text = "No platforms selected.", color = Color.DarkGray, fontSize = 14.sp)
                         } else {
                             Text(text = selectedPlatforms.joinToString(", "), color = Color.DarkGray, fontSize = 14.sp)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
-
-                    // Edit/Save Button (Moved to bottom)
-                    Button(
-                        onClick = {
-                            if (isEditMode) {
-                                val updatedBrand = brandProfile?.copy(
-                                    name = name,
-                                    email = email,
-                                    role = role,
-                                    about = about,
-                                    primaryObjective = primaryObjective,
-                                    brandCategory = BrandCategory(category, subCategory),
-                                    profileUrl = profileUrl,
-                                    logoUrl = logoUrl,
-                                    targetAudience = TargetAudience(
-                                        ageMin = ageMin.toIntOrNull(),
-                                        ageMax = ageMax.toIntOrNull(),
-                                        gender = gender,
-                                        locations = brandProfile.targetAudience?.locations
-                                    ),
-                                    preferredPlatforms = selectedPlatforms.map { platformName ->
-                                        PreferredPlatform(
-                                            platform = platformName,
-                                            profileUrl = null,
-                                            followers = null,
-                                            avgViews = null,
-                                            engagement = null,
-                                            formats = null,
-                                            connected = null,
-                                            minFollowers = null,
-                                            minEngagement = null
-                                        )
-                                    }
-                                )
-                                if (updatedBrand != null) {
-                                    onUpdateProfile(updatedBrand)
-                                }
-                            }
-                            isEditMode = !isEditMode
-                        },
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (isEditMode) Color(0xFF4CAF50) else Color(0xFFFF8383))
-                    ) {
-                        Icon(
-                            if (isEditMode) Icons.Default.Save else Icons.Default.Edit,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isEditMode) stringResource(id = R.string.btn_save) else stringResource(id = R.string.btn_edit),
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Log Out Button
                     Button(
@@ -531,7 +454,7 @@ fun BrandProfileContent(
                     ) {
                         Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(stringResource(id = R.string.btn_log_out), color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Log Out", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                     
                     Spacer(modifier = Modifier.height(32.dp))
@@ -541,6 +464,16 @@ fun BrandProfileContent(
     }
 }
 
+@Composable
+fun ProfileSectionTitle(title: String) {
+    Text(
+        text = title,
+        color = Color.Black,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+}
 
 @Preview(showBackground = true)
 @Composable

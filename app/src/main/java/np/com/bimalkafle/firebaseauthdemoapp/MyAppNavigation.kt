@@ -195,7 +195,7 @@ fun MyAppNavigation(
             WishlistScreen(navController, campaignViewModel)
         }
         composable("influencerProfile") {
-            InfluencerProfileScreen(modifier, navController, authViewModel, influencerViewModel)
+            InfluencerProfileScreen(navController)
         }
         composable("discover") {
             DiscoverBrandsScreen(navController)

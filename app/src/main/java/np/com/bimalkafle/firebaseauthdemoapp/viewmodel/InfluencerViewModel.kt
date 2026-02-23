@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
-import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -100,26 +99,6 @@ class InfluencerViewModel : ViewModel() {
             }.onFailure {
                 Log.e("InfluencerViewModel", "Network error", it)
                 _error.postValue("Network error: ${'$'}{it.message}")
-            }
-            _loading.postValue(false)
-        }
-    }
-
-    fun updateInfluencerProfile(
-        token: String,
-        input: JSONObject,
-        onComplete: (Boolean) -> Unit
-    ) {
-        _loading.value = true
-        _error.value = null
-        viewModelScope.launch {
-            val result = BackendRepository.setupInfluencerProfile(input, token)
-            result.onSuccess {
-                fetchInfluencerDetails(token)
-                onComplete(true)
-            }.onFailure {
-                _error.postValue(it.message ?: "Update failed")
-                onComplete(false)
             }
             _loading.postValue(false)
         }
