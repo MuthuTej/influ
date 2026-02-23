@@ -75,7 +75,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     val categoryOptions = listOf("Fashion", "Tech", "Lifestyle", "Gaming", "Food", "Beauty", "Travel")
     val selectedCategories = remember { mutableStateListOf<String>() }
 
-    val platforms = listOf("Instagram", "Facebook", "Twitter", "YouTube")
+    val platforms = listOf("Instagram", "Facebook", "YouTube")
     val selectedPlatforms = remember { mutableStateListOf<String>() }
 
     var profileUrls by remember { mutableStateOf(mapOf<String, String>()) }
@@ -226,7 +226,6 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                     val icon = when (platform) {
                         "Instagram" -> painterResource(id = R.drawable.ic_instagram)
                         "Facebook" -> painterResource(id = R.drawable.ic_facebook)
-                        "Twitter" -> painterResource(id = R.drawable.ic_twitter)
                         "YouTube" -> painterResource(id = R.drawable.ic_youtube)
                         else -> null
                     }
@@ -286,7 +285,6 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                             val icon = when (platform) {
                                 "Instagram" -> painterResource(id = R.drawable.ic_instagram)
                                 "Facebook" -> painterResource(id = R.drawable.ic_facebook)
-                                "Twitter" -> painterResource(id = R.drawable.ic_twitter)
                                 "YouTube" -> painterResource(id = R.drawable.ic_youtube)
                                 else -> null
                             }
