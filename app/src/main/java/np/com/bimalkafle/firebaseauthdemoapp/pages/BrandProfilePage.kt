@@ -348,20 +348,6 @@ fun BrandProfileContent(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    ProfileSectionTitle(stringResource(id = R.string.section_primary_objective))
-                    if (isEditMode) {
-                        OutlinedTextField(
-                            value = primaryObjective,
-                            onValueChange = { primaryObjective = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            label = { Text(stringResource(id = R.string.label_objective)) }
-                        )
-                    } else {
-                        Text(text = primaryObjective.ifEmpty { stringResource(id = R.string.not_available) }, color = Color.DarkGray, fontSize = 14.sp)
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
 
                     ProfileSectionTitle(stringResource(id = R.string.section_category))
                     if (isEditMode) {
@@ -473,7 +459,7 @@ fun BrandProfileContent(
                                     email = email,
                                     role = role,
                                     about = about,
-                                    primaryObjective = primaryObjective,
+
                                     brandCategory = BrandCategory(category, subCategory),
                                     profileUrl = profileUrl,
                                     logoUrl = logoUrl,
