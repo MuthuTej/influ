@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -494,7 +495,7 @@ fun BrandProfileContent(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isEditMode) stringResource(id = R.string.btn_save) else stringResource(id = R.string.btn_edit),
+                            text = stringResource(id = if (isEditMode) R.string.btn_save else R.string.btn_edit),
                             color = Color.White,
                             fontWeight = FontWeight.Bold
                         )
