@@ -104,6 +104,80 @@ class InfluencerViewModel : ViewModel() {
         }
     }
 
+    fun updateInfluencerProfile(
+        token: String,
+        name: String,
+        bio: String,
+        location: String,
+        logoUrl: String,
+        categories: List<Category>,
+        platforms: List<Platform>,
+        pricing: List<PricingInfo>,
+        onComplete: (Boolean) -> Unit
+    ) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val mutation = """
+                mutation UpdateInfluencerProfile(${'$'}input: InfluencerProfileInput!) {
+                  updateInfluencerProfile(input: ${'$'}input) {
+                    id
+                    name
+                    bio
+                    location
+                    profileCompleted
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "input" to mapOf(
+                    "name" to name,
+                    "bio" to bio,
+                    "location" to location,
+                    "logoUrl" to logoUrl,
+                    "categories" to categories.map { mapOf("category" to it.category, "subCategory" to it.subCategory) },
+                    "platforms" to platforms.map { 
+                        mapOf(
+                            "platform" to it.platform,
+                            "profileUrl" to (it.profileUrl ?: ""),
+                            "followers" to (it.followers ?: 0),
+                            "avgViews" to (it.avgViews ?: 0),
+                            "engagement" to (it.engagement ?: 0f).toDouble()
+                        )
+                    },
+                    "pricing" to pricing.map { 
+                        mapOf(
+                            "platform" to it.platform,
+                            "deliverable" to it.deliverable,
+                            "price" to it.price,
+                            "currency" to it.currency
+                        )
+                    },
+                    "availability" to "Available"
+                )
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("updateInfluencerProfile") != null) {
+                    onComplete(true)
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Update failed"
+                    _error.postValue(errorMsg)
+                    onComplete(false)
+                }
+            }.onFailure {
+                Log.e("InfluencerViewModel", "Network error", it)
+                _error.postValue("Network error: ${'$'}{it.message}")
+                onComplete(false)
+            }
+            _loading.postValue(false)
+        }
+    }
+
     fun fetchInfluencerById(id: String, token: String) {
         _loading.value = true
         _error.value = null

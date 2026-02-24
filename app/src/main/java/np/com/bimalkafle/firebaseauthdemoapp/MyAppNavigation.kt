@@ -36,13 +36,25 @@ fun MyAppNavigation(
             OnboardingScreen(navController)
         }
         composable("login") {
-            LoginPage(modifier, navController, authViewModel)
+            LoginPage(
+                modifier = modifier, 
+                navController = navController, 
+                authViewModel = authViewModel
+            )
         }
         composable("signup") {
-            SignupPage(modifier, navController, authViewModel)
+            SignupPage(
+                modifier = modifier, 
+                navController = navController, 
+                authViewModel = authViewModel
+            )
         }
         composable("forgot_password") {
-            ForgotPasswordPage(modifier, navController, authViewModel)
+            ForgotPasswordPage(
+                modifier = modifier, 
+                navController = navController, 
+                authViewModel = authViewModel
+            )
         }
         composable("brand_registration") {
             BrandRegistrationScreen(
@@ -106,7 +118,12 @@ fun MyAppNavigation(
             )
         }
         composable("brand_home") {
-            BrandHomePage(modifier, navController, authViewModel, brandViewModel)
+            BrandHomePage(
+                modifier = modifier, 
+                navController = navController, 
+                authViewModel = authViewModel, 
+                brandViewModel = brandViewModel
+            )
         }
         composable("all_campaigns") {
             AllCampaignPage(navController, brandViewModel)
@@ -122,13 +139,28 @@ fun MyAppNavigation(
             )
         }
         composable("brand_search") {
-            BrandSearchPage(modifier, navController, authViewModel, brandViewModel)
+            BrandSearchPage(
+                modifier = modifier, 
+                navController = navController, 
+                authViewModel = authViewModel, 
+                brandViewModel = brandViewModel
+            )
         }
         composable("brand_history") {
-            ProposalPage (modifier, navController, authViewModel, brandViewModel)
+            ProposalPage (
+                modifier = modifier, 
+                navController = navController, 
+                authViewModel = authViewModel, 
+                brandViewModel = brandViewModel
+            )
         }
         composable("brand_profile") {
-            BrandProfilePage(modifier, navController, authViewModel, brandViewModel)
+            BrandProfilePage(
+                modifier = modifier, 
+                navController = navController, 
+                authViewModel = authViewModel, 
+                brandViewModel = brandViewModel
+            )
         }
         composable("brand_wishlist") {
             BrandWishlistPage(navController, brandViewModel)
@@ -174,28 +206,30 @@ fun MyAppNavigation(
         @Suppress("UnusedMaterial3ScaffoldPaddingParameter")
         composable("influencer_home") {
             InfluencerHomePage(
-                modifier,
-                navController,
-                authViewModel,
-                influencerViewModel,
-                campaignViewModel
+                modifier = modifier,
+                navController = navController,
+                authViewModel = authViewModel,
+                influencerViewModel = influencerViewModel,
+                campaignViewModel = campaignViewModel
             )
         }
         composable("influencer_search") {
             InfluencerSearchPage(
-                modifier,
-                navController,
-                campaignViewModel
+                modifier = modifier,
+                navController = navController,
+                campaignViewModel = campaignViewModel
             )
-        }
-        composable("proposals") {
-            ProposalPage(modifier, navController, authViewModel, brandViewModel)
         }
         composable("wishlist") {
             WishlistScreen(navController, campaignViewModel)
         }
         composable("influencerProfile") {
-            InfluencerProfileScreen(navController)
+            InfluencerProfileScreen(
+                modifier = modifier,
+                navController = navController,
+                authViewModel = authViewModel,
+                influencerViewModel = influencerViewModel
+            )
         }
         composable("discover") {
             DiscoverBrandsScreen(navController)
