@@ -132,9 +132,16 @@ fun BrandProfileContent(
     var ageMax by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.ageMax?.toString() ?: "") }
     var gender by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.gender ?: "Any") }
     
+    val platformOptions = listOf("Instagram", "YouTube","Facebook")
+
     val selectedPlatforms = remember(brandProfile) {
         mutableStateListOf<String>().apply {
-            brandProfile?.preferredPlatforms?.forEach { add(it.platform) }
+            brandProfile?.preferredPlatforms?.forEach { pref ->
+                val normalizedName = platformOptions.find { it.equals(pref.platform, ignoreCase = true) } ?: pref.platform
+                if (!contains(normalizedName)) {
+                    add(normalizedName)
+                }
+            }
         }
     }
 
