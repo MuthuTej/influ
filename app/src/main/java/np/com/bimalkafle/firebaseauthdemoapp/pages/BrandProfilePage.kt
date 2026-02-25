@@ -138,7 +138,7 @@ fun BrandProfileContent(
         }
     }
 
-    val platformOptions = listOf("Instagram", "YouTube", "Twitter", "Facebook")
+    val platformOptions = listOf("Instagram", "YouTube", "Facebook")
     val themeColor = Color(0xFFFF8383)
 
     Scaffold(

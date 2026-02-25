@@ -126,12 +126,11 @@ fun InfluencerProfileContent(
     var platforms by remember(influencerProfile) { mutableStateOf(influencerProfile?.platforms ?: emptyList()) }
     
     // State for services/pricing
-    val availablePlatforms = listOf("Instagram", "YouTube", "Facebook", "Twitter")
+    val availablePlatforms = listOf("Instagram", "YouTube", "Facebook")
     val servicesByPlatform = mapOf(
         "Instagram" to listOf("Story", "Reel", "Post"),
         "YouTube" to listOf("Video", "Shorts", "Community Post"),
-        "Facebook" to listOf("Post", "Story", "Video"),
-        "Twitter" to listOf("Tweet", "Thread")
+        "Facebook" to listOf("Post", "Story", "Video")
     )
     
     var selectedPricing = remember(influencerProfile) { 
@@ -224,23 +223,6 @@ fun InfluencerProfileContent(
                                 label = { Text("Influencer Name") },
                                 textStyle = TextStyle(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = logoUrl,
-                                onValueChange = { logoUrl = it },
-                                modifier = Modifier.padding(horizontal = 32.dp).fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.White,
-                                    unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = Color.White,
-                                    focusedLabelColor = Color.White,
-                                    unfocusedLabelColor = Color.White.copy(alpha = 0.7f)
-                                ),
-                                label = { Text("Logo URL") },
-                                textStyle = TextStyle(textAlign = TextAlign.Center, fontSize = 14.sp)
-                            )
                         } else {
                             Text(
                                 text = name.ifEmpty { "Influencer Name" },
@@ -312,6 +294,21 @@ fun InfluencerProfileContent(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
+                    ProfileSectionTitle("Logo URL")
+                    if (isEditMode) {
+                        OutlinedTextField(
+                            value = logoUrl,
+                            onValueChange = { logoUrl = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            label = { Text("Logo URL") }
+                        )
+                    } else {
+                        Text(text = logoUrl.ifEmpty { "N/A" }, color = Color.DarkGray, fontSize = 14.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
                     ProfileSectionTitle("Availability Status")
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -327,7 +324,14 @@ fun InfluencerProfileContent(
                             Switch(
                                 checked = availability,
                                 onCheckedChange = { availability = it },
-                                colors = SwitchDefaults.colors(checkedThumbColor = themeColor)
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = themeColor,
+                                    checkedTrackColor = Color.White,
+                                    checkedBorderColor = themeColor,
+                                    uncheckedThumbColor = Color.Gray,
+                                    uncheckedTrackColor = Color.White,
+                                    uncheckedBorderColor = Color.Gray
+                                )
                             )
                         }
                     }
