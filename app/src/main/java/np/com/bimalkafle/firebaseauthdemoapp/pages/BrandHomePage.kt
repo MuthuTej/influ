@@ -320,7 +320,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
 
         // ---------------- FLOATING BUTTON ----------------
         Button(
-            onClick = { },
+            onClick = { navController.navigate("brand_search") },
             shape = RoundedCornerShape(30.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFFFF5252)
