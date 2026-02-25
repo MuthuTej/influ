@@ -47,7 +47,7 @@ fun BrandRegistrationScreen(
     var brandCategory by remember { mutableStateOf("E-commerce") }
     var subCategory by remember { mutableStateOf("Fashion") }
     var description by remember { mutableStateOf("") }
-    val platformOptions = listOf("Instagram", "YouTube", "Twitter", "Facebook")
+    val platformOptions = listOf("Instagram", "YouTube", "Facebook")
     val selectedPlatforms = remember { mutableStateListOf<String>() }
     var ageMin by remember { mutableStateOf("18") }
     var ageMax by remember { mutableStateOf("25") }

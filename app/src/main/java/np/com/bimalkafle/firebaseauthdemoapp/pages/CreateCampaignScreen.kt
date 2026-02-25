@@ -55,7 +55,7 @@ fun CreateCampaignScreen(
     onNext: () -> Unit = {},
     campaignViewModel: CampaignViewModel = CampaignViewModel()
 ) {
-    val platforms = listOf("Youtube", "Instagram", "Facebook", "Twitter")
+    val platforms = listOf("Youtube", "Instagram", "Facebook")
 
     var showDatePicker by remember { mutableStateOf(false) }
     var dateField by remember { mutableStateOf<String?>(null) }
@@ -256,7 +256,6 @@ fun PlatformChip(name: String, isSelected: Boolean, onSelected: () -> Unit) {
         "Youtube" -> painterResource(id = R.drawable.ic_youtube) // Replace with actual icons
         "Instagram" -> painterResource(id = R.drawable.ic_instagram)
         "Facebook" -> painterResource(id = R.drawable.ic_facebook)
-        "Twitter" -> painterResource(id = R.drawable.ic_twitter)
         else -> painterResource(id = R.drawable.splash1)
     }
     FilterChip(
