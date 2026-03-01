@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +34,7 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.MainActivity
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.model.Brand
@@ -49,13 +52,27 @@ fun BrandProfilePage(
     brandViewModel: BrandViewModel
 ) {
     val brandProfile by brandViewModel.brandProfile.observeAsState()
+    val collaborations by brandViewModel.collaborations.observeAsState(emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
+    val errorMsg by brandViewModel.error.observeAsState()
+    val context = LocalContext.current
+    var firebaseToken by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(errorMsg) {
+        errorMsg?.let {
+            if (it.isNotEmpty()) {
+                Toast.makeText(context, "Error: $it", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-            val firebaseToken = result.token
-            if (firebaseToken != null) {
-                brandViewModel.fetchBrandDetails(firebaseToken)
+            val token = result.token
+            firebaseToken = token
+            if (token != null) {
+                brandViewModel.fetchBrandDetails(token)
+                brandViewModel.fetchCollaborations(token)
             }
         }
     }
@@ -64,6 +81,9 @@ fun BrandProfilePage(
         modifier = modifier,
         brandProfile = brandProfile,
         isLoading = isLoading,
+        firebaseToken = firebaseToken,
+        brandViewModel = brandViewModel,
+        collaborationId = collaborations.find { it.status == "ACCEPTED" }?.id,
         onSignOut = {
             authViewModel.signout()
             navController.navigate("login") {
@@ -72,25 +92,22 @@ fun BrandProfilePage(
         },
         onNavigateToCreateCampaign = { navController.navigate("create_campaign") },
         onUpdateProfile = { updatedBrand ->
-            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-                val firebaseToken = result.token
-                if (firebaseToken != null) {
-                    brandViewModel.updateBrandProfile(
-                        token = firebaseToken,
-                        name = updatedBrand.name,
-                        brandCategory = updatedBrand.brandCategory?.category ?: "",
-                        subCategory = updatedBrand.brandCategory?.subCategory ?: "",
-                        about = updatedBrand.about ?: "",
-                        preferredPlatforms = updatedBrand.preferredPlatforms?.map { it.platform } ?: emptyList(),
-                        ageMin = updatedBrand.targetAudience?.ageMin,
-                        ageMax = updatedBrand.targetAudience?.ageMax,
-                        gender = updatedBrand.targetAudience?.gender ?: "Any",
-                        profileUrl = updatedBrand.profileUrl,
-                        logoUrl = updatedBrand.logoUrl ?: ""
-                    ) { success ->
-                        if (success) {
-                            brandViewModel.fetchBrandDetails(firebaseToken)
-                        }
+            firebaseToken?.let { token ->
+                brandViewModel.updateBrandProfile(
+                    token = token,
+                    name = updatedBrand.name,
+                    brandCategory = updatedBrand.brandCategory?.category ?: "",
+                    subCategory = updatedBrand.brandCategory?.subCategory ?: "",
+                    about = updatedBrand.about ?: "",
+                    preferredPlatforms = updatedBrand.preferredPlatforms?.map { it.platform } ?: emptyList(),
+                    ageMin = updatedBrand.targetAudience?.ageMin,
+                    ageMax = updatedBrand.targetAudience?.ageMax,
+                    gender = updatedBrand.targetAudience?.gender ?: "Any",
+                    profileUrl = updatedBrand.profileUrl,
+                    logoUrl = updatedBrand.logoUrl ?: ""
+                ) { success ->
+                    if (success) {
+                        brandViewModel.fetchBrandDetails(token)
                     }
                 }
             }
@@ -112,12 +129,16 @@ fun BrandProfileContent(
     modifier: Modifier = Modifier,
     brandProfile: Brand?,
     isLoading: Boolean,
+    firebaseToken: String?,
+    brandViewModel: BrandViewModel,
+    collaborationId: String?,
     onSignOut: () -> Unit,
     onNavigateToCreateCampaign: () -> Unit,
     onUpdateProfile: (Brand) -> Unit,
     bottomBar: @Composable () -> Unit = {}
 ) {
     var isEditMode by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     // State for ALL editable fields
     var name by remember(brandProfile) { mutableStateOf(brandProfile?.name ?: "") }
@@ -446,6 +467,40 @@ fun BrandProfileContent(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Log Out", color = Color.White, fontWeight = FontWeight.Bold)
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Pay Button
+                    Button(
+                        onClick = {
+                            if (firebaseToken != null && !collaborationId.isNullOrEmpty()) {
+                                brandViewModel.createPaymentOrder(
+                                    token = firebaseToken,
+                                    collaborationId = collaborationId,
+                                    paymentType = "ADVANCE"
+                                ) { orderId, amount ->
+                                    if (!orderId.isNullOrEmpty() && amount != null) {
+                                        (context as? MainActivity)?.startPayment(
+                                            orderId = orderId,
+                                            amount = amount,
+                                            collaborationId = collaborationId,
+                                            paymentType = "ADVANCE",
+                                            brandName = name
+                                        )
+                                    }
+                                }
+                            } else if (collaborationId.isNullOrEmpty()) {
+                                Toast.makeText(context, "No Accepted collaboration found. Status in DB must be ACCEPTED.", Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE))
+                    ) {
+                        Icon(Icons.Default.Payment, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Pay Now (Auto-Select)", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                     
                     Spacer(modifier = Modifier.height(32.dp))
                 }
@@ -472,6 +527,9 @@ fun BrandProfilePreview() {
         BrandProfileContent(
             brandProfile = null,
             isLoading = false,
+            firebaseToken = null,
+            brandViewModel = BrandViewModel(),
+            collaborationId = null,
             onSignOut = {},
             onNavigateToCreateCampaign = {},
             onUpdateProfile = {}

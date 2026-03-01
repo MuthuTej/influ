@@ -51,6 +51,100 @@ class BrandViewModel : ViewModel() {
     private val _wishlistedInfluencers = MutableLiveData<List<InfluencerProfile>>(emptyList())
     val wishlistedInfluencers: LiveData<List<InfluencerProfile>> = _wishlistedInfluencers
 
+    fun createPaymentOrder(
+        token: String,
+        collaborationId: String,
+        paymentType: String,
+        onComplete: (String?, Int?) -> Unit
+    ) {
+        _loading.value = true
+        viewModelScope.launch {
+            Log.d("GraphQL", "Creating Order - ID: $collaborationId, Type: $paymentType")
+            
+            val mutation = """
+                mutation CreateCollaborationPaymentOrder(${'$'}collaborationId: ID!, ${'$'}paymentType: PaymentType!) {
+                  createCollaborationPaymentOrder(collaborationId: ${'$'}collaborationId, paymentType: ${'$'}paymentType) {
+                    success
+                    razorpayOrderId
+                    totalAmount
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "collaborationId" to collaborationId,
+                "paymentType" to paymentType
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                Log.d("GraphQL", "Response: ${jsonObject.toString()}")
+                val data = jsonObject.optJSONObject("data")?.optJSONObject("createCollaborationPaymentOrder")
+                if (data != null && data.optBoolean("success")) {
+                    onComplete(data.optString("razorpayOrderId"), data.optInt("totalAmount"))
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    val msg = errors?.optJSONObject(0)?.optString("message") ?: "Server logic failed"
+                    _error.postValue(msg)
+                    onComplete(null, null)
+                }
+            }.onFailure {
+                Log.e("GraphQL", "Network Error: ${it.message}")
+                _error.postValue(it.message)
+                onComplete(null, null)
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun verifyPayment(
+        token: String,
+        collaborationId: String,
+        razorpayPaymentId: String,
+        razorpaySignature: String,
+        paymentType: String,
+        onComplete: (Boolean) -> Unit
+    ) {
+        _loading.value = true
+        viewModelScope.launch {
+            val mutation = """
+                mutation VerifyPayment(${'$'}collaborationId: ID!, ${'$'}razorpayPaymentId: String!, ${'$'}razorpaySignature: String!, ${'$'}paymentType: PaymentType!) {
+                  verifyPayment(collaborationId: ${'$'}collaborationId, razorpayPaymentId: ${'$'}razorpayPaymentId, razorpaySignature: ${'$'}razorpaySignature, paymentType: ${'$'}paymentType) {
+                    id
+                    status
+                    paymentStatus
+                    advancePaid
+                    finalPaid
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "collaborationId" to collaborationId,
+                "razorpayPaymentId" to razorpayPaymentId,
+                "razorpaySignature" to razorpaySignature,
+                "paymentType" to paymentType
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")?.optJSONObject("verifyPayment")
+                if (data != null) {
+                    fetchCollaborations(token)
+                    onComplete(true)
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    _error.postValue(errors?.optJSONObject(0)?.optString("message") ?: "Verification failed")
+                    onComplete(false)
+                }
+            }.onFailure {
+                _error.postValue(it.message)
+                onComplete(false)
+            }
+            _loading.postValue(false)
+        }
+    }
+
     fun toggleWishlist(influencer: InfluencerProfile, token: String) {
         viewModelScope.launch {
             val mutation = """
@@ -317,8 +411,7 @@ class BrandViewModel : ViewModel() {
         val strengthsArray = obj.optJSONArray("strengths")
         val strengths = mutableListOf<String>()
         if (strengthsArray != null) {
-            for (i in 0 until strengthsArray.length()) {
-                strengths.add(strengthsArray.getString(i))
+            for (i in 0 until strengthsArray.length()) { strengths.add(strengthsArray.getString(i))
             }
         }
 

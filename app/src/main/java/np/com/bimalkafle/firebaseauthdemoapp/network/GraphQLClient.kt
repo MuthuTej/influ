@@ -47,10 +47,10 @@ object GraphQLClient {
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("Connection", "close") // Try disabling keep-alive to avoid stale connections
+            connection.setRequestProperty("Connection", "close")
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
-            
+
             if (token != null) {
                 connection.setRequestProperty("Authorization", "Bearer $token")
             }
@@ -70,25 +70,33 @@ object GraphQLClient {
 
             val responseCode = connection.responseCode
             val stream = if (responseCode == HttpURLConnection.HTTP_OK) connection.inputStream else connection.errorStream
-            
+
+            val response = StringBuilder()
             if (stream != null) {
                 val reader = BufferedReader(InputStreamReader(stream))
-                val response = StringBuilder()
                 var line: String?
                 while (reader.readLine().also { line = it } != null) {
                     response.append(line)
                 }
                 reader.close()
-                val jsonResponse = JSONObject(response.toString())
-                
-                return if (responseCode == HttpURLConnection.HTTP_OK) {
-                    Result.success(jsonResponse)
-                } else {
-                    Log.e("GraphQLClient", "Server Error Body: $response")
-                    Result.failure(Exception("HTTP Error: $responseCode - $response"))
-                }
+            }
+
+            return if (responseCode == HttpURLConnection.HTTP_OK) {
+                Result.success(JSONObject(response.toString()))
             } else {
-                return Result.failure(Exception("HTTP Error: $responseCode (No error body)"))
+                val errorBody = response.toString()
+                Log.e("GraphQLClient", "HTTP $responseCode Error: $errorBody")
+                
+                // Try to extract a clean message if it's a GraphQL error JSON
+                val errorMessage = try {
+                    val json = JSONObject(errorBody)
+                    val errors = json.optJSONArray("errors")
+                    errors?.optJSONObject(0)?.optString("message") ?: errorBody
+                } catch (e: Exception) {
+                    errorBody
+                }
+
+                Result.failure(Exception(errorMessage.ifEmpty { "HTTP Error $responseCode" }))
             }
         } finally {
             connection.disconnect()

@@ -3,6 +3,7 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import coil.compose.AsyncImage
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,7 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.MainActivity
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import java.time.Instant
 import java.time.LocalDateTime
@@ -67,18 +70,25 @@ fun BrandHomePage(
     val collaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
     val influencers by brandViewModel.influencers.observeAsState(initial = emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
-    val error by brandViewModel.error.observeAsState()
+    val errorMsg by brandViewModel.error.observeAsState()
     val wishlistedInfluencers by brandViewModel.wishlistedInfluencers.observeAsState(initial = emptyList())
-    var firebaseToken by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     val brandProfile by brandViewModel.brandProfile.observeAsState()
+
+    LaunchedEffect(errorMsg) {
+        errorMsg?.let {
+            if (it.isNotEmpty()) {
+                Toast.makeText(context, "Payment Error: $it", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser
             ?.getIdToken(true)
             ?.addOnSuccessListener { result ->
-                firebaseToken = result.token
-                firebaseToken?.let { token ->
+                result.token?.let { token ->
                     brandViewModel.fetchCollaborations(token)
                     brandViewModel.fetchInfluencers(token)
                     brandViewModel.fetchBrandDetails(token)
@@ -118,7 +128,7 @@ fun BrandHomePage(
                 )
             }
         },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0) // Allow content to flow into status bar
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
 
         if (isLoading) {
@@ -129,7 +139,7 @@ fun BrandHomePage(
             LazyColumn(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(bottom = padding.calculateBottomPadding()) // Only apply bottom padding
+                    .padding(bottom = padding.calculateBottomPadding()) 
                     .background(Color.White)
             ) {
 
@@ -141,7 +151,11 @@ fun BrandHomePage(
                             .fillMaxWidth()
                             .padding(top = 16.dp)
                     ) {
-                        ActiveCampaignSection(collaborations)
+                        ActiveCampaignSection(
+                            collaborations = collaborations,
+                            brandViewModel = brandViewModel,
+                            brandName = brandProfile?.name ?: "Brand"
+                        )
                         TopPicksSectionBrand()
                     }
 
@@ -151,8 +165,8 @@ fun BrandHomePage(
                         influencer = influencer,
                         isWishlisted = wishlistedInfluencers.any { it.id == influencer.id },
                         onWishlistToggle = {
-                            firebaseToken?.let { token ->
-                                brandViewModel.toggleWishlist(influencer, token)
+                            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                result.token?.let { token -> brandViewModel.toggleWishlist(influencer, token) }
                             }
                         },
                         modifier = Modifier
@@ -191,7 +205,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(headerHeight + cardHeight * 0.6f) // dynamic total height
+            .height(headerHeight + cardHeight * 0.6f) 
     ) {
 
         // ---------------- HEADER ----------------
@@ -199,14 +213,14 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(brandThemeColor) // Added background color to the header box
+                .background(brandThemeColor) 
                 .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
         ) {
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 40.dp, start = 16.dp, end = 16.dp), // Increased top padding for status bar
+                    .padding(top = 40.dp, start = 16.dp, end = 16.dp), 
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
@@ -215,7 +229,6 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                     color = Color.White,
                     modifier = Modifier.size(54.dp)
                 ) {
-                    Log.d("LOGO_DEBUG", "Logo URL: ${brandProfile?.logoUrl}")
                     if (!brandProfile?.logoUrl.isNullOrEmpty()) {
                         AsyncImage(
                             model = brandProfile?.logoUrl,
@@ -260,11 +273,10 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             }
         }
 
-        // ---------------- STATS CARD ----------------
         Card(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = headerHeight - (cardHeight * 0.75f)) // 🔥 dynamic overlap
+                .padding(top = headerHeight - (cardHeight * 0.75f)) 
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
                 .height(cardHeight),
@@ -318,7 +330,6 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             }
         }
 
-        // ---------------- FLOATING BUTTON ----------------
         Button(
             onClick = { },
             shape = RoundedCornerShape(30.dp),
@@ -406,7 +417,11 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ActiveCampaignSection(collaborations: List<Collaboration>) {
+fun ActiveCampaignSection(
+    collaborations: List<Collaboration>,
+    brandViewModel: BrandViewModel,
+    brandName: String
+) {
 
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -447,8 +462,8 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
         } else {
             val configuration = LocalConfiguration.current
             val screenHeight = configuration.screenHeightDp.dp
-            val maxSectionHeight = screenHeight * 0.20f
-            val singleCardHeight = 140.dp
+            val maxSectionHeight = screenHeight * 0.25f 
+            val singleCardHeight = 180.dp 
 
             val finalHeight = if (maxSectionHeight > singleCardHeight) {
                 maxSectionHeight
@@ -493,6 +508,7 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
                             .fillMaxHeight()
                     ) {
                         CampaignItem(
+                            collaborationId = collaboration.id,
                             influencerName = collaboration.influencer.name,
                             influencerLogo = collaboration.influencer.logoUrl,
                             campaignTitle = collaboration.campaign.title,
@@ -501,7 +517,9 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
                             platform = pricing?.platform ?: "N/A",
                             price = pricing?.price ?: 0,
                             currency = pricing?.currency ?: "USD",
-                            time = timeAgo
+                            time = timeAgo,
+                            brandViewModel = brandViewModel,
+                            brandName = brandName
                         )
                     }
                 }
@@ -510,11 +528,9 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
     }
 }
 
-// Data class moved/used from model, or mapped directly.
-// We are using the domain model directly in the composable for simplicity.
-
 @Composable
 fun CampaignItem(
+    collaborationId: String,
     influencerName: String,
     campaignTitle: String,
     status: String,
@@ -523,9 +539,12 @@ fun CampaignItem(
     price: Int,
     currency: String,
     time: String,
-    influencerLogo: String?
+    influencerLogo: String?,
+    brandViewModel: BrandViewModel,
+    brandName: String
 ) {
     val primaryColor = brandThemeColor
+    val context = LocalContext.current
 
     val statusColor = when (status) {
         "ACCEPTED" -> Color(0xFF4CAF50)
@@ -614,31 +633,64 @@ fun CampaignItem(
 
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
 
-            Text(
-                text = "$deliverable • $platform",
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp
-            )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text(
+                        text = "$deliverable • $platform",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
+                    )
                     Text(
                         text = "$currency $price",
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
                         color = primaryColor
                     )
-
-
                 }
-                Text(
-                    text = time,
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
+
+                if (status == "ACCEPTED") {
+                    Button(
+                        onClick = {
+                            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                val token = result.token
+                                if (token != null) {
+                                    Toast.makeText(context, "Initiating Razorpay...", Toast.LENGTH_SHORT).show()
+                                    brandViewModel.createPaymentOrder(
+                                        token = token,
+                                        collaborationId = collaborationId,
+                                        paymentType = "ADVANCE"
+                                    ) { orderId, amount ->
+                                        if (!orderId.isNullOrEmpty() && amount != null) {
+                                            (context as? MainActivity)?.startPayment(
+                                                orderId = orderId,
+                                                amount = amount,
+                                                collaborationId = collaborationId,
+                                                paymentType = "ADVANCE",
+                                                brandName = brandName
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Pay", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Text(
+                        text = time,
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
             }
         }
     }
@@ -812,7 +864,7 @@ fun BrandCardBrand(
                         )
                     }
                     
-                    Spacer(modifier = Modifier.height(24.dp)) // Increased spacing to move Available tag lower
+                    Spacer(modifier = Modifier.height(24.dp))
                     
                     Surface(
                         shape = RoundedCornerShape(8.dp),
