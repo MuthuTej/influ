@@ -9,6 +9,7 @@ import java.net.URL
 
 object BackendRepository {
     private const val BACKEND_URL = "https://connect-backend-e22a.onrender.com/graphql"
+//    private const val BACKEND_URL = "http://192.168.1.8:5001/graphql"
 
     suspend fun signUp(name: String, role: String, token: String): Result<String> = withContext(Dispatchers.IO) {
         try {
@@ -277,4 +278,70 @@ object BackendRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun connectYouTube(authCode: String, token: String): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d("BackendRepository", "connectYouTube - AuthCode: $authCode")
+                val url = URL(BACKEND_URL)
+                val connection = url.openConnection() as HttpURLConnection
+
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Authorization", "Bearer $token")
+                connection.doOutput = true
+
+                val query = """
+                mutation ConnectYouTube(${'$'}code: String!) {
+                    connectYouTube(code: ${'$'}code)
+                }
+            """.trimIndent()
+
+                val variables = JSONObject().apply {
+                    put("code", authCode)
+                }
+
+                val requestBody = JSONObject().apply {
+                    put("query", query)
+                    put("variables", variables)
+                }.toString()
+
+                Log.d("BackendRepository", "connectYouTube - Request Body: $requestBody")
+
+                connection.outputStream.use {
+                    it.write(requestBody.toByteArray())
+                }
+
+                val responseCode = connection.responseCode
+                Log.d("BackendRepository", "connectYouTube - Response Code: $responseCode")
+
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    Log.d("BackendRepository", "connectYouTube - Response: $response")
+                    val jsonResponse = JSONObject(response)
+
+                    if (jsonResponse.has("errors")) {
+                        val errorMsg = jsonResponse
+                            .getJSONArray("errors")
+                            .getJSONObject(0)
+                            .getString("message")
+                        Log.e("BackendRepository", "connectYouTube - GraphQL Error: $errorMsg")
+                        Result.failure(Exception(errorMsg))
+                    } else {
+                        Log.d("BackendRepository", "connectYouTube - SUCCESS")
+                        Result.success(true)
+                    }
+                } else {
+                    val errorResponse =
+                        connection.errorStream?.bufferedReader()?.use { it.readText() }
+                            ?: "Unknown error"
+                    Log.e("BackendRepository", "connectYouTube - Server Error: $errorResponse")
+                    Result.failure(Exception("Server error $responseCode: $errorResponse"))
+                }
+
+            } catch (e: Exception) {
+                Log.e("BackendRepository", "connectYouTube - Exception: ${e.message}", e)
+                Result.failure(e)
+            }
+        }
 }

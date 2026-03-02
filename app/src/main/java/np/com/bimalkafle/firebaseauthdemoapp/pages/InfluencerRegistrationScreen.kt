@@ -98,27 +98,64 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     val youtubeAuthLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        Log.d("InfluencerRegistration", "YouTube Connect launcher result code: ${result.resultCode}")
         if (result.resultCode == Activity.RESULT_OK) {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             try {
                 // Get the signed-in account details
                 val account = task.getResult(ApiException::class.java)
                 val authCode = account?.serverAuthCode
-                if (authCode != null) {
-                    // Successfully retrieved the server auth code
-                    youtubeAuthCode = authCode
-                    isYouTubeConnected = true
-                    Toast.makeText(context, "YouTube Connected Successfully", Toast.LENGTH_SHORT).show()
-                    Log.d("YOUTUBE_AUTH_CODE", authCode)
+                Log.d("InfluencerRegistration", "Account email: ${account?.email}")
+                Log.d("InfluencerRegistration", "Server Auth Code: $authCode")
 
+                if (authCode != null) {
+                    youtubeAuthCode = authCode
+
+                    coroutineScope.launch {
+                        val firebaseUser = FirebaseAuth.getInstance().currentUser
+                        Log.d("InfluencerRegistration", "Firebase User UID: ${firebaseUser?.uid}")
+                        firebaseUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                            val idToken = result.token
+                            Log.d("InfluencerRegistration", "ID Token retrieved: ${if (idToken != null) "Success" else "Null"}")
+
+                            if (idToken != null) {
+                                coroutineScope.launch {
+                                    Log.d("InfluencerRegistration", "Calling BackendRepository.connectYouTube...")
+                                    val response = BackendRepository.connectYouTube(authCode, idToken)
+
+                                    response.onSuccess {
+                                        Log.d("InfluencerRegistration", "connectYouTube SUCCESS")
+                                        isYouTubeConnected = true
+                                        Toast.makeText(
+                                            context,
+                                            "YouTube Connected & Saved",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }.onFailure {
+                                        Log.e("InfluencerRegistration", "connectYouTube FAILURE: ${it.message}", it)
+                                        Toast.makeText(
+                                            context,
+                                            "Failed: ${it.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            }
+                        }?.addOnFailureListener {
+                            Log.e("InfluencerRegistration", "Failed to get Firebase ID Token", it)
+                        }
+                    }
                 } else {
+                    Log.w("InfluencerRegistration", "Auth Code is NULL")
                     Toast.makeText(context, "Failed to get server auth code", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: ApiException) {
                 // Handling API exception during Google Sign In
+                Log.e("InfluencerRegistration", "Google Sign-In ApiException: status code ${e.statusCode}, message: ${e.message}", e)
                 Toast.makeText(context, "YouTube Connect failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         } else {
+             Log.d("InfluencerRegistration", "YouTube Connect cancelled or failed by user")
             Toast.makeText(context, "YouTube Connect cancelled", Toast.LENGTH_SHORT).show()
         }
         isYouTubeConnecting = false
@@ -406,6 +443,8 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                         // Replace YOUR_WEB_CLIENT_ID with the actual Google Cloud Web Client ID
                         .requestServerAuthCode("60831940637-pgkdgu5qe3htquot95fddf50rljm6er0.apps.googleusercontent.com", true)
                         .build()
+
+
 
                     val googleSignInClient = GoogleSignIn.getClient(context, gso)
                     // Launch the intent using the modern Activity Result API launcher
