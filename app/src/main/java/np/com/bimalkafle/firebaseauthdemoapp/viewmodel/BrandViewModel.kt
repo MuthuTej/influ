@@ -14,6 +14,8 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.BrandCategory
 import np.com.bimalkafle.firebaseauthdemoapp.model.Campaign
 import np.com.bimalkafle.firebaseauthdemoapp.model.Category
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
+import np.com.bimalkafle.firebaseauthdemoapp.model.CollaborationAnalytics
+import np.com.bimalkafle.firebaseauthdemoapp.model.OverallAnalytics
 import np.com.bimalkafle.firebaseauthdemoapp.model.GenderSplit
 import np.com.bimalkafle.firebaseauthdemoapp.model.Influencer
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
@@ -50,6 +52,86 @@ class BrandViewModel : ViewModel() {
 
     private val _wishlistedInfluencers = MutableLiveData<List<InfluencerProfile>>(emptyList())
     val wishlistedInfluencers: LiveData<List<InfluencerProfile>> = _wishlistedInfluencers
+
+    fun createPaymentOrder(
+        token: String,
+        collaborationId: String,
+        paymentType: String,
+        onComplete: (String?, Int?) -> Unit
+    ) {
+        _loading.value = true
+        viewModelScope.launch {
+            Log.d("GraphQL", "Creating Order for Collab: $collaborationId")
+            
+            val mutation = """
+                mutation {
+                  createCollaborationPaymentOrder(collaborationId: "$collaborationId", paymentType: $paymentType) {
+                    success
+                    razorpayOrderId
+                    totalAmount
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = mutation, token = token)
+            result.onSuccess { jsonObject ->
+                Log.d("GraphQL", "Response: $jsonObject")
+                val data = jsonObject.optJSONObject("data")?.optJSONObject("createCollaborationPaymentOrder")
+                if (data != null && data.optBoolean("success")) {
+                    onComplete(data.optString("razorpayOrderId"), data.optInt("totalAmount"))
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    val msg = errors?.optJSONObject(0)?.optString("message") ?: "Payment creation failed"
+                    _error.postValue(msg)
+                    onComplete(null, null)
+                }
+            }.onFailure {
+                Log.e("GraphQL", "Error: ${it.message}")
+                _error.postValue(it.message)
+                onComplete(null, null)
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun verifyPayment(
+        token: String,
+        collaborationId: String,
+        razorpayPaymentId: String,
+        razorpaySignature: String,
+        paymentType: String,
+        onComplete: (Boolean) -> Unit
+    ) {
+        _loading.value = true
+        viewModelScope.launch {
+            val mutation = """
+                mutation {
+                  verifyPayment(collaborationId: "$collaborationId", razorpayPaymentId: "$razorpayPaymentId", razorpaySignature: "$razorpaySignature", paymentType: $paymentType) {
+                    id
+                    status
+                    paymentStatus
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = mutation, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")?.optJSONObject("verifyPayment")
+                if (data != null) {
+                    fetchCollaborations(token)
+                    onComplete(true)
+                } else {
+                    val errors = jsonObject.optJSONArray("errors")
+                    _error.postValue(errors?.optJSONObject(0)?.optString("message") ?: "Verification failed")
+                    onComplete(false)
+                }
+            }.onFailure {
+                _error.postValue(it.message)
+                onComplete(false)
+            }
+            _loading.postValue(false)
+        }
+    }
 
     fun toggleWishlist(influencer: InfluencerProfile, token: String) {
         viewModelScope.launch {
@@ -317,8 +399,7 @@ class BrandViewModel : ViewModel() {
         val strengthsArray = obj.optJSONArray("strengths")
         val strengths = mutableListOf<String>()
         if (strengthsArray != null) {
-            for (i in 0 until strengthsArray.length()) {
-                strengths.add(strengthsArray.getString(i))
+            for (i in 0 until strengthsArray.length()) { strengths.add(strengthsArray.getString(i))
             }
         }
 
@@ -743,6 +824,29 @@ class BrandViewModel : ViewModel() {
                     advancePaid
                     finalPaid
                     totalAmount
+                    overallAnalytics {
+                      impressions
+                      clicks
+                      likes
+                      comments
+                      shares
+                      saves
+                      views
+                      retweets
+                    }
+                    platformAnalytics {
+                      platform
+                      duration
+                      cost
+                      impressions
+                      clicks
+                      likes
+                      comments
+                      shares
+                      saves
+                      views
+                      retweets
+                    }
                   }
                 }
             """.trimIndent()
@@ -816,8 +920,8 @@ class BrandViewModel : ViewModel() {
                     onComplete(false)
                 }
             }.onFailure {
+                Log.e("BrandViewModel", "Network error", it)
                 _error.postValue("Network error: ${'$'}{it.message}")
-                onComplete(false)
             }
             _loading.postValue(false)
         }
@@ -877,6 +981,48 @@ class BrandViewModel : ViewModel() {
                 }
             }
 
+            val oaObj = obj.optJSONObject("overallAnalytics")
+            val overallAnalytics = if (oaObj != null) {
+                OverallAnalytics(
+                    impressions = if (oaObj.isNull("impressions")) null else oaObj.optInt("impressions"),
+                    clicks = if (oaObj.isNull("clicks")) null else oaObj.optInt("clicks"),
+                    likes = if (oaObj.isNull("likes")) null else oaObj.optInt("likes"),
+                    comments = if (oaObj.isNull("comments")) null else oaObj.optInt("comments"),
+                    shares = if (oaObj.isNull("shares")) null else oaObj.optInt("shares"),
+                    saves = if (oaObj.isNull("saves")) null else oaObj.optInt("saves"),
+                    views = if (oaObj.isNull("views")) null else oaObj.optInt("views"),
+                    retweets = if (oaObj.isNull("retweets")) null else oaObj.optInt("retweets"),
+                    replies = null
+                )
+            } else null
+
+            val paArray = obj.optJSONArray("platformAnalytics")
+            val platformAnalytics = if (paArray != null) {
+                val pList = mutableListOf<CollaborationAnalytics>()
+                for (j in 0 until paArray.length()) {
+                    val pObj = paArray.optJSONObject(j)
+                    if (pObj != null) {
+                        pList.add(
+                            CollaborationAnalytics(
+                                platform = pObj.optString("platform"),
+                                duration = if (pObj.isNull("duration")) null else pObj.optInt("duration"),
+                                cost = if (pObj.isNull("cost")) null else pObj.optDouble("cost").toFloat(),
+                                impressions = if (pObj.isNull("impressions")) null else pObj.optInt("impressions"),
+                                clicks = if (pObj.isNull("clicks")) null else pObj.optInt("clicks"),
+                                likes = if (pObj.isNull("likes")) null else pObj.optInt("likes"),
+                                comments = if (pObj.isNull("comments")) null else pObj.optInt("comments"),
+                                shares = if (pObj.isNull("shares")) null else pObj.optInt("shares"),
+                                saves = if (pObj.isNull("saves")) null else pObj.optInt("saves"),
+                                views = if (pObj.isNull("views")) null else pObj.optInt("views"),
+                                retweets = if (pObj.isNull("retweets")) null else pObj.optInt("retweets"),
+                                replies = null
+                            )
+                        )
+                    }
+                }
+                pList
+            } else null
+
             list.add(
                 Collaboration(
                     id = obj.optString("id"),
@@ -895,7 +1041,9 @@ class BrandViewModel : ViewModel() {
                     razorpayOrderId = obj.optString("razorpayOrderId"),
                     advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),
                     finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
-                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optInt("totalAmount")
+                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount"),
+                    overallAnalytics = overallAnalytics,
+                    platformAnalytics = platformAnalytics
                 )
             )
         }
