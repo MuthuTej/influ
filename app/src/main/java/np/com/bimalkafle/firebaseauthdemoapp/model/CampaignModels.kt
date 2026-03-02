@@ -12,13 +12,15 @@ data class CampaignInput(
 )
 
 data class CampaignPlatformInput(
-    val platform: String
+    val platform: String,
+    val formats: List<String>
 )
 
 data class CampaignAudienceInput(
     val ageMin: Int,
     val ageMax: Int,
-    val gender: String
+    val gender: String,
+    val locations: List<String>
 )
 
 data class CreateCampaignResponse(
@@ -41,6 +43,7 @@ data class CampaignDetail(
     val startDate: String?,
     val endDate: String?,
     val targetAudience: CampaignAudienceResponse?,
+    val platforms: List<Platform>?,
     val brand: Brand?
 )
 

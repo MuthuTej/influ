@@ -131,9 +131,9 @@ fun BrandProfileContent(
     var ageMin by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.ageMin?.toString() ?: "") }
     var ageMax by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.ageMax?.toString() ?: "") }
     var gender by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.gender ?: "Any") }
-    
-    val platformOptions = listOf("Instagram", "YouTube","Facebook")
 
+
+    val platformOptions = listOf("Instagram", "YouTube", "Facebook")
     val selectedPlatforms = remember(brandProfile) {
         mutableStateListOf<String>().apply {
             brandProfile?.preferredPlatforms?.forEach { pref ->
@@ -171,7 +171,6 @@ fun BrandProfileContent(
                     .fillMaxSize()
                     .background(Color.White)
                     .verticalScroll(rememberScrollState())
-                    .padding(padding)
             ) {
                 // Profile Header
                 Box(
@@ -192,7 +191,10 @@ fun BrandProfileContent(
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(top = 24.dp)
                     ) {
                         Surface(
                             modifier = Modifier.size(100.dp),
@@ -256,7 +258,9 @@ fun BrandProfileContent(
                 }
 
                 // Profile Details
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier
+                    .padding(16.dp)
+                    .padding(bottom = padding.calculateBottomPadding())) {
                     ProfileSectionTitle("Email Address")
                     if (isEditMode) {
                         OutlinedTextField(

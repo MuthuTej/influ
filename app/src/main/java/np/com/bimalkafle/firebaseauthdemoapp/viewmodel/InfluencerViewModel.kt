@@ -667,7 +667,7 @@ class InfluencerViewModel : ViewModel() {
                     razorpayOrderId = obj.optString("razorpayOrderId"),
                     advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),
                     finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
-                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optInt("totalAmount"),
+                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount"),
                     brand = brand
                 )
             )

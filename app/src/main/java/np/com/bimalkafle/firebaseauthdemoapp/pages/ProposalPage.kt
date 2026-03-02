@@ -76,13 +76,17 @@ data class Proposal(
 )
 
 fun Collaboration.toProposal(isBrand: Boolean): Proposal {
-    val pricing = this.pricing?.firstOrNull()
+    val pricingList = this.pricing ?: emptyList()
+    val pricing = pricingList.firstOrNull()
     
     val proposalType = if (isBrand) {
         if (this.initiatedBy == "BRAND") ProposalType.SENT else ProposalType.RECEIVED
     } else {
         if (this.initiatedBy == "INFLUENCER") ProposalType.SENT else ProposalType.RECEIVED
     }
+
+    // Calculate total from pricing list if totalAmount is null
+    val totalSum = this.totalAmount ?: pricingList.sumOf { it.price.toDouble() }
 
     return Proposal(
         id = this.id,
@@ -101,7 +105,7 @@ fun Collaboration.toProposal(isBrand: Boolean): Proposal {
         type = proposalType,
         logoUrl = if (isBrand) this.influencer.logoUrl else this.brand?.logoUrl,
         date = this.createdAt.take(10),
-        totalAmount = if (this.totalAmount != null) "₹${this.totalAmount}" else "N/A",
+        totalAmount = if (totalSum > 0) "₹$totalSum" else "N/A",
         paymentStatus = this.paymentStatus ?: "pending"
     )
 }
@@ -151,6 +155,7 @@ fun ProposalPage(
         .filter { it.type == selectedTab && (selectedStatus == null || it.status == selectedStatus) }
 
     val configuration = LocalConfiguration.current
+    val headerColor = Color(0xFFFF8383)
     val headerHeight = 120.dp
     val contentPaddingTop = headerHeight - 20.dp
 
@@ -168,7 +173,7 @@ fun ProposalPage(
             if (isBrand) {
                 FloatingActionButton(
                     onClick = { navController.navigate("create_campaign") },
-                    containerColor = Color(0xFFFF8383),
+                    containerColor = headerColor,
                     shape = CircleShape
                 ) {
                     Icon(
@@ -183,26 +188,26 @@ fun ProposalPage(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color(0xFFFF8383))
+                .background(headerColor)
         ) {
             // Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(headerHeight)
+                    .wrapContentHeight()
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.vector),
                     contentDescription = null,
                     modifier = Modifier
-                        .fillMaxSize()
+                        .matchParentSize()
                         .alpha(0.15f),
                     contentScale = ContentScale.Crop
                 )
 
                 Column(
                     modifier = Modifier
+                        .statusBarsPadding()
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 24.dp)
                 ) {
@@ -231,10 +236,11 @@ fun ProposalPage(
             // Content Card
             Column(
                 modifier = Modifier
-                    .padding(top = contentPaddingTop)
+                    .padding(top = contentPaddingTop + 40.dp) // Adjust for status bar
                     .fillMaxSize()
                     .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
                     .background(Color.White)
+                    .padding(bottom = paddingValues.calculateBottomPadding())
             ) {
                 ProposalToggle(selectedTab = selectedTab, onTabSelected = {
                     selectedTab = it
@@ -243,7 +249,7 @@ fun ProposalPage(
 
                 if (isLoading && collaborations.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFFFF8383))
+                        CircularProgressIndicator(color = headerColor)
                     }
                 } else {
                     StatusFilterRow(
@@ -264,6 +270,9 @@ fun ProposalPage(
                                 PremiumProposalCard(
                                     proposal = proposal,
                                     isBrand = isBrand,
+                                    onClick = {
+                                        navController.navigate("collaboration_analytics/${proposal.id}")
+                                    },
                                     onChat = {
                                         val otherUserId = if (isBrand) proposal.influencerId else proposal.brandId
                                         val otherUserName = proposal.otherPartyName
@@ -357,6 +366,7 @@ fun StatusFilterRow(selectedStatus: ProposalStatus?, onStatusSelected: (Proposal
 fun PremiumProposalCard(
     proposal: Proposal, 
     isBrand: Boolean,
+    onClick: () -> Unit,
     onChat: () -> Unit,
     onAction: (String) -> Unit
 ) {
@@ -367,6 +377,7 @@ fun PremiumProposalCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
+            .clickable { onClick() }
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -380,7 +391,9 @@ fun PremiumProposalCard(
                         AsyncImage(
                             model = proposal.logoUrl,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(id = R.drawable.brand_profile)
                         )
                     } else {
                         Image(
@@ -425,7 +438,7 @@ fun PremiumProposalCard(
             ) {
                 // Chat Button is always available for active/pending collaborations
                 OutlinedButton(
-                    onClick = onChat,
+                    onClick = { onChat() },
                     modifier = Modifier.weight(1f).height(48.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8383)),
                     border = BorderStroke(1.dp, Color(0xFFFF8383)),

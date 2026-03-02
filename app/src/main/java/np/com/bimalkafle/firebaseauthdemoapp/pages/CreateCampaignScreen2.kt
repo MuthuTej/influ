@@ -73,15 +73,20 @@ fun CreateCampaignScreen2(
     LaunchedEffect(success) {
         if (success) {
             onNext()
-            // clear state if needed, or keep it for review
+            campaignViewModel.clearState() // Clear form for the next use
         }
     }
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
-
-    val headerHeight = screenHeight * 0.4f
+    val headerHeight = screenHeight * 0.35f
     val formPaddingTop = headerHeight - 40.dp
+
+    // Validation
+    val isFormValid = campaignViewModel.budgetMin > 0 && 
+                      campaignViewModel.budgetMax >= campaignViewModel.budgetMin &&
+                      campaignViewModel.selectedLocations.isNotEmpty() &&
+                      campaignViewModel.selectedGender.isNotBlank()
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Header
@@ -105,18 +110,18 @@ fun CreateCampaignScreen2(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 48.dp),
+                    .padding(top = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.brand_profile),
                     contentDescription = "Brand Logo",
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(70.dp)
                         .clip(CircleShape)
                         .background(Color.White)
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "Budget and Audience",
                     color = Color.White,
@@ -127,10 +132,9 @@ fun CreateCampaignScreen2(
                     text = "Fill your budget and the target audience for your campaign",
                     color = Color.White.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    fontSize = 14.sp
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                // Stepper can be added here
             }
         }
 
@@ -146,14 +150,15 @@ fun CreateCampaignScreen2(
                 .verticalScroll(rememberScrollState())
         ) {
             // Budget Range
-            Text("Budget Range", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text("Budget Range (₹K) *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 "₹${formatBudgetValue(campaignViewModel.budgetMin.toFloat())} - ${formatBudgetValue(campaignViewModel.budgetMax.toFloat())}",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFFF8383)
             )
             RangeSlider(
                 value = campaignViewModel.budgetMin.toFloat()..campaignViewModel.budgetMax.toFloat(),
@@ -161,7 +166,7 @@ fun CreateCampaignScreen2(
                     campaignViewModel.budgetMin = it.start.toInt()
                     campaignViewModel.budgetMax = it.endInclusive.toInt()
                 },
-                valueRange = 1f..500f,
+                valueRange = 1f..1000f,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
                     thumbColor = Color(0xFFFF8383),
@@ -172,7 +177,7 @@ fun CreateCampaignScreen2(
             Spacer(modifier = Modifier.height(24.dp))
 
             // Target Location
-            Text("Target Location", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text("Target Location *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -194,14 +199,15 @@ fun CreateCampaignScreen2(
             Spacer(modifier = Modifier.height(24.dp))
 
             // Age Group
-            Text("Age group", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text("Age group *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "${campaignViewModel.ageMin} - ${campaignViewModel.ageMax}",
+                "${campaignViewModel.ageMin} - ${campaignViewModel.ageMax} years",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFFF8383)
             )
             RangeSlider(
                 value = campaignViewModel.ageMin.toFloat()..campaignViewModel.ageMax.toFloat(),
@@ -217,15 +223,15 @@ fun CreateCampaignScreen2(
                 )
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("min", fontWeight =FontWeight.SemiBold)
-                Text("max", fontWeight =FontWeight.SemiBold)
+                Text("min", fontSize = 12.sp, color = Color.Gray)
+                Text("max", fontSize = 12.sp, color = Color.Gray)
             }
 
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Gender Split
-            Text("Gender Split", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text("Gender Split *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -239,16 +245,15 @@ fun CreateCampaignScreen2(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Next Button
             if (error != null) {
                 Text(
                     text = error!!,
                     color = Color.Red,
+                    fontSize = 14.sp,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
             }
 
-            // Next Button (Submit)
             Button(
                 onClick = {
                     FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { result ->
@@ -257,28 +262,52 @@ fun CreateCampaignScreen2(
                         }
                     }
                 },
-                enabled = !loading,
+                enabled = !loading && isFormValid,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = PaddingValues()
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isFormValid) Color(0xFFFF8383) else Color.LightGray
+                )
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(if (loading) Color.Gray else Color(0xFFFF8383)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (loading) {
-                        androidx.compose.material3.CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    } else {
-                        Text("SUBMIT", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
+                if (loading) {
+                    androidx.compose.material3.CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("SUBMIT", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
+    }
+}
+
+@Composable
+fun LocationChip(name: String, isSelected: Boolean, onSelected: () -> Unit) {
+    FilterChip(
+        selected = isSelected,
+        onClick = onSelected,
+        label = { Text(name) },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = Color(0xFFFF8383),
+            selectedLabelColor = Color.White
+        )
+    )
+}
+
+@Composable
+fun GenderButton(text: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, if (isSelected) Color(0xFFFF8383) else Color.LightGray),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (isSelected) Color(0xFFFF8383).copy(alpha = 0.1f) else Color.White,
+            contentColor = if (isSelected) Color(0xFFFF8383) else Color.Gray
+        )
+    ) {
+        Text(text)
     }
 }
 
@@ -294,52 +323,6 @@ private fun formatBudgetValue(value: Float): String {
         "${value.toInt()}K"
     }
 }
-
-@Composable
-fun LocationChip(name: String, isSelected: Boolean, onSelected: () -> Unit) {
-    val countryIcon = when (name) {
-        "India" -> "🇮🇳"
-        "USA" -> "🇺🇸"
-        "Sri Lanka" -> "🇱🇰"
-        "Maldives" -> "🇲🇻"
-        "UK" -> "🇬🇧"
-        else -> ""
-    }
-
-    FilterChip(
-        selected = isSelected,
-        onClick = onSelected,
-        label = { Text(name) },
-        leadingIcon = {
-            Text(countryIcon, fontSize = 20.sp)
-        },
-        shape = RoundedCornerShape(8.dp),
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Color(0xFFFF8383).copy(alpha = 0.2f),
-        ),
-        border = BorderStroke(1.dp, if (isSelected) Color(0xFFFF8383) else Color.LightGray)
-    )
-}
-
-@Composable
-fun GenderButton(text: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (isSelected) Color(0xFFFF8383).copy(alpha = 0.2f) else Color.Transparent,
-            contentColor = Color.Black
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (isSelected) Color(0xFFFF8383) else Color.LightGray
-        )
-    ) {
-        Text(text)
-    }
-}
-
 
 @Preview(showBackground = true)
 @Composable

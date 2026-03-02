@@ -281,11 +281,11 @@ fun CampaignDetailCard(campaign: Campaign) {
                 icon = Icons.Default.CurrencyRupee,
                 label = "Budget",
                 value = if (campaign.budgetMin != null && campaign.budgetMax != null) {
-                    "₹${campaign.budgetMin} - ₹${campaign.budgetMax}"
+                    "₹${campaign.budgetMin}K - ₹${campaign.budgetMax}K"
                 } else if (campaign.budgetMin != null) {
-                    "From ₹${campaign.budgetMin}"
+                    "From ₹${campaign.budgetMin}K"
                 } else if (campaign.budgetMax != null) {
-                    "Up to ₹${campaign.budgetMax}"
+                    "Up to ₹${campaign.budgetMax}K"
                 } else "Not specified"
             )
 

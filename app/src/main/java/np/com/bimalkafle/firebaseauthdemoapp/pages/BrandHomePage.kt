@@ -3,6 +3,7 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import coil.compose.AsyncImage
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,7 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.MainActivity
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import java.time.Instant
 import java.time.LocalDateTime
@@ -67,11 +70,20 @@ fun BrandHomePage(
     val collaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
     val influencers by brandViewModel.influencers.observeAsState(initial = emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
-    val error by brandViewModel.error.observeAsState()
+    val errorMsg by brandViewModel.error.observeAsState()
     val wishlistedInfluencers by brandViewModel.wishlistedInfluencers.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     val brandProfile by brandViewModel.brandProfile.observeAsState()
+
+    LaunchedEffect(errorMsg) {
+        errorMsg?.let {
+            if (it.isNotEmpty()) {
+                Toast.makeText(context, "Server Error: $it", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser
@@ -118,7 +130,7 @@ fun BrandHomePage(
                 )
             }
         },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0) // Allow content to flow into status bar
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
 
         if (isLoading) {
@@ -129,7 +141,7 @@ fun BrandHomePage(
             LazyColumn(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(bottom = padding.calculateBottomPadding()) // Only apply bottom padding
+                    .padding(bottom = padding.calculateBottomPadding())
                     .background(Color.White)
             ) {
 
@@ -141,28 +153,28 @@ fun BrandHomePage(
                             .fillMaxWidth()
                             .padding(top = 16.dp)
                     ) {
-                        ActiveCampaignSection(collaborations)
-                        TopPicksSectionBrand()
-                    }
-
-                }
-                items(influencers.take(10)) { influencer ->
-                    BrandCardBrand(
-                        influencer = influencer,
-                        isWishlisted = wishlistedInfluencers.any { it.id == influencer.id },
-                        onWishlistToggle = {
-                            firebaseToken?.let { token ->
-                                brandViewModel.toggleWishlist(influencer, token)
+     ActiveCampaignSection(
+                            collaborations = collaborations,
+                            brandViewModel = brandViewModel,
+                            brandName = brandProfile?.name ?: "Brand",
+                            onCollaborationClick = { id ->
+                                navController.navigate("collaboration_analytics/$id")
                             }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        onCardClick = {
-                            navController.navigate("brand_influencer_detail/${influencer.id}")
-                        }
-                    )
+                        )
+                       
+                        TopPicksSectionBrand(
+                            influencers = influencers,
+                            wishlistedInfluencers = wishlistedInfluencers,
+                            onWishlistToggle = { influencer ->
+                                firebaseToken?.let { token ->
+                                    brandViewModel.toggleWishlist(influencer, token)
+                                }
+                            },
+                            navController = navController
+                        )
+                    }
                 }
+                
                 item {
                     Spacer(modifier = Modifier.height(40.dp))
                     Button(
@@ -191,22 +203,22 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(headerHeight + cardHeight * 0.6f) // dynamic total height
+            .height(headerHeight + cardHeight * 0.6f)
     ) {
 
-        // ---------------- HEADER ----------------
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(brandThemeColor) // Added background color to the header box
+                .background(brandThemeColor)
                 .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
         ) {
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 40.dp, start = 16.dp, end = 16.dp), // Increased top padding for status bar
+                    .statusBarsPadding()
+                    .padding(top = 16.dp, start = 16.dp, end = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
@@ -260,11 +272,10 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             }
         }
 
-        // ---------------- STATS CARD ----------------
         Card(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = headerHeight - (cardHeight * 0.75f)) // 🔥 dynamic overlap
+                .padding(top = headerHeight - (cardHeight * 0.75f))
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
                 .height(cardHeight),
@@ -318,9 +329,8 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             }
         }
 
-        // ---------------- FLOATING BUTTON ----------------
         Button(
-            onClick = { navController.navigate("brand_search") },
+            onClick = { },
             shape = RoundedCornerShape(30.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFFFF5252)
@@ -406,7 +416,12 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ActiveCampaignSection(collaborations: List<Collaboration>) {
+fun ActiveCampaignSection(
+    collaborations: List<Collaboration>,
+    brandViewModel: BrandViewModel,
+    brandName: String,
+    onCollaborationClick: (String) -> Unit
+) {
 
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -414,7 +429,7 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
             Text(
-                text = "Active Collabrations",
+                text = "Active Campaigns",
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -442,24 +457,18 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
                 text = "No active campaigns found.",
                 fontStyle = FontStyle.Italic,
                 color = Color.Gray,
-                modifier = Modifier.padding(8.dp)
+                modifier = Modifier.padding(16.dp)
             )
         } else {
             val configuration = LocalConfiguration.current
             val screenHeight = configuration.screenHeightDp.dp
-            val maxSectionHeight = screenHeight * 0.20f
-            val singleCardHeight = 140.dp
-
-            val finalHeight = if (maxSectionHeight > singleCardHeight) {
-                maxSectionHeight
-            } else {
-                singleCardHeight
-            }
+            val maxSectionHeight = screenHeight * 0.25f 
+            val singleCardHeight = 180.dp 
 
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(finalHeight)
+                    .height(singleCardHeight + 20.dp)
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -493,6 +502,7 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
                             .fillMaxHeight()
                     ) {
                         CampaignItem(
+                            collaborationId = collaboration.id,
                             influencerName = collaboration.influencer.name,
                             influencerLogo = collaboration.influencer.logoUrl,
                             campaignTitle = collaboration.campaign.title,
@@ -501,7 +511,10 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
                             platform = pricing?.platform ?: "N/A",
                             price = pricing?.price ?: 0,
                             currency = pricing?.currency ?: "USD",
-                            time = timeAgo
+                            time = timeAgo,
+                            brandViewModel = brandViewModel,
+                            brandName = brandName,
+                            onClick = { onCollaborationClick(collaboration.id) }
                         )
                     }
                 }
@@ -510,11 +523,9 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
     }
 }
 
-// Data class moved/used from model, or mapped directly.
-// We are using the domain model directly in the composable for simplicity.
-
 @Composable
 fun CampaignItem(
+    collaborationId: String,
     influencerName: String,
     campaignTitle: String,
     status: String,
@@ -523,9 +534,13 @@ fun CampaignItem(
     price: Int,
     currency: String,
     time: String,
-    influencerLogo: String?
+    influencerLogo: String?,
+    brandViewModel: BrandViewModel,
+    brandName: String,
+    onClick: () -> Unit
 ) {
     val primaryColor = brandThemeColor
+    val context = LocalContext.current
 
     val statusColor = when (status) {
         "ACCEPTED" -> Color(0xFF4CAF50)
@@ -538,7 +553,7 @@ fun CampaignItem(
 
     Card(
         shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
@@ -606,7 +621,7 @@ fun CampaignItem(
                         text = status,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                         fontSize = 8.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         color = statusColor
                     )
                 }
@@ -614,26 +629,25 @@ fun CampaignItem(
 
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
 
-            Text(
-                text = "$deliverable • $platform",
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp
-            )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text(
+                        text = "$deliverable • $platform",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
+                    )
                     Text(
                         text = "$currency $price",
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
                         color = primaryColor
                     )
-
-
                 }
+
                 Text(
                     text = time,
                     fontSize = 12.sp,
@@ -645,25 +659,43 @@ fun CampaignItem(
 }
 
 @Composable
-fun TopPicksSectionBrand() {
+fun TopPicksSectionBrand(
+    influencers: List<InfluencerProfile>,
+    wishlistedInfluencers: List<InfluencerProfile>,
+    onWishlistToggle: (InfluencerProfile) -> Unit,
+    navController: NavController
+) {
     var selectedPlatform by remember { mutableStateOf("YouTube") }
     val platforms = listOf("YouTube", "Instagram", "Facebook")
 
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Top Influencers", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+    val filteredInfluencers = remember(selectedPlatform, influencers) {
+        influencers.filter { influencer ->
+            influencer.platforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
+        }.take(10)
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Top Influencers",
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        
         Spacer(modifier = Modifier.height(16.dp))
 
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier.padding(horizontal = 16.dp)
         ) {
             TabRow(
                 selectedTabIndex = platforms.indexOf(selectedPlatform),
                 containerColor = Color.Transparent,
-                indicator = {
+                indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(it[platforms.indexOf(selectedPlatform)]),
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[platforms.indexOf(selectedPlatform)]),
                         color = brandThemeColor
                     )
                 }
@@ -689,6 +721,32 @@ fun TopPicksSectionBrand() {
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (filteredInfluencers.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No influencers found for $selectedPlatform", color = Color.Gray)
+            }
+        } else {
+            filteredInfluencers.forEach { influencer ->
+                BrandCardBrand(
+                    influencer = influencer,
+                    isWishlisted = wishlistedInfluencers.any { it.id == influencer.id },
+                    onWishlistToggle = { onWishlistToggle(influencer) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    onCardClick = {
+                        navController.navigate("brand_influencer_detail/${influencer.id}")
+                    },
+                    selectedPlatform = selectedPlatform
+                )
+            }
+        }
     }
 }
 
@@ -698,7 +756,8 @@ fun BrandCardBrand(
     isWishlisted: Boolean = false,
     onWishlistToggle: () -> Unit = {},
     modifier: Modifier = Modifier,
-    onCardClick: () -> Unit
+    onCardClick: () -> Unit,
+    selectedPlatform: String? = null
 ) {
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -812,25 +871,25 @@ fun BrandCardBrand(
                         )
                     }
                     
-                    Spacer(modifier = Modifier.height(24.dp)) // Increased spacing to move Available tag lower
+                    Spacer(modifier = Modifier.height(24.dp)) 
                     
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF4CAF50)
+                        color = if (influencer.availability == true) Color(0xFF4CAF50) else Color.Gray
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Check,
+                                imageVector = if (influencer.availability == true) Icons.Default.Check else Icons.Default.Close,
                                 contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Available",
+                                text = if (influencer.availability == true) "Available" else "Busy",
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
@@ -877,10 +936,16 @@ fun BrandCardBrand(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Determine which platform stats to show
+                val platformToShow = if (selectedPlatform != null) {
+                    influencer.platforms?.find { it.platform.equals(selectedPlatform, ignoreCase = true) }
+                } else {
+                    influencer.platforms?.firstOrNull()
+                }
+
                 // Followers
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    val firstPlatform = influencer.platforms?.firstOrNull()
-                    val platformIcon = when(firstPlatform?.platform?.uppercase()) {
+                    val platformIcon = when(platformToShow?.platform?.uppercase()) {
                         "YOUTUBE" -> R.drawable.ic_youtube
                         "INSTAGRAM" -> R.drawable.ic_instagram
                         "FACEBOOK" -> R.drawable.ic_facebook
@@ -903,7 +968,7 @@ fun BrandCardBrand(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "${formatCount(firstPlatform?.followers ?: 0)} Followers",
+                        text = "${formatCount(platformToShow?.followers ?: 0)} Followers",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
@@ -920,7 +985,7 @@ fun BrandCardBrand(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Avg Views: ${formatCount(influencer.platforms?.firstOrNull()?.avgViews ?: 0)}",
+                        text = "Avg Views: ${formatCount(platformToShow?.avgViews ?: 0)}",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
@@ -940,39 +1005,49 @@ fun BrandCardBrand(
             
             Spacer(modifier = Modifier.height(8.dp))
 
-            influencer.pricing?.forEach { pricingInfo ->
-                Row(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val platformIcon = when(pricingInfo.platform.uppercase()) {
-                        "YOUTUBE" -> R.drawable.ic_youtube
-                        "INSTAGRAM" -> R.drawable.ic_instagram
-                        "FACEBOOK" -> R.drawable.ic_facebook
-                        else -> R.drawable.ic_youtube
-                    }
-                    
-                    Surface(
-                        shape = CircleShape,
-                        color = brandThemeColor,
-                        modifier = Modifier.size(20.dp)
+            val relevantPricing = if (selectedPlatform != null) {
+                influencer.pricing?.filter { it.platform.equals(selectedPlatform, ignoreCase = true) }
+            } else {
+                influencer.pricing
+            }
+
+            if (relevantPricing.isNullOrEmpty()) {
+                Text("No pricing for $selectedPlatform", color = Color.Gray, fontSize = 12.sp)
+            } else {
+                relevantPricing.forEach { pricingInfo ->
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                painter = painterResource(id = platformIcon),
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(12.dp)
-                            )
+                        val platformIcon = when(pricingInfo.platform.uppercase()) {
+                            "YOUTUBE" -> R.drawable.ic_youtube
+                            "INSTAGRAM" -> R.drawable.ic_instagram
+                            "FACEBOOK" -> R.drawable.ic_facebook
+                            else -> R.drawable.ic_youtube
                         }
+                        
+                        Surface(
+                            shape = CircleShape,
+                            color = brandThemeColor,
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    painter = painterResource(id = platformIcon),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "${pricingInfo.deliverable}: ₹${pricingInfo.price} ${pricingInfo.currency}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "${pricingInfo.deliverable}: ₹${pricingInfo.price} ${pricingInfo.currency}",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
                 }
             }
         }

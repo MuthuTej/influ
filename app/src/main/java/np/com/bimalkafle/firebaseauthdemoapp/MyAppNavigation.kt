@@ -220,6 +220,14 @@ fun MyAppNavigation(
                 campaignViewModel = campaignViewModel
             )
         }
+        composable("proposals") {
+            ProposalPage(
+                modifier = Modifier, 
+                navController = navController, 
+                authViewModel = authViewModel, 
+                brandViewModel = brandViewModel
+            )
+        }
         composable("wishlist") {
             WishlistScreen(navController, campaignViewModel)
         }
@@ -263,6 +271,18 @@ fun MyAppNavigation(
                 },
                 campaignViewModel = campaignViewModel,
                 influencerViewModel = influencerViewModel
+            )
+        }
+        
+        composable(
+            route = "collaboration_analytics/{collaborationId}",
+            arguments = listOf(navArgument("collaborationId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val collaborationId = backStackEntry.arguments?.getString("collaborationId") ?: ""
+            CollaborationAnalyticsPage(
+                navController = navController,
+                collaborationId = collaborationId,
+                brandViewModel = brandViewModel
             )
         }
     })

@@ -22,6 +22,7 @@ class CampaignViewModel : ViewModel() {
     var title by mutableStateOf("")
     var description by mutableStateOf("")
     var selectedPlatforms by mutableStateOf(setOf<String>())
+    var platformFormats by mutableStateOf(mapOf<String, Set<String>>())
     var startDate by mutableStateOf<Date?>(null)
     var endDate by mutableStateOf<Date?>(null)
 
@@ -113,6 +114,16 @@ class CampaignViewModel : ViewModel() {
                       budgetMax
                       startDate
                       endDate
+                      platforms {
+                        platform
+                        formats
+                      }
+                      targetAudience {
+                        ageMin
+                        ageMax
+                        gender
+                        locations
+                      }
                       brand {
                         id
                         name
@@ -122,16 +133,6 @@ class CampaignViewModel : ViewModel() {
                         brandCategory {
                           category
                           subCategory
-                        }
-                        preferredPlatforms {
-                            platform
-                            formats
-                        }
-                        targetAudience {
-                            ageMin
-                            ageMax
-                            gender
-                            locations
                         }
                       }
                     }
@@ -185,6 +186,16 @@ class CampaignViewModel : ViewModel() {
                     budgetMax
                     startDate
                     endDate
+                    platforms {
+                      platform
+                      formats
+                    }
+                    targetAudience {
+                      ageMin
+                      ageMax
+                      gender
+                      locations
+                    }
                     brand {
                       id
                       name
@@ -194,16 +205,6 @@ class CampaignViewModel : ViewModel() {
                       brandCategory {
                         category
                         subCategory
-                      }
-                      preferredPlatforms {
-                          platform
-                          formats
-                      }
-                      targetAudience {
-                          ageMin
-                          ageMax
-                          gender
-                          locations
                       }
                     }
                   }
@@ -255,6 +256,16 @@ class CampaignViewModel : ViewModel() {
                     budgetMax
                     startDate
                     endDate
+                    platforms {
+                      platform
+                      formats
+                    }
+                    targetAudience {
+                      ageMin
+                      ageMax
+                      gender
+                      locations
+                    }
                     brand {
                       id
                       name
@@ -264,16 +275,6 @@ class CampaignViewModel : ViewModel() {
                       brandCategory {
                         category
                         subCategory
-                      }
-                      preferredPlatforms {
-                          platform
-                          formats
-                      }
-                      targetAudience {
-                          ageMin
-                          ageMax
-                          gender
-                          locations
                       }
                     }
                   }
@@ -322,32 +323,37 @@ class CampaignViewModel : ViewModel() {
                     budgetMax
                     startDate
                     endDate
+                    platforms {
+                      platform
+                      formats
+                    }
+                    targetAudience {
+                      ageMin
+                      ageMax
+                      gender
+                      locations
+                    }
                     brand {
-                      brandCategory {
-                        category
-                        subCategory
-                      }
-                      about
-                      preferredPlatforms {
-                        platform
-                        formats
-                      }
-                      targetAudience {
-                        ageMin
-                        ageMax
-                        gender
-                        locations
-                      }
+                      id
                       name
                       logoUrl
                       isVerified
                       averageRating
+                      brandCategory {
+                        category
+                        subCategory
+                      }
                     }
                   }
                 }
             """.trimIndent()
 
-            val platformsJson = selectedPlatforms.map { mapOf("platform" to it) }
+            val platformsJson = selectedPlatforms.map { platform ->
+                mapOf(
+                    "platform" to platform,
+                    "formats" to (platformFormats[platform]?.toList() ?: emptyList<String>())
+                )
+            }
             val audienceJson = mapOf(
                 "ageMin" to ageMin,
                 "ageMax" to ageMax,
@@ -399,53 +405,6 @@ class CampaignViewModel : ViewModel() {
                 BrandCategory(cat.optString("category"), cat.optString("subCategory"))
             }
             
-            val platformsArray = it.optJSONArray("preferredPlatforms")
-            val platforms = mutableListOf<PreferredPlatform>()
-            if (platformsArray != null) {
-                for (i in 0 until platformsArray.length()) {
-                    val p = platformsArray.getJSONObject(i)
-                    val formatsArray = p.optJSONArray("formats")
-                    val formats = if (formatsArray != null) {
-                        val fList = mutableListOf<String>()
-                        for (j in 0 until formatsArray.length()) {
-                            fList.add(formatsArray.getString(j))
-                        }
-                        fList
-                    } else null
-                    
-                    platforms.add(
-                        PreferredPlatform(
-                            platform = p.optString("platform"),
-                            profileUrl = null,
-                            followers = null,
-                            avgViews = null,
-                            engagement = null,
-                            formats = formats,
-                            connected = null,
-                            minFollowers = null,
-                            minEngagement = null
-                        )
-                    )
-                }
-            }
-
-            val audienceJson = it.optJSONObject("targetAudience")
-            val audience = audienceJson?.let { aud ->
-                val locationsArray = aud.optJSONArray("locations")
-                val locations = mutableListOf<String>()
-                if (locationsArray != null) {
-                    for (i in 0 until locationsArray.length()) {
-                        locations.add(locationsArray.getString(i))
-                    }
-                }
-                TargetAudience(
-                    aud.optInt("ageMin").takeIf { it != 0 },
-                    aud.optInt("ageMax").takeIf { it != 0 },
-                    aud.optString("gender"),
-                    locations
-                )
-            }
-
             Brand(
                 it.optString("id"),
                 it.optString("email"),
@@ -462,8 +421,55 @@ class CampaignViewModel : ViewModel() {
                 null,
                 it.optDouble("averageRating").takeIf { it != 0.0 },
                 it.optString("fcmToken"),
-                platforms,
-                audience
+                null, // Use campaign level platforms
+                null  // Use campaign level audience
+            )
+        }
+
+        val platformsArray = json.optJSONArray("platforms")
+        val platforms = mutableListOf<Platform>()
+        if (platformsArray != null) {
+            for (i in 0 until platformsArray.length()) {
+                val p = platformsArray.getJSONObject(i)
+                val formatsArray = p.optJSONArray("formats")
+                val formats = if (formatsArray != null) {
+                    val fList = mutableListOf<String>()
+                    for (j in 0 until formatsArray.length()) {
+                        fList.add(formatsArray.getString(j))
+                    }
+                    fList
+                } else null
+                
+                platforms.add(
+                    Platform(
+                        platform = p.optString("platform"),
+                        profileUrl = null,
+                        followers = null,
+                        avgViews = null,
+                        engagement = null,
+                        formats = formats,
+                        connected = null,
+                        minFollowers = null,
+                        minEngagement = null
+                    )
+                )
+            }
+        }
+
+        val audienceJson = json.optJSONObject("targetAudience")
+        val audience = audienceJson?.let { aud ->
+            val locationsArray = aud.optJSONArray("locations")
+            val locations = mutableListOf<String>()
+            if (locationsArray != null) {
+                for (i in 0 until locationsArray.length()) {
+                    locations.add(locationsArray.getString(i))
+                }
+            }
+            CampaignAudienceResponse(
+                aud.optInt("ageMin").takeIf { it != 0 },
+                aud.optInt("ageMax").takeIf { it != 0 },
+                aud.optString("gender"),
+                locations
             )
         }
 
@@ -477,7 +483,8 @@ class CampaignViewModel : ViewModel() {
             json.optInt("budgetMax").takeIf { it != 0 },
             json.optString("startDate"),
             json.optString("endDate"),
-            null,
+            audience,
+            platforms,
             brand
         )
     }
@@ -486,6 +493,7 @@ class CampaignViewModel : ViewModel() {
         title = ""
         description = ""
         selectedPlatforms = emptySet()
+        platformFormats = emptyMap()
         startDate = null
         endDate = null
         budgetMin = 50
