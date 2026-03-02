@@ -92,7 +92,7 @@ fun CmnBottomNavigationBar(
                                 }
                                 "Search" -> navController.navigate("influencer_search")
                                 "Connect" -> navController.navigate("chatList") // Shared chat list
-                                "History" -> navController.navigate("proposals") // Influencer history/proposals
+                                "History" -> navController.navigate("brand_history") // Influencer history/proposals pointing to shared ProposalPage
                                 "Profile" -> navController.navigate("influencerProfile")
                             }
                         }

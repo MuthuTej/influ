@@ -60,7 +60,7 @@ enum class ProposalType {
 
 data class Proposal(
     val id: String,
-    val influencerName: String,
+    val otherPartyName: String,
     val influencerId: String,
     val brandId: String,
     val campaignTitle: String,
@@ -86,7 +86,7 @@ fun Collaboration.toProposal(isBrand: Boolean): Proposal {
 
     return Proposal(
         id = this.id,
-        influencerName = this.influencer.name,
+        otherPartyName = if (isBrand) this.influencer.name else this.brand?.name ?: "Unknown Brand",
         influencerId = this.influencerId,
         brandId = this.brandId,
         campaignTitle = this.campaign.title,
@@ -99,7 +99,7 @@ fun Collaboration.toProposal(isBrand: Boolean): Proposal {
             ProposalStatus.PENDING
         },
         type = proposalType,
-        logoUrl = this.influencer.logoUrl,
+        logoUrl = if (isBrand) this.influencer.logoUrl else this.brand?.logoUrl,
         date = this.createdAt.take(10),
         totalAmount = if (this.totalAmount != null) "₹${this.totalAmount}" else "N/A",
         paymentStatus = this.paymentStatus ?: "pending"
@@ -266,7 +266,7 @@ fun ProposalPage(
                                     isBrand = isBrand,
                                     onChat = {
                                         val otherUserId = if (isBrand) proposal.influencerId else proposal.brandId
-                                        val otherUserName = proposal.influencerName
+                                        val otherUserName = proposal.otherPartyName
                                         navController.navigate("chat/$otherUserId/$otherUserName?collaborationId=${proposal.id}")
                                     },
                                     onAction = { status ->
@@ -393,7 +393,7 @@ fun PremiumProposalCard(
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = proposal.influencerName,
+                        text = proposal.otherPartyName,
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
                         color = Color(0xFF1D1D1F)
