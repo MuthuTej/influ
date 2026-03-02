@@ -168,13 +168,13 @@ fun CampaignDetailsPage(
                 CampaignDetailRow("Duration", duration)
                 Divider(color = Color.LightGray)
 
-                val ageRange = if (createdCampaign?.brand?.targetAudience?.ageMin != null && createdCampaign?.brand?.targetAudience?.ageMax != null) {
-                    "${createdCampaign?.brand?.targetAudience?.ageMin} - ${createdCampaign?.brand?.targetAudience?.ageMax}"
+                val ageRange = if (createdCampaign?.targetAudience?.ageMin != null && createdCampaign?.targetAudience?.ageMax != null) {
+                    "${createdCampaign?.targetAudience?.ageMin} - ${createdCampaign?.targetAudience?.ageMax}"
                 } else "N/A"
                 CampaignDetailRow("Age group", ageRange)
                 Divider(color = Color.LightGray)
 
-                val platforms = createdCampaign?.brand?.preferredPlatforms?.joinToString(", ") { it.platform } ?: "N/A"
+                val platforms = createdCampaign?.platforms?.joinToString(", ") { it.platform } ?: "N/A"
                 CampaignDetailRow("Platform", platforms)
             }
 
