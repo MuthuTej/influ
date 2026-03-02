@@ -270,7 +270,7 @@ fun BrandSearchPageContent(
                 val categories = listOf("All", "Tech", "Fashion", "Food", "Lifestyle", "Beauty", "Sports")
                 val categoryOptions = categories.map { category ->
                     val count = if (category == "All") {
-                        if (allInfluencers.isNotEmpty()) allInfluencers.size else 0
+                        allInfluencers.size
                     } else {
                         allInfluencers.count { influencer ->
                             influencer.categories?.any { it.category.equals(category, ignoreCase = true) } == true
@@ -283,7 +283,7 @@ fun BrandSearchPageContent(
                 val platforms = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK")
                 val platformOptions = platforms.map { platform ->
                     val count = if (platform == "All") {
-                         if (allInfluencers.isNotEmpty()) allInfluencers.size else 0
+                         allInfluencers.size
                     } else {
                         allInfluencers.count { influencer ->
                              influencer.platforms?.any { it.platform.equals(platform, ignoreCase = true) } == true
@@ -292,7 +292,19 @@ fun BrandSearchPageContent(
                     platform to count
                 }
                 
-                val followerOptions = listOf("All", "0-10K", "10K-100K", "100K-1M", "1M+").map { it to null }
+                // Calculate counts for Followers
+                val followerRanges = listOf("All", "0-10K", "10K-100K", "100K-1M", "1M+")
+                val followerOptions = followerRanges.map { range ->
+                    val count = when (range) {
+                        "All" -> allInfluencers.size
+                        "0-10K" -> allInfluencers.count { inf -> inf.platforms?.any { (it.followers ?: 0) < 10000 } == true }
+                        "10K-100K" -> allInfluencers.count { inf -> inf.platforms?.any { (it.followers ?: 0) in 10000..100000 } == true }
+                        "100K-1M" -> allInfluencers.count { inf -> inf.platforms?.any { (it.followers ?: 0) in 100000..1000000 } == true }
+                        "1M+" -> allInfluencers.count { inf -> inf.platforms?.any { (it.followers ?: 0) > 1000000 } == true }
+                        else -> 0
+                    }
+                    range to count
+                }
 
                 FilterDropdown(
                     label = "Platform",
@@ -317,27 +329,45 @@ fun BrandSearchPageContent(
                     onOptionSelected = onFollowerRangeSelected,
                     modifier = Modifier.weight(1f)
                 )
+            }
 
-                // Filter Settings Icon
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFFF8383).copy(alpha = 0.8f),
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        IconButton(onClick = { /* Open detailed filters */ }) {
-                            Icon(Icons.Default.Tune, contentDescription = "Filters", tint = Color.White)
+            // Results count and header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${filteredInfluencers.size} Influencers Found",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color.Black
+                )
+
+                // Optional: Clear Filters Button
+                if (selectedPlatform != "All" || selectedCategory != "All" || selectedFollowerRange != "All" || searchQuery.isNotEmpty()) {
+                    Text(
+                        text = "Clear All",
+                        color = Color(0xFFFF8383),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable {
+                            onPlatformSelected("All")
+                            onCategorySelected("All")
+                            onFollowerRangeSelected("All")
+                            onSearchQueryChange("")
                         }
-                    }
+                    )
                 }
             }
 
             // ---------------- PAGINATION LOGIC ----------------
             var currentPage by remember { mutableStateOf(1) }
-            val itemsPerPage = 5 // Adjust as needed
+            val itemsPerPage = 10 // Increased for better UX
             val totalPages = (filteredInfluencers.size + itemsPerPage - 1) / itemsPerPage
             
-            // Reset to page 1 if filters change
             LaunchedEffect(filteredInfluencers) {
                 currentPage = 1
             }
@@ -371,16 +401,13 @@ fun BrandSearchPageContent(
                     if (filteredInfluencers.isEmpty()) {
                         item {
                             Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                                Text("No influencers found.", color = Color.Gray, fontWeight = FontWeight.Medium)
+                                Text("No influencers match your criteria.", color = Color.Gray, fontWeight = FontWeight.Medium)
                             }
                         }
                     } else if (totalPages > 1) {
                          item {
-                            // Pagination Controls
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -393,12 +420,7 @@ fun BrandSearchPageContent(
                                 }
 
                                 Spacer(modifier = Modifier.width(16.dp))
-
-                                Text(
-                                    text = "Page $currentPage of $totalPages",
-                                    fontWeight = FontWeight.Bold
-                                )
-
+                                Text(text = "$currentPage / $totalPages", fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.width(16.dp))
 
                                 Button(
@@ -415,61 +437,4 @@ fun BrandSearchPageContent(
             }
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun BrandSearchPagePreview() {
-    val sampleInfluencer = InfluencerProfile(
-        id = "1",
-        email = "test@example.com",
-        name = "Karthick Gopinath",
-        role = "INFLUENCER",
-        profileCompleted = true,
-        updatedAt = "2024-03-20T10:00:00Z",
-        bio = "Tech Enthusiast & Content Creator",
-        location = "Chennai, India",
-        categories = listOf(Category("Tech", "Gadgets")),
-        platforms = listOf(
-            Platform(
-                platform = "YOUTUBE",
-                profileUrl = "https://youtube.com/c/test",
-                followers = 1500000,
-                avgViews = 500000,
-                engagement = 4.5f,
-                formats = null,
-                connected = true
-            )
-        ),
-        audienceInsights = null,
-        strengths = listOf("Product Reviews", "Educational Content"),
-        pricing = listOf(
-            PricingInfo(
-                platform = "YOUTUBE",
-                deliverable = "Video",
-                price = 50000,
-                currency = "INR"
-            )
-        ),
-        availability = true,
-        logoUrl = null
-    )
-
-    BrandSearchPageContent(
-        searchQuery = "",
-        onSearchQueryChange = {},
-        selectedPlatform = "All",
-        onPlatformSelected = {},
-        selectedCategory = "All",
-        onCategorySelected = {},
-        selectedFollowerRange = "All",
-        onFollowerRangeSelected = {},
-        filteredInfluencers = listOf(sampleInfluencer),
-        allInfluencers = listOf(sampleInfluencer),
-        isLoading = false,
-        onBackClick = {},
-        onInfluencerClick = {},
-        onCreateCampaignClick = {},
-        navController = rememberNavController()
-    )
 }
