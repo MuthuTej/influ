@@ -54,6 +54,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.imePadding
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
 import com.google.firebase.auth.FirebaseAuth
@@ -89,477 +90,102 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     var profileUrls by remember { mutableStateOf(mapOf<String, String>()) }
     var pricing by remember { mutableStateOf(mapOf<String, Map<String, String>>()) }
 
-    // --- YouTube Connection State ---
     var isYouTubeConnecting by remember { mutableStateOf(false) }
     var isYouTubeConnected by remember { mutableStateOf(false) }
     var youtubeAuthCode by remember { mutableStateOf<String?>(null) }
 
-    // --- Google Sign-In Launcher for Activity Result ---
     val youtubeAuthLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             try {
-                // Get the signed-in account details
                 val account = task.getResult(ApiException::class.java)
                 val authCode = account?.serverAuthCode
                 if (authCode != null) {
-                    // Successfully retrieved the server auth code
                     youtubeAuthCode = authCode
                     isYouTubeConnected = true
-                    Toast.makeText(context, "YouTube Connected Successfully", Toast.LENGTH_SHORT).show()
-                    Log.d("YOUTUBE_AUTH_CODE", authCode)
-
+                    Toast.makeText(context, "YouTube Connected!", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "Failed to get server auth code", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Auth code missing", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: ApiException) {
-                // Handling API exception during Google Sign In
-                Toast.makeText(context, "YouTube Connect failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                val statusCode = e.statusCode
+                val errorMsg = GoogleSignInStatusCodes.getStatusCodeString(statusCode)
+                Toast.makeText(context, "Error $statusCode: $errorMsg", Toast.LENGTH_LONG).show()
+                Log.e("GOOGLE_SIGN_IN", "Status: $statusCode, Msg: $errorMsg", e)
             }
         } else {
-            Toast.makeText(context, "YouTube Connect cancelled", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Cancelled", Toast.LENGTH_SHORT).show()
         }
         isYouTubeConnecting = false
     }
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
-
     val headerHeight = screenHeight * 0.4f
     val formPaddingTop = headerHeight - 80.dp
 
     Box(modifier = Modifier.fillMaxSize().imePadding()) {
-        // Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(headerHeight)
-                .background(Color(0xFFFF8383))
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.vector),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(0.2f),
-                contentScale = ContentScale.Crop
-            )
-            IconButton(
-                onClick = {
-                    FirebaseAuth.getInstance().signOut()
-                    navController.popBackStack()
-                },
-                modifier = Modifier
-                    .statusBarsPadding()
-                    .padding(16.dp)
-            ) {
+        Box(modifier = Modifier.fillMaxWidth().height(headerHeight).background(Color(0xFFFF8383))) {
+            Image(painter = painterResource(id = R.drawable.vector), contentDescription = null, modifier = Modifier.fillMaxSize().alpha(0.2f), contentScale = ContentScale.Crop)
+            IconButton(onClick = { FirebaseAuth.getInstance().signOut(); navController.popBackStack() }, modifier = Modifier.statusBarsPadding().padding(16.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 60.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.brand_profile), // Replace with actual influencer image
-                    contentDescription = "Influencer Profile",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                )
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 60.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(painter = painterResource(id = R.drawable.brand_profile), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(CircleShape).background(Color.White))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Creator Profile Setup",
-                    color = Color.White,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Let's get started by filling out your details",
-                    color = Color.White.copy(alpha = 0.9f),
-                    textAlign = TextAlign.Center
-                )
+                Text(text = "Creator Profile Setup", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             }
         }
 
-        // Form
-        Column(
-            modifier = Modifier
-                .padding(top = formPaddingTop)
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                .background(Color.White)
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp)
-        ) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Creator Name") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
-            )
+        Column(modifier = Modifier.padding(top = formPaddingTop).fillMaxSize().padding(horizontal = 16.dp).clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(Color.White).verticalScroll(rememberScrollState()).padding(24.dp)) {
+            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Creator Name") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = location,
-                onValueChange = { location = it },
-                label = { Text("Location") },
-                trailingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
-            )
+            OutlinedTextField(value = location, onValueChange = { location = it }, label = { Text("Location") }, trailingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = bio,
-                onValueChange = { bio = it },
-                label = { Text("Short Bio / About") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
-            )
+            OutlinedTextField(value = bio, onValueChange = { bio = it }, label = { Text("Bio") }, modifier = Modifier.fillMaxWidth().height(120.dp), shape = RoundedCornerShape(12.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = logoUrl,
-                onValueChange = { logoUrl = it },
-                label = { Text("Logo URL") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Category", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+            OutlinedTextField(value = logoUrl, onValueChange = { logoUrl = it }, label = { Text("Logo URL") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("Platforms", fontWeight = FontWeight.Bold)
             FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                categoryOptions.forEach { category ->
-                    FilterChip(
-                        selected = selectedCategories.contains(category),
-                        onClick = { if (selectedCategories.contains(category)) selectedCategories.remove(category) else selectedCategories.add(category) },
-                        label = { Text(category) }
-                    )
+                listOf("Instagram", "Facebook", "YouTube").forEach { plat ->
+                    FilterChip(selected = selectedPlatforms.contains(plat), onClick = { if (selectedPlatforms.contains(plat)) selectedPlatforms.remove(plat) else selectedPlatforms.add(plat) }, label = { Text(plat) })
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Deliverables", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-            FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                deliverables.forEach { deliverable ->
-                    FilterChip(
-                        selected = selectedDeliverables.contains(deliverable),
-                        onClick = { if (selectedDeliverables.contains(deliverable)) selectedDeliverables.remove(deliverable) else selectedDeliverables.add(deliverable) },
-                        label = { Text(deliverable) }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Platform", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-            FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                platforms.forEach { platform ->
-                    val isSelected = selectedPlatforms.contains(platform)
-                    val icon = when (platform) {
-                        "Instagram" -> painterResource(id = R.drawable.ic_instagram)
-                        "Facebook" -> painterResource(id = R.drawable.ic_facebook)
-                        "YouTube" -> painterResource(id = R.drawable.ic_youtube)
-                        else -> null
-                    }
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { if (isSelected) selectedPlatforms.remove(platform) else selectedPlatforms.add(platform) },
-                        label = { Text(platform) },
-                        leadingIcon = {
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "$platform selected",
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            } else if (icon != null) {
-                                Image(
-                                    painter = icon,
-                                    contentDescription = "$platform logo",
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    )
-                }
-            }
-
-            if (selectedPlatforms.isNotEmpty()) {
+            if (selectedPlatforms.contains("YouTube")) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Profile URLs", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-                selectedPlatforms.forEach { platform ->
-                    OutlinedTextField(
-                        value = profileUrls[platform] ?: "",
-                        onValueChange = {
-                            profileUrls = profileUrls.toMutableMap().apply { this[platform] = it }
-                        },
-                        label = { Text("$platform Profile URL") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
-                    )
+                Button(
+                    onClick = {
+                        isYouTubeConnecting = true
+                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestEmail()
+                            .requestServerAuthCode("61884125308-s3uiiss031jvqaje7thsu58027dckp8b.apps.googleusercontent.com")
+                            .requestScopes(Scope("https://www.googleapis.com/auth/youtube.readonly"), Scope("https://www.googleapis.com/auth/youtube.analytics.readonly"))
+                            .build()
+                        val client = GoogleSignIn.getClient(context, gso)
+                        client.signOut().addOnCompleteListener { youtubeAuthLauncher.launch(client.signInIntent) }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    enabled = !isYouTubeConnected,
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isYouTubeConnected) Color(0xFF4CAF50) else Color.Red)
+                ) {
+                    if (isYouTubeConnecting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
+                    else Text(if (isYouTubeConnected) "YouTube Linked ✓" else "Link YouTube Channel")
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Pricing", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-
-            if (selectedPlatforms.isNotEmpty() && selectedDeliverables.isNotEmpty()) {
-                selectedPlatforms.forEach { platform ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val icon = when (platform) {
-                                "Instagram" -> painterResource(id = R.drawable.ic_instagram)
-                                "Facebook" -> painterResource(id = R.drawable.ic_facebook)
-                                "YouTube" -> painterResource(id = R.drawable.ic_youtube)
-                                else -> null
-                            }
-                            if (icon != null) {
-                                Image(painter = icon, contentDescription = null, modifier = Modifier.size(24.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            Text(platform, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        val platformDeliverables = when (platform) {
-                            "Instagram" -> selectedDeliverables.filter { it != "Video" }
-                            "YouTube" -> selectedDeliverables.filter { it != "Story" && it != "Post" }
-                            else -> selectedDeliverables
-                        }
-
-                        if (platformDeliverables.isNotEmpty()) {
-                            platformDeliverables.forEach { deliverable ->
-                                OutlinedTextField(
-                                    value = pricing[platform]?.get(deliverable) ?: "",
-                                    onValueChange = { price ->
-                                        val newPricing = pricing.toMutableMap()
-                                        val platformPricing =
-                                            newPricing[platform]?.toMutableMap() ?: mutableMapOf()
-                                        platformPricing[deliverable] = price
-                                        newPricing[platform] = platformPricing
-                                        pricing = newPricing
-                                    },
-                                    label = { Text("$deliverable Price") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 8.dp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
-                                )
-                            }
-                        } else {
-                            Text(
-                                text = "No applicable deliverables selected for this platform.",
-                                color = Color.Gray,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)
-                            )
-                        }
-                    }
-                }
-            } else {
-                Text(
-                    text = "no platform or deliverables are selected",
-                    color = Color.Gray,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp)
-                )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-
-            // --- CONNECT YOUTUBE BUTTON ---
             Button(
-                onClick = {
-                    isYouTubeConnecting = true
-                    // Configure Google Sign-In options with required scopes
-                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                        .requestEmail() // Common requirement
-                        .requestScopes(
-                            Scope("https://www.googleapis.com/auth/yt-analytics.readonly"),
-                            Scope("https://www.googleapis.com/auth/youtube.readonly")
-                        )
-                        // Request server auth code using Web Client ID
-                        // Replace YOUR_WEB_CLIENT_ID with the actual Google Cloud Web Client ID
-                        .requestServerAuthCode("60831940637-pgkdgu5qe3htquot95fddf50rljm6er0.apps.googleusercontent.com", true)
-                        .build()
-
-                    val googleSignInClient = GoogleSignIn.getClient(context, gso)
-                    // Launch the intent using the modern Activity Result API launcher
-                    youtubeAuthLauncher.launch(googleSignInClient.signInIntent)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                // Disable button if it's already connected or currently connecting
-                enabled = !isYouTubeConnected && !isYouTubeConnecting,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isYouTubeConnected) Color(0xFF4CAF50) else Color(0xFFFF0000), // Green when connected, Red otherwise
-                    disabledContainerColor = if (isYouTubeConnected) Color(0xFF4CAF50).copy(alpha = 0.5f) else Color.LightGray
-                )
+                onClick = { /* Submit Logic */ },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
             ) {
-                // Display different content based on connection state
-                if (isYouTubeConnecting) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Connecting...", color = Color.White, fontWeight = FontWeight.Bold)
-                } else if (isYouTubeConnected) {
-                    Icon(Icons.Default.Check, contentDescription = "Checked", tint = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("YouTube Connected ✓", color = Color.White, fontWeight = FontWeight.Bold)
-                } else {
-                    Text("Connect YouTube", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    if (name.isEmpty() || location.isEmpty() || bio.isEmpty() || logoUrl.isEmpty() || selectedCategories.isEmpty() || selectedPlatforms.isEmpty() || pricing.isEmpty()) {
-                        Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-
-                    isLoading = true
-                    coroutineScope.launch {
-                        try {
-                            val user = auth.currentUser
-                            if (user == null) {
-                                Toast.makeText(context, "User not authenticated", Toast.LENGTH_SHORT).show()
-                                isLoading = false
-                                return@launch
-                            }
-
-                            user.getIdToken(true).addOnCompleteListener { task ->
-                                if (task.isSuccessful) {
-                                    val token = task.result?.token
-                                    if (token != null) {
-                                        coroutineScope.launch {
-                                            val input = JSONObject().apply {
-                                                put("name", name)
-                                                put("bio", bio)
-                                                put("location", location)
-                                                put("availability", true) // Default as discussed
-                                                put("logoUrl", logoUrl)
-
-                                                val categoriesJson = JSONArray()
-                                                selectedCategories.forEach { cat ->
-                                                    categoriesJson.put(JSONObject().apply {
-                                                        put("category", cat)
-                                                        put("subCategory", "General") // Default
-                                                    })
-                                                }
-                                                put("categories", categoriesJson)
-
-                                                val platformsJson = JSONArray()
-                                                selectedPlatforms.forEach { plat ->
-                                                    platformsJson.put(JSONObject().apply {
-                                                        put("platform", plat)
-                                                        put("profileUrl", profileUrls[plat] ?: "")
-                                                        put("followers", 0) // Default
-                                                        put("avgViews", 0) // Default
-                                                        put("engagement", 0.0) // Default
-                                                        put("formats", JSONArray())
-                                                    })
-                                                }
-                                                put("platforms", platformsJson)
-
-                                                val pricingJson = JSONArray()
-                                                pricing.forEach { (plat, deliverableMap) ->
-                                                    deliverableMap.forEach { (deliverable, price) ->
-                                                        pricingJson.put(JSONObject().apply {
-                                                            put("platform", plat)
-                                                            put("deliverable", deliverable)
-                                                            put("price", price.toIntOrNull() ?: 0)
-                                                            put("currency", "INR") // Default
-                                                        })
-                                                    }
-                                                }
-                                                put("pricing", pricingJson)
-
-                                                put("strengths", JSONArray())
-                                                put("audienceInsights", JSONObject.NULL)
-                                            }
-
-                                            val result = BackendRepository.setupInfluencerProfile(input, token)
-                                            isLoading = false
-                                            result.onSuccess {
-                                                user.uid.let { uid ->
-                                                    prefsManager.saveProfileCompleted(uid, true)
-                                                }
-                                                Toast.makeText(context, "Profile setup successful!", Toast.LENGTH_SHORT).show()
-                                                navController.navigate("influencer_detail")
-                                            }.onFailure {
-                                                Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    } else {
-                                        isLoading = false
-                                        Toast.makeText(context, "Failed to get auth token", Toast.LENGTH_SHORT).show()
-                                    }
-                                } else {
-                                    isLoading = false
-                                    Toast.makeText(context, "Token error: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        } catch (e: Exception) {
-                            isLoading = false
-                            Toast.makeText(context, "Unexpected error: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                enabled = !isLoading,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = PaddingValues()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(if (isLoading) Color.Gray else Color(0xFFFF8383)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    } else {
-                        Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                }
+                Text("FINISH SETUP", fontWeight = FontWeight.Bold)
             }
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun InfluencerRegistrationScreenPreview() {
-    InfluencerRegistrationScreen(NavController(androidx.compose.ui.platform.LocalContext.current))
 }

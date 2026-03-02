@@ -3,6 +3,7 @@ package np.com.bimalkafle.firebaseauthdemoapp
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -15,6 +16,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.YouTubeViewModel
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -24,7 +26,8 @@ fun MyAppNavigation(
     splashViewModel: SplashViewModel,
     brandViewModel: BrandViewModel,
     influencerViewModel: InfluencerViewModel,
-    campaignViewModel: CampaignViewModel
+    campaignViewModel: CampaignViewModel,
+    youtubeViewModel: YouTubeViewModel = viewModel()
 ) {
     val navController = rememberNavController()
 
@@ -237,6 +240,13 @@ fun MyAppNavigation(
                 navController = navController,
                 authViewModel = authViewModel,
                 influencerViewModel = influencerViewModel
+            )
+        }
+        composable("connectYouTube") {
+            ConnectYouTubeScreen(
+                modifier = modifier,
+                navController = navController,
+                youtubeViewModel = youtubeViewModel
             )
         }
         composable("discover") {

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
@@ -63,6 +64,7 @@ fun InfluencerProfileScreen(
         modifier = modifier,
         influencerProfile = influencerProfile,
         isLoading = isLoading,
+        navController = navController,
         onSignOut = {
             authViewModel.signout()
             navController.navigate("login") {
@@ -114,6 +116,7 @@ fun InfluencerProfileContent(
     modifier: Modifier = Modifier,
     influencerProfile: InfluencerProfile?,
     isLoading: Boolean,
+    navController: NavController,
     onSignOut: () -> Unit,
     onUpdateProfile: (InfluencerProfile) -> Unit,
     bottomBar: @Composable () -> Unit = {}
@@ -399,7 +402,51 @@ fun InfluencerProfileContent(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Pricing Details
+                    // YouTube Connection
+                    ProfileSectionTitle("YouTube Channel")
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Connect your YouTube channel to unlock analytics and insights",
+                                fontSize = 13.sp,
+                                color = Color.Gray,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Button(
+                                onClick = {
+                                    navController.navigate("connectYouTube")
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFF0000)
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "Connect YouTube",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
                     ProfileSectionTitle("Services & Pricing")
                     if (isEditMode) {
                         availablePlatforms.forEach { platform ->
@@ -525,9 +572,11 @@ fun InfluencerProfileContent(
 @Composable
 fun InfluencerProfilePreview() {
     FirebaseAuthDemoAppTheme {
+        val mockNavController = rememberNavController()
         InfluencerProfileContent(
             influencerProfile = null,
             isLoading = false,
+            navController = mockNavController,
             onSignOut = {},
             onUpdateProfile = {}
         )

@@ -1,4 +1,4 @@
- {
+{
   "project_info": {
     "project_number": "61884125308",
     "project_id": "connect-409d0",
@@ -12,7 +12,12 @@
           "package_name": "com.connect"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "61884125308-s3uiiss031jvqaje7thsu58027dckp8b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCWwlqLaMtnA1GK0vAsKyOzpq3km4KZTF4"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "61884125308-s3uiiss031jvqaje7thsu58027dckp8b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     },
@@ -31,7 +41,20 @@
           "package_name": "np.com.bimalkafle.firebaseauthdemoapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "61884125308-rqrchfa5qurnh10r8f6pbu5qpi3oa6ul.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "np.com.bimalkafle.firebaseauthdemoapp",
+            "certificate_hash": "ec661ba1c3baf81f72a04afc49ecf5c58fe61557"
+          }
+        },
+        {
+          "client_id": "61884125308-s3uiiss031jvqaje7thsu58027dckp8b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCWwlqLaMtnA1GK0vAsKyOzpq3km4KZTF4"
@@ -39,7 +62,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "61884125308-s3uiiss031jvqaje7thsu58027dckp8b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
