@@ -145,7 +145,6 @@ fun BrandProfileContent(
         }
     }
 
-
     val themeColor = Color(0xFFFF8383)
 
     Scaffold(

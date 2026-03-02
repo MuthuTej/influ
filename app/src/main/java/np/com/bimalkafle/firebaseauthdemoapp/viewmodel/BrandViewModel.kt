@@ -819,6 +819,15 @@ class BrandViewModel : ViewModel() {
                       logoUrl
                       updatedAt
                     }
+                    brand {
+                      id
+                      email
+                      name
+                      role
+                      about
+                      profileUrl
+                      logoUrl
+                    }
                     paymentStatus
                     razorpayOrderId
                     advancePaid
@@ -963,6 +972,24 @@ class BrandViewModel : ViewModel() {
                  Influencer("Unknown", null, null, null)
             }
 
+            val brandObj = obj.optJSONObject("brand")
+            val brand = if (brandObj != null) {
+                Brand(
+                    id = brandObj.optString("id", ""),
+                    email = brandObj.optString("email", ""),
+                    name = brandObj.optString("name", "Unknown Brand"),
+                    role = brandObj.optString("role", ""),
+                    profileCompleted = null,
+                    updatedAt = null,
+                    brandCategory = null,
+                    about = brandObj.optString("about", null),
+                    profileUrl = brandObj.optString("profileUrl", null),
+                    logoUrl = brandObj.optString("logoUrl", null),
+                    preferredPlatforms = null,
+                    targetAudience = null
+                )
+            } else null
+
             val pricingList = mutableListOf<Pricing>()
             val pricingArray = obj.optJSONArray("pricing")
             if (pricingArray != null) {
@@ -1037,6 +1064,7 @@ class BrandViewModel : ViewModel() {
                     updatedAt = obj.optString("updatedAt"),
                     campaign = campaign,
                     influencer = influencer,
+                    brand = brand,
                     paymentStatus = obj.optString("paymentStatus"),
                     razorpayOrderId = obj.optString("razorpayOrderId"),
                     advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),

@@ -220,6 +220,14 @@ fun MyAppNavigation(
                 campaignViewModel = campaignViewModel
             )
         }
+        composable("proposals") {
+            ProposalPage(
+                modifier = Modifier, 
+                navController = navController, 
+                authViewModel = authViewModel, 
+                brandViewModel = brandViewModel
+            )
+        }
         composable("wishlist") {
             WishlistScreen(navController, campaignViewModel)
         }
