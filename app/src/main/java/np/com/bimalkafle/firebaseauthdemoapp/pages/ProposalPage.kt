@@ -150,7 +150,6 @@ fun ProposalPage(
     val proposals = collaborations.map { it.toProposal(isBrand) }
         .filter { it.type == selectedTab && (selectedStatus == null || it.status == selectedStatus) }
 
-    val configuration = LocalConfiguration.current
     val headerHeight = 120.dp
     val contentPaddingTop = headerHeight - 20.dp
 
@@ -234,7 +233,7 @@ fun ProposalPage(
                     .padding(top = contentPaddingTop)
                     .fillMaxSize()
                     .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                    .background(Color.White)
+                    .background(Color(0xFFF8F9FE)) // Use standard bg color
             ) {
                 ProposalToggle(selectedTab = selectedTab, onTabSelected = {
                     selectedTab = it
@@ -264,6 +263,9 @@ fun ProposalPage(
                                 PremiumProposalCard(
                                     proposal = proposal,
                                     isBrand = isBrand,
+                                    onClick = {
+                                        navController.navigate("collaboration_analytics/${proposal.id}")
+                                    },
                                     onChat = {
                                         val otherUserId = if (isBrand) proposal.influencerId else proposal.brandId
                                         val otherUserName = proposal.otherPartyName
@@ -357,6 +359,7 @@ fun StatusFilterRow(selectedStatus: ProposalStatus?, onStatusSelected: (Proposal
 fun PremiumProposalCard(
     proposal: Proposal, 
     isBrand: Boolean,
+    onClick: () -> Unit,
     onChat: () -> Unit,
     onAction: (String) -> Unit
 ) {
@@ -367,6 +370,7 @@ fun PremiumProposalCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
+            .clickable { onClick() }
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -380,7 +384,9 @@ fun PremiumProposalCard(
                         AsyncImage(
                             model = proposal.logoUrl,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(id = R.drawable.brand_profile)
                         )
                     } else {
                         Image(
@@ -425,7 +431,7 @@ fun PremiumProposalCard(
             ) {
                 // Chat Button is always available for active/pending collaborations
                 OutlinedButton(
-                    onClick = onChat,
+                    onClick = { onChat() },
                     modifier = Modifier.weight(1f).height(48.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8383)),
                     border = BorderStroke(1.dp, Color(0xFFFF8383)),
