@@ -64,7 +64,12 @@ fun BrandProfilePage(
         modifier = modifier,
         brandProfile = brandProfile,
         isLoading = isLoading,
-        onSignOut = { authViewModel.signout() },
+        onSignOut = {
+            authViewModel.signout()
+            navController.navigate("login") {
+                popUpTo(0)
+            }
+        },
         onNavigateToCreateCampaign = { navController.navigate("create_campaign") },
         onUpdateProfile = { updatedBrand ->
             FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
@@ -127,13 +132,20 @@ fun BrandProfileContent(
     var ageMax by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.ageMax?.toString() ?: "") }
     var gender by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.gender ?: "Any") }
     
+    val platformOptions = listOf("Instagram", "YouTube","Facebook")
+
     val selectedPlatforms = remember(brandProfile) {
         mutableStateListOf<String>().apply {
-            brandProfile?.preferredPlatforms?.forEach { add(it.platform) }
+            brandProfile?.preferredPlatforms?.forEach { pref ->
+                val normalizedName = platformOptions.find { it.equals(pref.platform, ignoreCase = true) } ?: pref.platform
+                if (!contains(normalizedName)) {
+                    add(normalizedName)
+                }
+            }
         }
     }
 
-    val platformOptions = listOf("Instagram", "YouTube", "Twitter", "Facebook")
+    val themeColor = Color(0xFFFF8383)
 
     Scaffold(
         bottomBar = bottomBar,
@@ -141,7 +153,7 @@ fun BrandProfileContent(
             if (!isEditMode) {
                 FloatingActionButton(
                     onClick = onNavigateToCreateCampaign,
-                    containerColor = Color(0xFFFF8383),
+                    containerColor = themeColor,
                     shape = CircleShape
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White)
@@ -151,7 +163,7 @@ fun BrandProfileContent(
     ) { padding ->
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFFFF8383))
+                CircularProgressIndicator(color = themeColor)
             }
         } else {
             Column(
@@ -161,12 +173,12 @@ fun BrandProfileContent(
                     .verticalScroll(rememberScrollState())
                     .padding(padding)
             ) {
-                // Profile Header (Editable)
+                // Profile Header
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(340.dp)
-                        .background(Color(0xFFFF8383)),
+                        .background(themeColor),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
@@ -177,64 +189,6 @@ fun BrandProfileContent(
                             .alpha(0.15f),
                         contentScale = ContentScale.Crop
                     )
-
-                    // Edit/Save Toggle with Text and Icon
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(16.dp)
-                            .clickable {
-                                if (isEditMode) {
-                                    val updatedBrand = brandProfile?.copy(
-                                        name = name,
-                                        email = email,
-                                        role = role,
-                                        about = about,
-                                        brandCategory = BrandCategory(category, subCategory),
-                                        profileUrl = profileUrl,
-                                        logoUrl = logoUrl,
-                                        targetAudience = TargetAudience(
-                                            ageMin = ageMin.toIntOrNull(),
-                                            ageMax = ageMax.toIntOrNull(),
-                                            gender = gender,
-                                            locations = brandProfile.targetAudience?.locations
-                                        ),
-                                        preferredPlatforms = selectedPlatforms.map { platformName ->
-                                            PreferredPlatform(
-                                                platform = platformName,
-                                                profileUrl = null,
-                                                followers = null,
-                                                avgViews = null,
-                                                engagement = null,
-                                                formats = null,
-                                                connected = null,
-                                                minFollowers = null,
-                                                minEngagement = null
-                                            )
-                                        }
-                                    )
-                                    if (updatedBrand != null) {
-                                        onUpdateProfile(updatedBrand)
-                                    }
-                                }
-                                isEditMode = !isEditMode
-                            },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (isEditMode) "Save" else "Edit",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            if (isEditMode) Icons.Default.Save else Icons.Default.Edit,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -259,7 +213,7 @@ fun BrandProfileContent(
                                     Icons.Default.Business,
                                     contentDescription = null,
                                     modifier = Modifier.padding(24.dp),
-                                    tint = Color(0xFFFF8383)
+                                    tint = themeColor
                                 )
                             }
                         }
@@ -283,23 +237,6 @@ fun BrandProfileContent(
                                 label = { Text("Brand Name") },
                                 textStyle = TextStyle(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            OutlinedTextField(
-                                value = role,
-                                onValueChange = { role = it },
-                                modifier = Modifier.padding(horizontal = 64.dp).height(50.dp).fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.White,
-                                    unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = Color.White,
-                                    focusedLabelColor = Color.White,
-                                    unfocusedLabelColor = Color.White.copy(alpha = 0.7f)
-                                ),
-                                label = { Text("Role") },
-                                textStyle = TextStyle(textAlign = TextAlign.Center, fontSize = 12.sp)
-                            )
                         } else {
                             Text(
                                 text = name.ifEmpty { "Brand Name" },
@@ -307,16 +244,18 @@ fun BrandProfileContent(
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(
-                                text = role.ifEmpty { "BRAND" },
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 14.sp
-                            )
                         }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = role.ifEmpty { "BRAND" },
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 14.sp
+                        )
                     }
                 }
 
-                // Profile Details (All Editable)
+                // Profile Details
                 Column(modifier = Modifier.padding(16.dp)) {
                     ProfileSectionTitle("Email Address")
                     if (isEditMode) {
@@ -428,9 +367,9 @@ fun BrandProfileContent(
                                     },
                                     label = { Text(platform) },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFFFF8383).copy(alpha = 0.1f),
-                                        selectedLabelColor = Color(0xFFFF8383),
-                                        selectedLeadingIconColor = Color(0xFFFF8383)
+                                        selectedContainerColor = themeColor.copy(alpha = 0.1f),
+                                        selectedLabelColor = themeColor,
+                                        selectedLeadingIconColor = themeColor
                                     )
                                 )
                             }
@@ -445,7 +384,7 @@ fun BrandProfileContent(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Edit/Save Button (Moved to bottom)
+                    // Edit/Save Button
                     Button(
                         onClick = {
                             if (isEditMode) {
@@ -454,7 +393,6 @@ fun BrandProfileContent(
                                     email = email,
                                     role = role,
                                     about = about,
-
                                     brandCategory = BrandCategory(category, subCategory),
                                     profileUrl = profileUrl,
                                     logoUrl = logoUrl,
@@ -486,7 +424,7 @@ fun BrandProfileContent(
                         },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (isEditMode) Color(0xFF4CAF50) else Color(0xFFFF8383))
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColor)
                     ) {
                         Icon(
                             if (isEditMode) Icons.Default.Save else Icons.Default.Edit,

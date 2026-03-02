@@ -37,21 +37,21 @@ fun MyAppNavigation(
         }
         composable("login") {
             LoginPage(
-                modifier = Modifier, 
+                modifier = modifier, 
                 navController = navController, 
                 authViewModel = authViewModel
             )
         }
         composable("signup") {
             SignupPage(
-                modifier = Modifier, 
+                modifier = modifier, 
                 navController = navController, 
                 authViewModel = authViewModel
             )
         }
         composable("forgot_password") {
             ForgotPasswordPage(
-                modifier = Modifier, 
+                modifier = modifier, 
                 navController = navController, 
                 authViewModel = authViewModel
             )
@@ -119,7 +119,7 @@ fun MyAppNavigation(
         }
         composable("brand_home") {
             BrandHomePage(
-                modifier = Modifier, 
+                modifier = modifier, 
                 navController = navController, 
                 authViewModel = authViewModel, 
                 brandViewModel = brandViewModel
@@ -140,7 +140,7 @@ fun MyAppNavigation(
         }
         composable("brand_search") {
             BrandSearchPage(
-                modifier = Modifier, 
+                modifier = modifier, 
                 navController = navController, 
                 authViewModel = authViewModel, 
                 brandViewModel = brandViewModel
@@ -148,7 +148,7 @@ fun MyAppNavigation(
         }
         composable("brand_history") {
             ProposalPage (
-                modifier = Modifier, 
+                modifier = modifier, 
                 navController = navController, 
                 authViewModel = authViewModel, 
                 brandViewModel = brandViewModel
@@ -156,7 +156,7 @@ fun MyAppNavigation(
         }
         composable("brand_profile") {
             BrandProfilePage(
-                modifier = Modifier, 
+                modifier = modifier, 
                 navController = navController, 
                 authViewModel = authViewModel, 
                 brandViewModel = brandViewModel
@@ -206,7 +206,7 @@ fun MyAppNavigation(
         @Suppress("UnusedMaterial3ScaffoldPaddingParameter")
         composable("influencer_home") {
             InfluencerHomePage(
-                modifier = Modifier,
+                modifier = modifier,
                 navController = navController,
                 authViewModel = authViewModel,
                 influencerViewModel = influencerViewModel,
@@ -215,7 +215,7 @@ fun MyAppNavigation(
         }
         composable("influencer_search") {
             InfluencerSearchPage(
-                modifier = Modifier,
+                modifier = modifier,
                 navController = navController,
                 campaignViewModel = campaignViewModel
             )
@@ -233,7 +233,10 @@ fun MyAppNavigation(
         }
         composable("influencerProfile") {
             InfluencerProfileScreen(
-                navController = navController
+                modifier = modifier,
+                navController = navController,
+                authViewModel = authViewModel,
+                influencerViewModel = influencerViewModel
             )
         }
         composable("discover") {

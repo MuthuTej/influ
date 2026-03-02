@@ -402,7 +402,7 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
             Text(
-                text = "Active Campaigns",
+                text = "Active Collabrations",
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )

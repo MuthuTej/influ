@@ -64,7 +64,7 @@ fun InfluencerCreateProposal(
     var selectedCampaignId by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     
-    val platforms = listOf("Instagram", "Facebook", "Twitter", "YouTube")
+    val platforms = listOf("Instagram", "Facebook", "YouTube")
     val selectedPlatforms = remember { mutableStateListOf<String>() }
     val deliverables = listOf("Post", "Reels", "Story", "Videos")
     var deliverableQuantities by remember { mutableStateOf(deliverables.associateWith { 0 }) }
@@ -205,7 +205,6 @@ fun InfluencerCreateProposal(
                     val icon = when (platform) {
                         "Instagram" -> painterResource(id = R.drawable.ic_instagram)
                         "Facebook" -> painterResource(id = R.drawable.ic_facebook)
-                        "Twitter" -> painterResource(id = R.drawable.ic_twitter)
                         "YouTube" -> painterResource(id = R.drawable.ic_youtube)
                         else -> null
                     }
@@ -264,7 +263,6 @@ fun InfluencerCreateProposal(
                             val icon = when (platform) {
                                 "Instagram" -> painterResource(id = R.drawable.ic_instagram)
                                 "Facebook" -> painterResource(id = R.drawable.ic_facebook)
-                                "Twitter" -> painterResource(id = R.drawable.ic_twitter)
                                 "YouTube" -> painterResource(id = R.drawable.ic_youtube)
                                 else -> null
                             }
