@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,13 +30,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -51,7 +48,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 private val themeColor = Color(0xFFFF8383)
-private val softGray = Color(0xFFF8F9FA)
+private val softGray = Color(0xFFF8F9FE)
 private val darkerGray = Color(0xFF6C757D)
 private val cardBg = Color(0xFFFFFFFF)
 
@@ -136,6 +133,17 @@ fun InfluencerBrandDetailContent(campaign: CampaignDetail, navController: NavCon
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
+                text = "CAMPAIGN REQUIREMENTS",
+                style = MaterialTheme.typography.labelLarge,
+                color = darkerGray,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            CampaignRequirementsSection(campaign = campaign)
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
                 text = "BRAND DETAILS",
                 style = MaterialTheme.typography.labelLarge,
                 color = darkerGray,
@@ -166,7 +174,6 @@ fun HeaderSection(campaign: CampaignDetail, navController: NavController) {
             contentScale = ContentScale.Crop
         )
         
-        // Top Bar
         Box(
             modifier = Modifier
                 .statusBarsPadding()
@@ -311,14 +318,25 @@ fun CampaignInfoSection(campaign: CampaignDetail) {
 
 @Composable
 fun BudgetAndTimelineSection(campaign: CampaignDetail) {
-    val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
-    val outputFormat = SimpleDateFormat("dd MMM, yyyy", Locale.getDefault())
-
-    fun formatDate(dateString: String?): String {
+    fun formatCampaignDate(dateString: String?): String {
         if (dateString.isNullOrEmpty()) return "TBD"
         return try {
-            val date = inputFormat.parse(dateString)
-            outputFormat.format(date)
+            val formats = listOf(
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()),
+                SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            )
+            var date: java.util.Date? = null
+            for (format in formats) {
+                try {
+                    date = format.parse(dateString)
+                    if (date != null) break
+                } catch (e: Exception) { continue }
+            }
+            if (date != null) {
+                SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()).format(date)
+            } else {
+                dateString
+            }
         } catch (e: Exception) {
             dateString ?: "TBD"
         }
@@ -345,7 +363,7 @@ fun BudgetAndTimelineSection(campaign: CampaignDetail) {
                 Column {
                     Text("BUDGET RANGE", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = darkerGray)
                     Text(
-                        text = "₹${campaign.budgetMin} — ₹${campaign.budgetMax}",
+                        text = "₹${campaign.budgetMin}K — ₹${campaign.budgetMax}K",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.Black
@@ -358,14 +376,62 @@ fun BudgetAndTimelineSection(campaign: CampaignDetail) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TimelineBox(
                     label = "START DATE",
-                    date = formatDate(campaign.startDate),
+                    date = formatCampaignDate(campaign.startDate),
                     modifier = Modifier.weight(1f)
                 )
                 TimelineBox(
                     label = "END DATE",
-                    date = formatDate(campaign.endDate),
+                    date = formatCampaignDate(campaign.endDate),
                     modifier = Modifier.weight(1f)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun CampaignRequirementsSection(campaign: CampaignDetail) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            // Platforms
+            BrandDetailRowHeader(Icons.Default.Language, "REQUIRED PLATFORMS")
+            Spacer(modifier = Modifier.height(12.dp))
+            campaign.platforms?.forEach { platform ->
+                Surface(
+                    modifier = Modifier.padding(bottom = 8.dp, start = 48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = themeColor.copy(alpha = 0.05f)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(platform.platform, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        if (!platform.formats.isNullOrEmpty()) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                platform.formats.forEach { format ->
+                                    Surface(color = themeColor.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
+                                        Text(format, modifier = Modifier.padding(6.dp), fontSize = 10.sp, color = themeColor, fontWeight = FontWeight.Medium)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Divider(modifier = Modifier.padding(vertical = 12.dp), color = softGray)
+
+            // Audience
+            val target = campaign.targetAudience?.let { "${it.ageMin}-${it.ageMax} yrs, ${it.gender}" } ?: "Open to all"
+            BrandDetailRow(Icons.Default.People, "TARGET AUDIENCE", target)
+            
+            val locations = campaign.targetAudience?.locations?.joinToString(", ")
+            if (!locations.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                BrandDetailRow(Icons.Default.LocationOn, "TARGET LOCATIONS", locations)
             }
         }
     }
@@ -383,12 +449,7 @@ fun TimelineBox(label: String, date: String, modifier: Modifier = Modifier) {
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.CalendarMonth, 
-                contentDescription = null, 
-                tint = themeColor, 
-                modifier = Modifier.size(24.dp)
-            )
+            Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = themeColor, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(text = label, fontSize = 10.sp, color = darkerGray, fontWeight = FontWeight.Bold)
@@ -408,90 +469,33 @@ fun BrandInfoSection(brand: Brand?) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            // Header with color
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(themeColor)
-                    .padding(16.dp)
-            ) {
+            Box(modifier = Modifier.fillMaxWidth().background(themeColor).padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Info, contentDescription = null, tint = Color.White)
-                        }
+                    Surface(shape = RoundedCornerShape(12.dp), color = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(48.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Info, contentDescription = null, tint = Color.White) }
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text("Brand Overview", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
-                        val categoryText = brand.brandCategory?.let { 
-                            if (it.subCategory.isNotEmpty()) "${it.category} • ${it.subCategory}" else it.category 
-                        } ?: "N/A"
+                        val categoryText = brand.brandCategory?.let { if (it.subCategory.isNotEmpty()) "${it.category} • ${it.subCategory}" else it.category } ?: "N/A"
                         Text(categoryText, fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
                     }
                 }
             }
 
             Column(modifier = Modifier.padding(16.dp)) {
-                val categoryValue = brand.brandCategory?.let { 
-                    if (it.subCategory.isNotEmpty()) "${it.category} (${it.subCategory})" else it.category 
-                } ?: "N/A"
+                val categoryValue = brand.brandCategory?.let { if (it.subCategory.isNotEmpty()) "${it.category} (${it.subCategory})" else it.category } ?: "N/A"
                 BrandDetailRow(Icons.Default.Category, "CATEGORY", categoryValue)
-                Divider(modifier = Modifier.padding(vertical = 8.dp), color = softGray)
-                
-                // PREFERRED PLATFORMS with FORMATS
-                Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                    BrandDetailRowHeader(Icons.Default.Language, "PREFERRED PLATFORMS")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    brand.preferredPlatforms?.forEach { platform ->
-                        Surface(
-                            modifier = Modifier.padding(bottom = 8.dp, start = 52.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = themeColor.copy(alpha = 0.05f),
-                            border = BorderStroke(1.dp, themeColor.copy(alpha = 0.1f))
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = platform.platform,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = Color.Black
-                                )
-                                if (!platform.formats.isNullOrEmpty()) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        platform.formats.forEach { format ->
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = themeColor.copy(alpha = 0.1f)
-                                            ) {
-                                                Text(
-                                                    text = format,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                    fontSize = 10.sp,
-                                                    color = themeColor,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
                 
                 Divider(modifier = Modifier.padding(vertical = 8.dp), color = softGray)
                 
-                val target = brand.targetAudience?.let { "${it.ageMin}-${it.ageMax} yrs, ${it.gender}" } ?: "N/A"
-                BrandDetailRow(Icons.Default.People, "TARGET AUDIENCE", target)
-                Divider(modifier = Modifier.padding(vertical = 8.dp), color = softGray)
-                
-                BrandDetailRow(Icons.Default.LocationOn, "LOCATIONS", brand.targetAudience?.locations?.joinToString(", ") ?: "N/A")
+                Text(
+                    text = brand.about ?: "No additional information provided.",
+                    fontSize = 14.sp,
+                    color = darkerGray,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
             }
         }
     }
@@ -500,16 +504,10 @@ fun BrandInfoSection(brand: Brand?) {
 @Composable
 fun BrandDetailRowHeader(icon: ImageVector, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = themeColor.copy(alpha = 0.1f),
-            modifier = Modifier.size(36.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = themeColor, modifier = Modifier.size(20.dp))
-            }
+        Surface(shape = RoundedCornerShape(8.dp), color = themeColor.copy(alpha = 0.1f), modifier = Modifier.size(36.dp)) {
+            Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = themeColor, modifier = Modifier.size(20.dp)) }
         }
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Text(label, fontSize = 10.sp, color = darkerGray, fontWeight = FontWeight.Bold)
     }
 }
@@ -517,16 +515,10 @@ fun BrandDetailRowHeader(icon: ImageVector, label: String) {
 @Composable
 fun BrandDetailRow(icon: ImageVector, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = themeColor.copy(alpha = 0.1f),
-            modifier = Modifier.size(36.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = themeColor, modifier = Modifier.size(20.dp))
-            }
+        Surface(shape = RoundedCornerShape(8.dp), color = themeColor.copy(alpha = 0.1f), modifier = Modifier.size(36.dp)) {
+            Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = themeColor, modifier = Modifier.size(20.dp)) }
         }
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Column {
             Text(label, fontSize = 10.sp, color = darkerGray, fontWeight = FontWeight.Bold)
             Text(value, fontSize = 15.sp, color = Color.Black, fontWeight = FontWeight.SemiBold)
@@ -536,35 +528,17 @@ fun BrandDetailRow(icon: ImageVector, label: String, value: String) {
 
 @Composable
 fun CollaborateButton(campaign: CampaignDetail, navController: NavController) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Button(
             onClick = { navController.navigate("influencer_apply_campaign/${campaign.id}") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .shadow(8.dp, RoundedCornerShape(20.dp)),
+            modifier = Modifier.fillMaxWidth().height(64.dp).shadow(8.dp, RoundedCornerShape(20.dp)),
             shape = RoundedCornerShape(20.dp),
             colors = ButtonDefaults.buttonColors(containerColor = themeColor)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.AutoAwesome, 
-                    contentDescription = null, 
-                    modifier = Modifier.size(24.dp),
-                    tint = Color.White
-                )
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(24.dp), tint = Color.White)
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    "COLLABORATE NOW", 
-                    fontSize = 18.sp, 
-                    fontWeight = FontWeight.ExtraBold, 
-                    color = Color.White,
-                    letterSpacing = 1.sp
-                )
+                Text("COLLABORATE NOW", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, letterSpacing = 1.sp)
             }
         }
     }
