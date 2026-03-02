@@ -151,6 +151,7 @@ fun ProposalPage(
         .filter { it.type == selectedTab && (selectedStatus == null || it.status == selectedStatus) }
 
     val configuration = LocalConfiguration.current
+    val headerColor = Color(0xFFFF8383)
     val headerHeight = 120.dp
     val contentPaddingTop = headerHeight - 20.dp
 
@@ -168,7 +169,7 @@ fun ProposalPage(
             if (isBrand) {
                 FloatingActionButton(
                     onClick = { navController.navigate("create_campaign") },
-                    containerColor = Color(0xFFFF8383),
+                    containerColor = headerColor,
                     shape = CircleShape
                 ) {
                     Icon(
@@ -183,26 +184,26 @@ fun ProposalPage(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color(0xFFFF8383))
+                .background(headerColor)
         ) {
             // Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(headerHeight)
+                    .wrapContentHeight()
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.vector),
                     contentDescription = null,
                     modifier = Modifier
-                        .fillMaxSize()
+                        .matchParentSize()
                         .alpha(0.15f),
                     contentScale = ContentScale.Crop
                 )
 
                 Column(
                     modifier = Modifier
+                        .statusBarsPadding()
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 24.dp)
                 ) {
@@ -231,10 +232,11 @@ fun ProposalPage(
             // Content Card
             Column(
                 modifier = Modifier
-                    .padding(top = contentPaddingTop)
+                    .padding(top = contentPaddingTop + 40.dp) // Adjust for status bar
                     .fillMaxSize()
                     .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
                     .background(Color.White)
+                    .padding(bottom = paddingValues.calculateBottomPadding())
             ) {
                 ProposalToggle(selectedTab = selectedTab, onTabSelected = {
                     selectedTab = it
@@ -243,7 +245,7 @@ fun ProposalPage(
 
                 if (isLoading && collaborations.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFFFF8383))
+                        CircularProgressIndicator(color = headerColor)
                     }
                 } else {
                     StatusFilterRow(
