@@ -91,12 +91,19 @@ fun InfluencerProfileScreen(
             }
         },
         bottomBar = {
-            CmnBottomNavigationBar(
-                selectedItem = "Profile",
-                onItemSelected = { /* Handled in the component */ },
-                navController = navController,
-                isBrand = false
-            )
+            Surface(
+                color = Color.White,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(modifier = Modifier.navigationBarsPadding()) {
+                    CmnBottomNavigationBar(
+                        selectedItem = "Profile",
+                        onItemSelected = { /* Handled in the component */ },
+                        navController = navController,
+                        isBrand = false
+                    )
+                }
+            }
         }
     )
 }
@@ -126,11 +133,12 @@ fun InfluencerProfileContent(
     var platforms by remember(influencerProfile) { mutableStateOf(influencerProfile?.platforms ?: emptyList()) }
     
     // State for services/pricing
-    val availablePlatforms = listOf("Instagram", "YouTube", "Facebook")
+    val availablePlatforms = listOf("Instagram", "YouTube", "Facebook", "Twitter")
     val servicesByPlatform = mapOf(
         "Instagram" to listOf("Story", "Reel", "Post"),
         "YouTube" to listOf("Video", "Shorts", "Community Post"),
-        "Facebook" to listOf("Post", "Story", "Video")
+        "Facebook" to listOf("Post", "Story", "Video"),
+        "Twitter" to listOf("Tweet", "Thread")
     )
     
     var selectedPricing = remember(influencerProfile) { 
@@ -157,7 +165,6 @@ fun InfluencerProfileContent(
                     .fillMaxSize()
                     .background(Color.White)
                     .verticalScroll(rememberScrollState())
-                    .padding(padding)
             ) {
                 // Profile Header
                 Box(
@@ -178,7 +185,10 @@ fun InfluencerProfileContent(
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(top = 24.dp)
                     ) {
                         Surface(
                             modifier = Modifier.size(100.dp),
@@ -242,7 +252,9 @@ fun InfluencerProfileContent(
                 }
 
                 // Profile Details
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier
+                    .padding(16.dp)
+                    .padding(bottom = padding.calculateBottomPadding())) {
                     
                     // Email Section
                     ProfileSectionTitle("Email Address")

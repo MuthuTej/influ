@@ -217,7 +217,8 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 40.dp, start = 16.dp, end = 16.dp),
+                    .statusBarsPadding()
+                    .padding(top = 16.dp, start = 16.dp, end = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
@@ -226,6 +227,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                     color = Color.White,
                     modifier = Modifier.size(54.dp)
                 ) {
+                    Log.d("LOGO_DEBUG", "Logo URL: ${brandProfile?.logoUrl}")
                     if (!brandProfile?.logoUrl.isNullOrEmpty()) {
                         AsyncImage(
                             model = brandProfile?.logoUrl,

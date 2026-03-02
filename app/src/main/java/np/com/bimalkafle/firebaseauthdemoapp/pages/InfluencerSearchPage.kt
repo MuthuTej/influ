@@ -99,7 +99,6 @@ fun InfluencerSearchPage(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .padding(padding)
                 .background(Color.White)
         ) {
             // ---------------- REFINED HEADER ----------------
@@ -122,6 +121,7 @@ fun InfluencerSearchPage(
 
                 Column(
                     modifier = Modifier
+                        .statusBarsPadding()
                         .padding(24.dp)
                         .padding(top = 8.dp)
                 ) {
@@ -292,7 +292,7 @@ fun InfluencerSearchPage(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
-                     contentPadding = PaddingValues(bottom = 80.dp)
+                     contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 16.dp)
                 ) {
                     items(paginatedCampaigns) { campaign ->
                         CampaignCardInfluencer(
