@@ -5,19 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,17 +43,29 @@ fun CreateCampaignScreen(
     onNext: () -> Unit = {},
     campaignViewModel: CampaignViewModel = CampaignViewModel()
 ) {
-    val platforms = listOf("Youtube", "Instagram", "Facebook")
+    val platformsList = listOf("Youtube", "Instagram", "Facebook")
+    val platformFormatsMap = mapOf(
+        "Facebook" to listOf("reels/shorts", "post", "video", "story"),
+        "Instagram" to listOf("reels/shorts", "post", "story"),
+        "Youtube" to listOf("reels/shorts", "post", "video")
+    )
 
     var showDatePicker by remember { mutableStateOf(false) }
     var dateField by remember { mutableStateOf<String?>(null) }
 
-
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
-
-    val headerHeight = screenHeight * 0.4f
+    val headerHeight = screenHeight * 0.35f
     val formPaddingTop = headerHeight - 40.dp
+
+    // Validation
+    val isFormValid = campaignViewModel.title.isNotBlank() &&
+            campaignViewModel.description.isNotBlank() &&
+            campaignViewModel.selectedPlatforms.isNotEmpty() &&
+            campaignViewModel.selectedPlatforms.all { platform -> 
+                campaignViewModel.platformFormats[platform]?.isNotEmpty() == true 
+            } &&
+            campaignViewModel.startDate != null
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Header
@@ -89,18 +89,18 @@ fun CreateCampaignScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 48.dp),
+                    .padding(top = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.brand_profile),
                     contentDescription = "Brand Logo",
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(70.dp)
                         .clip(CircleShape)
                         .background(Color.White)
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "Campaign Details",
                     color = Color.White,
@@ -111,12 +111,9 @@ fun CreateCampaignScreen(
                     text = "Let's get started by filling out your campaign details",
                     color = Color.White.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    fontSize = 14.sp
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                // Stepper
-
-
             }
         }
 
@@ -124,23 +121,23 @@ fun CreateCampaignScreen(
         Column(
             modifier = Modifier
                 .padding(top = formPaddingTop)
-                .padding(horizontal = 24.dp) // Adds margin to the left and right of the card
+                .padding(horizontal = 24.dp)
                 .fillMaxSize()
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color.White)
-                .padding(24.dp) // Adds padding inside the card
+                .padding(24.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            Text("General Information", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
+            Spacer(modifier = Modifier.height(16.dp))
+
             OutlinedTextField(
                 value = campaignViewModel.title,
                 onValueChange = { campaignViewModel.title = it },
-                label = { Text("Name of the Campaign") },
-                modifier = Modifier
-                    .fillMaxWidth(),
+                label = { Text("Campaign Name *") },
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFFF8383)
-                )
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -148,76 +145,103 @@ fun CreateCampaignScreen(
             OutlinedTextField(
                 value = campaignViewModel.description,
                 onValueChange = { campaignViewModel.description = it },
-                label = { Text("Campaign Brief") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
+                label = { Text("Campaign Brief *") },
+                modifier = Modifier.fillMaxWidth().height(100.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFFF8383)
-                )
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Required Platforms", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("Target Platforms & Formats *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                platforms.forEach { platform ->
-                    val isSelected = campaignViewModel.selectedPlatforms.contains(platform)
-                    PlatformChip(platform, isSelected) {
-                        campaignViewModel.selectedPlatforms = if (isSelected) {
-                            campaignViewModel.selectedPlatforms - platform
-                        } else {
-                            campaignViewModel.selectedPlatforms + platform
+            
+            platformsList.forEach { platform ->
+                val isPlatformSelected = campaignViewModel.selectedPlatforms.contains(platform)
+                
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isPlatformSelected) Color(0xFFFF8383).copy(alpha = 0.1f) else Color(0xFFF5F5F5))
+                            .clickable {
+                                campaignViewModel.selectedPlatforms = if (isPlatformSelected) {
+                                    campaignViewModel.selectedPlatforms - platform
+                                } else {
+                                    campaignViewModel.selectedPlatforms + platform
+                                }
+                            }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PlatformIcon(platform)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(platform, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        Checkbox(
+                            checked = isPlatformSelected,
+                            onCheckedChange = null,
+                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFF8383))
+                        )
+                    }
+
+                    if (isPlatformSelected) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Select format for $platform:", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(start = 8.dp))
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            platformFormatsMap[platform]?.forEach { format ->
+                                val selectedFormats = campaignViewModel.platformFormats[platform] ?: emptySet()
+                                val isFormatSelected = selectedFormats.contains(format)
+                                
+                                FilterChip(
+                                    selected = isFormatSelected,
+                                    onClick = {
+                                        val newFormats = if (isFormatSelected) selectedFormats - format else selectedFormats + format
+                                        campaignViewModel.platformFormats = campaignViewModel.platformFormats + (platform to newFormats)
+                                    },
+                                    label = { Text(format, fontSize = 12.sp) },
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFFFF8383),
+                                        selectedLabelColor = Color.White
+                                    )
+                                )
+                            }
                         }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Text("Optional Campaign Timeline", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text("Campaign Timeline", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                DateSelector(label = "Start Date", date = campaignViewModel.startDate, modifier = Modifier.weight(1f), onClick = { dateField = "start"; showDatePicker = true })
-                DateSelector(label = "End Date", date = campaignViewModel.endDate, modifier = Modifier.weight(1f), onClick = { dateField = "end"; showDatePicker = true })
+                DateSelector(label = "Start Date *", date = campaignViewModel.startDate, modifier = Modifier.weight(1f), onClick = { dateField = "start"; showDatePicker = true })
+                DateSelector(label = "End Date (Optional)", date = campaignViewModel.endDate, modifier = Modifier.weight(1f), onClick = { dateField = "end"; showDatePicker = true })
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
                 onClick = onNext,
+                enabled = isFormValid,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = PaddingValues()
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isFormValid) Color(0xFFFF8383) else Color.LightGray
+                )
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFFFF8383)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
-                }
+                Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
 
         if (showDatePicker) {
             val datePickerState = rememberDatePickerState(
-                initialSelectedDateMillis = System.currentTimeMillis(),
-                selectableDates = object : SelectableDates {
-                    override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                        return utcTimeMillis >= Calendar.getInstance().timeInMillis
-                    }
-                }
+                initialSelectedDateMillis = System.currentTimeMillis()
             )
             DatePickerDialog(
                 onDismissRequest = { showDatePicker = false },
@@ -225,68 +249,29 @@ fun CreateCampaignScreen(
                     TextButton(onClick = {
                         showDatePicker = false
                         datePickerState.selectedDateMillis?.let {
-                            val date = Date(it)
-                            if (dateField == "start") {
-                                campaignViewModel.startDate = date
-                            } else {
-                                campaignViewModel.endDate = date
-                            }
+                            if (dateField == "start") campaignViewModel.startDate = Date(it)
+                            else campaignViewModel.endDate = Date(it)
                         }
-                    }) {
-                        Text("OK")
-                    }
+                    }) { Text("OK") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDatePicker = false }) {
-                        Text("Cancel")
-                    }
+                    TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
                 }
-            ) {
-                DatePicker(
-                    state = datePickerState
-                )
-            }
+            ) { DatePicker(state = datePickerState) }
         }
     }
 }
 
 @Composable
-fun PlatformChip(name: String, isSelected: Boolean, onSelected: () -> Unit) {
+fun PlatformIcon(name: String) {
     val icon = when (name) {
-        "Youtube" -> painterResource(id = R.drawable.ic_youtube) // Replace with actual icons
+        "Youtube" -> painterResource(id = R.drawable.ic_youtube)
         "Instagram" -> painterResource(id = R.drawable.ic_instagram)
         "Facebook" -> painterResource(id = R.drawable.ic_facebook)
         else -> painterResource(id = R.drawable.splash1)
     }
-    FilterChip(
-        selected = isSelected,
-        onClick = onSelected,
-        label = { Text(name) },
-        leadingIcon = {
-            if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "$name selected",
-                    modifier = Modifier.size(20.dp)
-                )
-            } else {
-                Image(
-                    painter = icon,
-                    contentDescription = "$name logo",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        },
-        shape = RoundedCornerShape(8.dp),
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Color(0xFFFF8383).copy(alpha = 0.2f),
-            labelColor = Color.Black,
-            selectedLabelColor = Color.Black
-        ),
-        border = BorderStroke(1.dp, if (isSelected) Color(0xFFFF8383) else Color.LightGray)
-    )
+    Image(painter = icon, contentDescription = name, modifier = Modifier.size(24.dp))
 }
-
 
 @Composable
 fun DateSelector(label: String, date: Date?, modifier: Modifier = Modifier, onClick: () -> Unit) {
@@ -294,23 +279,22 @@ fun DateSelector(label: String, date: Date?, modifier: Modifier = Modifier, onCl
     val dateString = date?.let { dateFormatter.format(it) } ?: "Select Date"
 
     Column(modifier = modifier) {
-        Text(label, fontSize = 14.sp, color = Color.Gray)
+        Text(label, fontSize = 12.sp, color = Color.Gray)
         Spacer(modifier = Modifier.height(4.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
-                .padding(12.dp)
-                .clickable(onClick = onClick),
+                .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick)
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(dateString)
-            Icon(Icons.Default.CalendarToday, contentDescription = "Select Date", tint = Color.Gray)
+            Text(dateString, fontSize = 14.sp)
+            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
         }
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable

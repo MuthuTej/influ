@@ -76,13 +76,17 @@ data class Proposal(
 )
 
 fun Collaboration.toProposal(isBrand: Boolean): Proposal {
-    val pricing = this.pricing?.firstOrNull()
+    val pricingList = this.pricing ?: emptyList()
+    val pricing = pricingList.firstOrNull()
     
     val proposalType = if (isBrand) {
         if (this.initiatedBy == "BRAND") ProposalType.SENT else ProposalType.RECEIVED
     } else {
         if (this.initiatedBy == "INFLUENCER") ProposalType.SENT else ProposalType.RECEIVED
     }
+
+    // Calculate total from pricing list if totalAmount is null
+    val totalSum = this.totalAmount ?: pricingList.sumOf { it.price.toDouble() }
 
     return Proposal(
         id = this.id,
@@ -101,7 +105,7 @@ fun Collaboration.toProposal(isBrand: Boolean): Proposal {
         type = proposalType,
         logoUrl = if (isBrand) this.influencer.logoUrl else this.brand?.logoUrl,
         date = this.createdAt.take(10),
-        totalAmount = if (this.totalAmount != null) "₹${this.totalAmount}" else "N/A",
+        totalAmount = if (totalSum > 0) "₹$totalSum" else "N/A",
         paymentStatus = this.paymentStatus ?: "pending"
     )
 }
