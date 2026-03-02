@@ -131,9 +131,9 @@ fun BrandProfileContent(
     var ageMin by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.ageMin?.toString() ?: "") }
     var ageMax by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.ageMax?.toString() ?: "") }
     var gender by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.gender ?: "Any") }
-    
-    val platformOptions = listOf("Instagram", "YouTube","Facebook")
 
+
+    val platformOptions = listOf("Instagram", "YouTube", "Facebook")
     val selectedPlatforms = remember(brandProfile) {
         mutableStateListOf<String>().apply {
             brandProfile?.preferredPlatforms?.forEach { pref ->

@@ -273,5 +273,17 @@ fun MyAppNavigation(
                 influencerViewModel = influencerViewModel
             )
         }
+        
+        composable(
+            route = "collaboration_analytics/{collaborationId}",
+            arguments = listOf(navArgument("collaborationId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val collaborationId = backStackEntry.arguments?.getString("collaborationId") ?: ""
+            CollaborationAnalyticsPage(
+                navController = navController,
+                collaborationId = collaborationId,
+                brandViewModel = brandViewModel
+            )
+        }
     })
 }

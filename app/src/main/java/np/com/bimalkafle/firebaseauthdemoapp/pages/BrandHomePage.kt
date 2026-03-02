@@ -3,6 +3,7 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import coil.compose.AsyncImage
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,7 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.MainActivity
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import java.time.Instant
 import java.time.LocalDateTime
@@ -67,11 +70,20 @@ fun BrandHomePage(
     val collaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
     val influencers by brandViewModel.influencers.observeAsState(initial = emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
-    val error by brandViewModel.error.observeAsState()
+    val errorMsg by brandViewModel.error.observeAsState()
     val wishlistedInfluencers by brandViewModel.wishlistedInfluencers.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     val brandProfile by brandViewModel.brandProfile.observeAsState()
+
+    LaunchedEffect(errorMsg) {
+        errorMsg?.let {
+            if (it.isNotEmpty()) {
+                Toast.makeText(context, "Server Error: $it", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser
@@ -141,7 +153,15 @@ fun BrandHomePage(
                             .fillMaxWidth()
                             .padding(top = 16.dp)
                     ) {
-                        ActiveCampaignSection(collaborations)
+     ActiveCampaignSection(
+                            collaborations = collaborations,
+                            brandViewModel = brandViewModel,
+                            brandName = brandProfile?.name ?: "Brand",
+                            onCollaborationClick = { id ->
+                                navController.navigate("collaboration_analytics/$id")
+                            }
+                        )
+                       
                         TopPicksSectionBrand(
                             influencers = influencers,
                             wishlistedInfluencers = wishlistedInfluencers,
@@ -308,7 +328,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
         }
 
         Button(
-            onClick = { navController.navigate("brand_search") },
+            onClick = { },
             shape = RoundedCornerShape(30.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFFFF5252)
@@ -394,7 +414,12 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ActiveCampaignSection(collaborations: List<Collaboration>) {
+fun ActiveCampaignSection(
+    collaborations: List<Collaboration>,
+    brandViewModel: BrandViewModel,
+    brandName: String,
+    onCollaborationClick: (String) -> Unit
+) {
 
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -402,7 +427,7 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
             Text(
-                text = "Active Collabrations",
+                text = "Active Campaigns",
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -433,7 +458,10 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
                 modifier = Modifier.padding(16.dp)
             )
         } else {
-            val singleCardHeight = 140.dp
+            val configuration = LocalConfiguration.current
+            val screenHeight = configuration.screenHeightDp.dp
+            val maxSectionHeight = screenHeight * 0.25f 
+            val singleCardHeight = 180.dp 
 
             LazyRow(
                 modifier = Modifier
@@ -472,6 +500,7 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
                             .fillMaxHeight()
                     ) {
                         CampaignItem(
+                            collaborationId = collaboration.id,
                             influencerName = collaboration.influencer.name,
                             influencerLogo = collaboration.influencer.logoUrl,
                             campaignTitle = collaboration.campaign.title,
@@ -480,7 +509,10 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
                             platform = pricing?.platform ?: "N/A",
                             price = pricing?.price ?: 0,
                             currency = pricing?.currency ?: "USD",
-                            time = timeAgo
+                            time = timeAgo,
+                            brandViewModel = brandViewModel,
+                            brandName = brandName,
+                            onClick = { onCollaborationClick(collaboration.id) }
                         )
                     }
                 }
@@ -491,6 +523,7 @@ fun ActiveCampaignSection(collaborations: List<Collaboration>) {
 
 @Composable
 fun CampaignItem(
+    collaborationId: String,
     influencerName: String,
     campaignTitle: String,
     status: String,
@@ -499,9 +532,13 @@ fun CampaignItem(
     price: Int,
     currency: String,
     time: String,
-    influencerLogo: String?
+    influencerLogo: String?,
+    brandViewModel: BrandViewModel,
+    brandName: String,
+    onClick: () -> Unit
 ) {
     val primaryColor = brandThemeColor
+    val context = LocalContext.current
 
     val statusColor = when (status) {
         "ACCEPTED" -> Color(0xFF4CAF50)
@@ -514,7 +551,7 @@ fun CampaignItem(
 
     Card(
         shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
@@ -590,22 +627,25 @@ fun CampaignItem(
 
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
 
-            Text(
-                text = "$deliverable • $platform",
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp
-            )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "$currency $price",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = primaryColor
-                )
+                Column {
+                    Text(
+                        text = "$deliverable • $platform",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "$currency $price",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = primaryColor
+                    )
+                }
+
                 Text(
                     text = time,
                     fontSize = 12.sp,

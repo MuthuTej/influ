@@ -8,6 +8,33 @@ data class Data(
     val getCollaborations: List<Collaboration>
 )
 
+data class CollaborationAnalytics(
+    val platform: String?,
+    val duration: Int?,
+    val cost: Float?,
+    val impressions: Int?,
+    val clicks: Int?,
+    val likes: Int?,
+    val comments: Int?,
+    val shares: Int?,
+    val saves: Int?,
+    val views: Int?,
+    val retweets: Int?,
+    val replies: Int?
+)
+
+data class OverallAnalytics(
+    val impressions: Int?,
+    val clicks: Int?,
+    val likes: Int?,
+    val comments: Int?,
+    val shares: Int?,
+    val saves: Int?,
+    val views: Int?,
+    val retweets: Int?,
+    val replies: Int?
+)
+
 data class Collaboration(
     val id: String,
     val campaignId: String,
@@ -25,8 +52,10 @@ data class Collaboration(
     val razorpayOrderId: String?,
     val advancePaid: Boolean?,
     val finalPaid: Boolean?,
-    val totalAmount: Int?,
-    val brand: Brand? = null
+    val totalAmount: Double?,
+    val brand: Brand? = null,
+    val overallAnalytics: OverallAnalytics? = null,
+    val platformAnalytics: List<CollaborationAnalytics>? = null
 )
 
 data class Campaign(
