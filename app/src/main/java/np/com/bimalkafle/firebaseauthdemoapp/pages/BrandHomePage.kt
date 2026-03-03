@@ -201,13 +201,13 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
-    val headerHeight = screenHeight * 0.32f
+    val headerHeight = screenHeight * 0.35f
     val cardHeight = screenHeight * 0.28f
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(headerHeight + cardHeight * 0.6f)
+            .height(headerHeight + cardHeight * 0.75f)
     ) {
 
         Box(
@@ -217,6 +217,14 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 .background(brandThemeColor)
                 .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.vector),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.15f),
+                contentScale = ContentScale.Crop
+            )
 
             Row(
                 modifier = Modifier
@@ -257,7 +265,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
                     Text(
-                        "${brandProfile?.name ?: "Guest"} 👋",
+                        "${brandProfile?.name ?: "Guest"}",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -293,7 +301,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
         Card(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = headerHeight - (cardHeight * 0.75f))
+                .padding(top = headerHeight - (cardHeight * 0.50f))
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
                 .height(cardHeight),
@@ -348,14 +356,14 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
         }
 
         Button(
-            onClick = { },
+            onClick = { navController.navigate("brand_search") },
             shape = RoundedCornerShape(30.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFFFF5252)
             ),
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = headerHeight + (cardHeight * 0.20f))
+                .padding(top = headerHeight + (cardHeight * 0.40f))
                 .fillMaxWidth(0.65f)
                 .height(52.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 10.dp)

@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -249,13 +250,13 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
-    val headerHeight = screenHeight * 0.32f
+    val headerHeight = screenHeight * 0.35f
     val cardHeight = screenHeight * 0.28f
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(headerHeight + cardHeight * 0.6f)
+            .height(headerHeight + cardHeight * 0.75f)
     ) {
 
         // ---------------- HEADER ----------------
@@ -266,6 +267,14 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                 .background(brandThemeColor)
                 .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.vector),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.15f),
+                contentScale = ContentScale.Crop
+            )
 
             Row(
                 modifier = Modifier
@@ -305,7 +314,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
                     Text(
-                        "${influencerProfile?.name ?: "Guest"} 👋",
+                        "${influencerProfile?.name ?: "Guest"}",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -342,7 +351,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
         Card(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = headerHeight - (cardHeight * 0.75f))
+                .padding(top = headerHeight - (cardHeight * 0.50f))
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
                 .height(cardHeight),
@@ -403,7 +412,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
             ),
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = headerHeight + (cardHeight * 0.20f))
+                .padding(top = headerHeight + (cardHeight * 0.40f))
                 .fillMaxWidth(0.65f)
                 .height(52.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 10.dp)
