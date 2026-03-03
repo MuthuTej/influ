@@ -174,6 +174,12 @@ fun BrandInfluencerDetailContent(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
+                    // YouTube Insights Section
+                    influencer.youtubeInsights?.let { ytInsights ->
+                        YouTubeInsightsSection(ytInsights)
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
+
                     // Analytics Row: Viewers & Top Locations
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -937,4 +943,176 @@ private fun FlowRow(
         horizontalArrangement = horizontalArrangement,
         content = content
     )
+}
+
+@Composable
+private fun YouTubeInsightsSection(insights: np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeInsights) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("YouTube Insights", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Text(
+            "Channel: ${insights.title ?: "N/A"}",
+            color = detailDarkerGray,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Channel Stats Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            YouTubeStatCard(
+                label = "Subscribers",
+                value = formatInfluencerCount(insights.subscribers ?: 0),
+                icon = Icons.Default.People,
+                modifier = Modifier.weight(1f)
+            )
+            YouTubeStatCard(
+                label = "Total Views",
+                value = formatInfluencerCount(insights.totalViews?.toInt() ?: 0),
+                icon = Icons.Default.Visibility,
+                modifier = Modifier.weight(1f)
+            )
+            YouTubeStatCard(
+                label = "Videos",
+                value = (insights.totalVideos ?: 0).toString(),
+                icon = Icons.Default.VideoLibrary,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Demographics
+        if (!insights.demographics.isNullOrEmpty()) {
+            YouTubeDemographicsCard(insights.demographics!!)
+        }
+        
+        if (!insights.lastSynced.isNullOrEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                "Last Synced: ${insights.lastSynced}",
+                color = detailDarkerGray,
+                fontSize = 12.sp,
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun YouTubeStatCard(
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(icon, contentDescription = null, tint = platformsColors["YOUTUBE"] ?: Color.Red, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(label, fontSize = 11.sp, color = detailDarkerGray)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebaseauthdemoapp.model.YoutubeDemographics>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("YouTube Audience Demographics", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // Age Groups Pie Chart
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Age Groups", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    val ageData = demographics.groupBy { d -> d.ageGroup ?: "Other" }
+                        .mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
+                    
+                    val values = ageData.values.toList()
+                    val labels = ageData.keys.toList()
+                    val colors = listOf(
+                        Color(0xFF6C63FF), Color(0xFFFF8383), Color(0xFF4CAF50), 
+                        Color(0xFFFFC107), Color(0xFF2196F3), Color(0xFF9C27B0)
+                    ).take(values.size)
+                    
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
+                        InfluencerDonutChart(values, colors, modifier = Modifier.fillMaxSize(), strokeWidth = 10.dp)
+                        Text("${values.sum().toInt()}%", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Legend for Age in two columns
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        labels.forEachIndexed { index, label ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(0.45f).padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(modifier = Modifier.size(8.dp).background(colors[index], CircleShape))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(label.removePrefix("age"), fontSize = 10.sp, color = detailDarkerGray)
+                            }
+                        }
+                    }
+                }
+                
+                // Gender Pie Chart
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Gender", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    val genderData = demographics.groupBy { d -> d.gender ?: "Other" }
+                        .mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
+                    
+                    val values = genderData.values.toList()
+                    val labels = genderData.keys.toList()
+                    val colors = listOf(Color(0xFF64B5F6), Color(0xFFF06292), Color(0xFF9E9E9E)).take(values.size)
+                    
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
+                        InfluencerDonutChart(values, colors, modifier = Modifier.fillMaxSize(), strokeWidth = 10.dp)
+                        Text("${values.sum().toInt()}%", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Legend for Gender
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        labels.forEachIndexed { index, label ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(8.dp).background(colors[index], CircleShape))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(label.replaceFirstChar { it.uppercase() }, fontSize = 10.sp, color = detailDarkerGray)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

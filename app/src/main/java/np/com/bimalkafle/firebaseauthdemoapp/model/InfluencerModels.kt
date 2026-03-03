@@ -17,7 +17,30 @@ data class InfluencerProfile(
     val availability: Boolean?,
     val logoUrl: String?,
     val averageRating: Float? = null,
-    val isVerified: Boolean? = false
+    val isVerified: Boolean? = false,
+    val youtubeInsights: YouTubeInsights? = null
+)
+
+data class YouTubeInsights(
+    val channelId: String?,
+    val title: String?,
+    val description: String?,
+    val subscribers: Int?,
+    val totalViews: Long?,
+    val totalVideos: Int?,
+    val demographics: List<YoutubeDemographics>?,
+    val revenue: YouTubeRevenue?,
+    val lastSynced: String?
+)
+
+data class YoutubeDemographics(
+    val ageGroup: String?,
+    val gender: String?,
+    val percentage: Float?
+)
+
+data class YouTubeRevenue(
+    val estimatedRevenue: Double?
 )
 
 data class AudienceInsights(

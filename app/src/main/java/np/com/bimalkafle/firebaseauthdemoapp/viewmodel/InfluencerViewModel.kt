@@ -223,6 +223,23 @@ class InfluencerViewModel : ViewModel() {
                         percentage
                       }
                     }
+                    youtubeInsights {
+                      channelId
+                      title
+                      description
+                      subscribers
+                      totalViews
+                      totalVideos
+                      demographics {
+                        ageGroup
+                        gender
+                        percentage
+                      }
+                      revenue {
+                        estimatedRevenue
+                      }
+                      lastSynced
+                    }
                     strengths
                     pricing {
                       platform
@@ -391,6 +408,44 @@ class InfluencerViewModel : ViewModel() {
             )
         }
 
+        val ytObj = obj.optJSONObject("youtubeInsights")
+        var youtubeInsights: YouTubeInsights? = null
+        if (ytObj != null) {
+            val demographics = mutableListOf<YoutubeDemographics>()
+            val demoArray = ytObj.optJSONArray("demographics")
+            if (demoArray != null) {
+                for (i in 0 until demoArray.length()) {
+                    val dObj = demoArray.optJSONObject(i)
+                    if (dObj != null) {
+                        demographics.add(
+                            YoutubeDemographics(
+                                ageGroup = dObj.optString("ageGroup"),
+                                gender = dObj.optString("gender"),
+                                percentage = dObj.optDouble("percentage").toFloat()
+                            )
+                        )
+                    }
+                }
+            }
+
+            val revenueObj = ytObj.optJSONObject("revenue")
+            val revenue = if (revenueObj != null) {
+                YouTubeRevenue(estimatedRevenue = revenueObj.optDouble("estimatedRevenue"))
+            } else null
+
+            youtubeInsights = YouTubeInsights(
+                channelId = ytObj.optString("channelId"),
+                title = ytObj.optString("title"),
+                description = ytObj.optString("description"),
+                subscribers = ytObj.optInt("subscribers"),
+                totalViews = ytObj.optLong("totalViews"),
+                totalVideos = ytObj.optInt("totalVideos"),
+                demographics = demographics,
+                revenue = revenue,
+                lastSynced = ytObj.optString("lastSynced")
+            )
+        }
+
         return InfluencerProfile(
             id = obj.optString("id", ""),
             email = obj.optString("email", ""),
@@ -406,7 +461,8 @@ class InfluencerViewModel : ViewModel() {
             pricing = pricingList,
             availability = if (obj.has("availability")) obj.optBoolean("availability") else null,
             logoUrl = obj.optString("logoUrl", null),
-            audienceInsights = audienceInsights
+            audienceInsights = audienceInsights,
+            youtubeInsights = youtubeInsights
         )
     }
 
