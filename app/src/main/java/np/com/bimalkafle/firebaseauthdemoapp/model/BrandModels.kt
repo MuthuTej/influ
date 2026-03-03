@@ -8,6 +8,28 @@ data class Data(
     val getCollaborations: List<Collaboration>
 )
 
+data class YouTubeVideoSummary(
+    val views: Int?,
+    val likes: Int?,
+    val comments: Int?,
+    val shares: Int?,
+    val watchTimeMinutes: Double?,
+    val subscribersGained: Int?,
+    val averageViewDurationSeconds: Int?,
+    val engagementRate: String?
+)
+
+data class YouTubeVideoData(
+    val videoId: String,
+    val title: String,
+    val viewCount: String?,
+    val likeCount: String?,
+    val thumbnail: String?,
+    val analytics: YouTubeVideoSummary?,
+    val videoUrl: String?,
+    val fetchedAt: String?
+)
+
 data class CollaborationAnalytics(
     val platform: String?,
     val duration: Int?,
@@ -55,7 +77,9 @@ data class Collaboration(
     val totalAmount: Double?,
     val brand: Brand? = null,
     val overallAnalytics: OverallAnalytics? = null,
-    val platformAnalytics: List<CollaborationAnalytics>? = null
+    val platformAnalytics: List<CollaborationAnalytics>? = null,
+    val yt: List<YouTubeVideoData>? = null,
+    val youtubeVideoId: String? = null
 )
 
 data class Campaign(
@@ -77,7 +101,11 @@ data class Pricing(
     val platform: String,
     val deliverable: String,
     val price: Int,
-    val currency: String
+    val currency: String,
+    val status: String? = null,
+    val totalAmount: Double? = null,
+    val updatedAt: String? = null,
+    val youtubeVideoId: String? = null
 )
 
 data class Influencer(

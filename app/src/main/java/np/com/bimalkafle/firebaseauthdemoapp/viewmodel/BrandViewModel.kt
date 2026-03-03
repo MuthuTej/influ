@@ -25,6 +25,8 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.Pricing
 import np.com.bimalkafle.firebaseauthdemoapp.model.PricingInfo
 import np.com.bimalkafle.firebaseauthdemoapp.model.PreferredPlatform
 import np.com.bimalkafle.firebaseauthdemoapp.model.TargetAudience
+import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeVideoData
+import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeVideoSummary
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
 import np.com.bimalkafle.firebaseauthdemoapp.network.BrandRepository
 import org.json.JSONArray
@@ -856,6 +858,25 @@ class BrandViewModel : ViewModel() {
                       views
                       retweets
                     }
+                    yt {
+                      videoId
+                      title
+                      viewCount
+                      likeCount
+                      thumbnail
+                      videoUrl
+                      fetchedAt
+                      analytics {
+                        views
+                        likes
+                        comments
+                        shares
+                        watchTimeMinutes
+                        subscribersGained
+                        averageViewDurationSeconds
+                        engagementRate
+                      }
+                    }
                   }
                 }
             """.trimIndent()
@@ -1050,6 +1071,41 @@ class BrandViewModel : ViewModel() {
                 pList
             } else null
 
+            val ytArray = obj.optJSONArray("yt")
+            val ytList = if (ytArray != null) {
+                val list = mutableListOf<YouTubeVideoData>()
+                for (j in 0 until ytArray.length()) {
+                    val yObj = ytArray.optJSONObject(j) ?: continue
+                    val aObj = yObj.optJSONObject("analytics")
+                    val summary = if (aObj != null) {
+                        YouTubeVideoSummary(
+                            views = if (aObj.isNull("views")) null else aObj.optInt("views"),
+                            likes = if (aObj.isNull("likes")) null else aObj.optInt("likes"),
+                            comments = if (aObj.isNull("comments")) null else aObj.optInt("comments"),
+                            shares = if (aObj.isNull("shares")) null else aObj.optInt("shares"),
+                            watchTimeMinutes = if (aObj.isNull("watchTimeMinutes")) null else aObj.optDouble("watchTimeMinutes"),
+                            subscribersGained = if (aObj.isNull("subscribersGained")) null else aObj.optInt("subscribersGained"),
+                            averageViewDurationSeconds = if (aObj.isNull("averageViewDurationSeconds")) null else aObj.optInt("averageViewDurationSeconds"),
+                            engagementRate = aObj.optString("engagementRate", null)
+                        )
+                    } else null
+
+                    list.add(
+                        YouTubeVideoData(
+                            videoId = yObj.optString("videoId"),
+                            title = yObj.optString("title"),
+                            viewCount = yObj.optString("viewCount", null),
+                            likeCount = yObj.optString("likeCount", null),
+                            thumbnail = yObj.optString("thumbnail", null),
+                            analytics = summary,
+                            videoUrl = yObj.optString("videoUrl", null),
+                            fetchedAt = yObj.optString("fetchedAt", null)
+                        )
+                    )
+                }
+                list
+            } else null
+
             list.add(
                 Collaboration(
                     id = obj.optString("id"),
@@ -1071,7 +1127,8 @@ class BrandViewModel : ViewModel() {
                     finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
                     totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount"),
                     overallAnalytics = overallAnalytics,
-                    platformAnalytics = platformAnalytics
+                    platformAnalytics = platformAnalytics,
+                    yt = ytList
                 )
             )
         }

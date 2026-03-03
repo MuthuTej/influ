@@ -514,6 +514,49 @@ class InfluencerViewModel : ViewModel() {
                     advancePaid
                     finalPaid
                     totalAmount
+                    overallAnalytics {
+                      impressions
+                      clicks
+                      likes
+                      comments
+                      shares
+                      saves
+                      views
+                      retweets
+                    }
+                    platformAnalytics {
+                      platform
+                      duration
+                      cost
+                      impressions
+                      clicks
+                      likes
+                      comments
+                      shares
+                      saves
+                      views
+                      retweets
+                    }
+                    youtubeVideoId
+                    yt {
+                      videoId
+                      title
+                      viewCount
+                      likeCount
+                      thumbnail
+                      videoUrl
+                      fetchedAt
+                      analytics {
+                        views
+                        likes
+                        comments
+                        shares
+                        watchTimeMinutes
+                        subscribersGained
+                        averageViewDurationSeconds
+                        engagementRate
+                      }
+                    }
                   }
                 }
             """.trimIndent()
@@ -659,9 +702,6 @@ class InfluencerViewModel : ViewModel() {
                 Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null)
             }
 
-            // Influencer object is not returned in this query based on user request, creating a dummy or handling nulls if needed.
-            // Actually the query in user request DOES NOT have influencer field in GetCollaborations for InfluencerHomePage.
-            // But Collaboration model needs it. We can create a partial one or empty one.
             val influencer = Influencer("Me", null, null, null)
             
             val brandObj = obj.optJSONObject("brand")
@@ -705,6 +745,83 @@ class InfluencerViewModel : ViewModel() {
                 }
             }
 
+            val oaObj = obj.optJSONObject("overallAnalytics")
+            val overallAnalytics = if (oaObj != null) {
+                OverallAnalytics(
+                    impressions = if (oaObj.isNull("impressions")) null else oaObj.optInt("impressions"),
+                    clicks = if (oaObj.isNull("clicks")) null else oaObj.optInt("clicks"),
+                    likes = if (oaObj.isNull("likes")) null else oaObj.optInt("likes"),
+                    comments = if (oaObj.isNull("comments")) null else oaObj.optInt("comments"),
+                    shares = if (oaObj.isNull("shares")) null else oaObj.optInt("shares"),
+                    saves = if (oaObj.isNull("saves")) null else oaObj.optInt("saves"),
+                    views = if (oaObj.isNull("views")) null else oaObj.optInt("views"),
+                    retweets = if (oaObj.isNull("retweets")) null else oaObj.optInt("retweets"),
+                    replies = null
+                )
+            } else null
+
+            val paArray = obj.optJSONArray("platformAnalytics")
+            val platformAnalytics = if (paArray != null) {
+                val pList = mutableListOf<CollaborationAnalytics>()
+                for (j in 0 until paArray.length()) {
+                    val pObj = paArray.optJSONObject(j)
+                    if (pObj != null) {
+                        pList.add(
+                            CollaborationAnalytics(
+                                platform = pObj.optString("platform"),
+                                duration = if (pObj.isNull("duration")) null else pObj.optInt("duration"),
+                                cost = if (pObj.isNull("cost")) null else pObj.optDouble("cost").toFloat(),
+                                impressions = if (pObj.isNull("impressions")) null else pObj.optInt("impressions"),
+                                clicks = if (pObj.isNull("clicks")) null else pObj.optInt("clicks"),
+                                likes = if (pObj.isNull("likes")) null else pObj.optInt("likes"),
+                                comments = if (pObj.isNull("comments")) null else pObj.optInt("comments"),
+                                shares = if (pObj.isNull("shares")) null else pObj.optInt("shares"),
+                                saves = if (pObj.isNull("saves")) null else pObj.optInt("saves"),
+                                views = if (pObj.isNull("views")) null else pObj.optInt("views"),
+                                retweets = if (pObj.isNull("retweets")) null else pObj.optInt("retweets"),
+                                replies = null
+                            )
+                        )
+                    }
+                }
+                pList
+            } else null
+
+            val ytArray = obj.optJSONArray("yt")
+            val ytList = if (ytArray != null) {
+                val list = mutableListOf<YouTubeVideoData>()
+                for (j in 0 until ytArray.length()) {
+                    val yObj = ytArray.optJSONObject(j) ?: continue
+                    val aObj = yObj.optJSONObject("analytics")
+                    val summary = if (aObj != null) {
+                        YouTubeVideoSummary(
+                            views = if (aObj.isNull("views")) null else aObj.optInt("views"),
+                            likes = if (aObj.isNull("likes")) null else aObj.optInt("likes"),
+                            comments = if (aObj.isNull("comments")) null else aObj.optInt("comments"),
+                            shares = if (aObj.isNull("shares")) null else aObj.optInt("shares"),
+                            watchTimeMinutes = if (aObj.isNull("watchTimeMinutes")) null else aObj.optDouble("watchTimeMinutes"),
+                            subscribersGained = if (aObj.isNull("subscribersGained")) null else aObj.optInt("subscribersGained"),
+                            averageViewDurationSeconds = if (aObj.isNull("averageViewDurationSeconds")) null else aObj.optInt("averageViewDurationSeconds"),
+                            engagementRate = aObj.optString("engagementRate", null)
+                        )
+                    } else null
+
+                    list.add(
+                        YouTubeVideoData(
+                            videoId = yObj.optString("videoId"),
+                            title = yObj.optString("title"),
+                            viewCount = yObj.optString("viewCount", null),
+                            likeCount = yObj.optString("likeCount", null),
+                            thumbnail = yObj.optString("thumbnail", null),
+                            analytics = summary,
+                            videoUrl = yObj.optString("videoUrl", null),
+                            fetchedAt = yObj.optString("fetchedAt", null)
+                        )
+                    )
+                }
+                list
+            } else null
+
             list.add(
                 Collaboration(
                     id = obj.optString("id"),
@@ -724,7 +841,11 @@ class InfluencerViewModel : ViewModel() {
                     advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),
                     finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
                     totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount"),
-                    brand = brand
+                    brand = brand,
+                    overallAnalytics = overallAnalytics,
+                    platformAnalytics = platformAnalytics,
+                    yt = ytList,
+                    youtubeVideoId = obj.optString("youtubeVideoId", null)
                 )
             )
         }
