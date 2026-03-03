@@ -43,6 +43,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.delay
 
 
 @Composable
@@ -82,12 +83,19 @@ fun ChatScreen(
         if (authState.value is AuthState.Authenticated) {
             val role = (authState.value as AuthState.Authenticated).role
             isBrand = role.equals("BRAND", ignoreCase = true)
-            
-            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-                result.token?.let { token ->
-                    if (isBrand) brandViewModel.fetchCollaborations(token)
-                    else influencerViewModel.fetchCollaborations(token)
+        }
+    }
+
+    LaunchedEffect(authState.value, isBrand) {
+        if (authState.value is AuthState.Authenticated) {
+            while (true) {
+                FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { result ->
+                    result.token?.let { token ->
+                        if (isBrand) brandViewModel.fetchCollaborations(token)
+                        else influencerViewModel.fetchCollaborations(token)
+                    }
                 }
+                delay(5000)
             }
         }
     }
