@@ -26,6 +26,7 @@ import androidx.compose.ui.window.Dialog
 @Composable
 fun RestrictedActionPanel(
     status: String?,
+    collaborationId: String?,
     isBrand: Boolean,
     onSend: (String, String, Map<String, Any>) -> Unit,
     onStatusUpdate: (String) -> Unit = {}
@@ -40,12 +41,17 @@ fun RestrictedActionPanel(
     if (status == null) return
 
     val statusMessage = when (status) {
-        "ACCEPTED" -> "Waiting for brand to send brief"
-        "BRIEF_SENT" -> "Waiting for brief approval"
-        "BRIEF_FINALIZED" -> "Waiting for influencer to send script"
-        "SCRIPT_SENT" -> "Waiting for script approval"
         "PENDING" -> "Waiting for proposal acceptance"
         "NEGOTIATION" -> "Negotiation in progress"
+        "ACCEPTED" -> "Waiting for campaign brief"
+        "BRIEF_SENT" -> "Brief sent, waiting for approval"
+        "BRIEF_FINALIZED" -> "Brief finalized, waiting for script"
+        "SCRIPT_SENT" -> "Script sent, waiting for approval"
+        "IN_PROGRESS" -> "Collaboration in progress"
+        "WAITING_FOR_PAYMENT" -> "Waiting for payment"
+        "COMPLETED" -> "Collaboration completed"
+        "REJECTED" -> "Proposal rejected"
+        "REVOKED" -> "Proposal withdrawn"
         else -> status.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
     }
 
@@ -117,11 +123,17 @@ fun RestrictedActionPanel(
                 
                 // Implementation Phase
                 if (status == "IN_PROGRESS" && !isBrand) {
-                    item { ActionCard("Upload", Icons.Default.CloudUpload) { showUpload = true } }
+                    item { ActionCard("Complete Work", Icons.Default.CloudUpload) { showUpload = true } }
+                }
+                
+                if (status == "WAITING_FOR_PAYMENT" && isBrand) {
+                    item { ActionCard("Release Payment", Icons.Default.Payments) { onStatusUpdate("COMPLETED") } }
                 }
 
-                // Always available
-                item { ActionCard("Feedback", Icons.Default.Feedback) { showFeedback = true } }
+                // Always available (except when completed)
+                if (status != "COMPLETED" && status != "REJECTED" && status != "REVOKED") {
+                    item { ActionCard("Feedback", Icons.Default.Feedback) { showFeedback = true } }
+                }
             }
         }
     }
@@ -132,6 +144,7 @@ fun RestrictedActionPanel(
             onDismiss = { showNegotiation = false },
             onSend = { amount ->
                 onSend("Proposed Budget: $$amount", "NEGOTIATION", mapOf("amount" to amount))
+                onStatusUpdate("NEGOTIATION")
                 showNegotiation = false
             }
         )
@@ -143,6 +156,7 @@ fun RestrictedActionPanel(
             onSend = { deliverables ->
                 val text = "Deliverables: ${deliverables.entries.joinToString { "${it.key} (x${it.value})" }}"
                 onSend(text, "DELIVERABLES", mapOf("items" to deliverables))
+                onStatusUpdate("NEGOTIATION")
                 showDeliverables = false
             }
         )
@@ -190,11 +204,12 @@ fun RestrictedActionPanel(
 
     if (showUpload) {
         TextInputDialog(
-            title = "Upload Content",
+            title = "Mark as Completed",
             label = "Final Content Link",
             onDismiss = { showUpload = false },
             onSend = { link ->
-                onSend("Content Uploaded", "UPLOAD", mapOf("link" to link))
+                onSend("Work Completed. Final Link: $link", "UPLOAD", mapOf("link" to link))
+                onStatusUpdate("WAITING_FOR_PAYMENT")
                 showUpload = false
             }
         )
