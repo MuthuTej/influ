@@ -537,7 +537,6 @@ class InfluencerViewModel : ViewModel() {
                       views
                       retweets
                     }
-                    youtubeVideoId
                     yt {
                       videoId
                       title
@@ -844,8 +843,7 @@ class InfluencerViewModel : ViewModel() {
                     brand = brand,
                     overallAnalytics = overallAnalytics,
                     platformAnalytics = platformAnalytics,
-                    yt = ytList,
-                    youtubeVideoId = obj.optString("youtubeVideoId", null)
+                    yt = ytList
                 )
             )
         }

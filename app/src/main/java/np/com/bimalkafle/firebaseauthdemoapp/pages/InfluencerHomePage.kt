@@ -100,7 +100,6 @@ fun InfluencerHomePage(
     var selectedPlatform by remember { mutableStateOf("YouTube") }
     val platforms = listOf("YouTube", "Instagram", "Facebook")
 
-    // Filter campaigns based on selected platform
     val filteredCampaigns = remember(selectedPlatform, campaigns) {
         campaigns.filter { campaign ->
             val matchesInCampaign = campaign.platforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
@@ -141,13 +140,23 @@ fun InfluencerHomePage(
 
                 item { InfluencerHeaderAndReachSection(influencerProfile, navController, unreadCount) }
 
+                // Checklist item for debugging
+                item {
+                    FetchStatusChecklist(
+                        influencerId = influencerProfile?.id,
+                        tokenPresent = firebaseToken != null,
+                        collabCount = collaborations.size,
+                        error = error
+                    )
+                }
+
                 item {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 16.dp)
                     ) {
-                        ActiveCollaborationsSection(collaborations)
+                        ActiveCollaborationsSection(collaborations, navController)
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
@@ -241,6 +250,50 @@ fun InfluencerHomePage(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun FetchStatusChecklist(
+    influencerId: String?,
+    tokenPresent: Boolean,
+    collabCount: Int,
+    error: String?
+) {
+    if (error == null && collabCount > 0) return // Hide if everything is fine and data exists
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
+        border = BorderStroke(1.dp, Color(0xFFFFB74D))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Debug: Fetch Status", fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
+            Spacer(modifier = Modifier.height(8.dp))
+            StatusItem("Influencer ID Detected", influencerId != null)
+            StatusItem("Auth Token Present", tokenPresent)
+            StatusItem("Collaborations Count", collabCount > 0, suffix = ": $collabCount")
+            if (error != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Error: $error", color = Color.Red, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun StatusItem(label: String, success: Boolean, suffix: String = "") {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            if (success) Icons.Default.CheckCircle else Icons.Default.Cancel,
+            contentDescription = null,
+            tint = if (success) Color(0xFF4CAF50) else Color.Red,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = "$label$suffix", fontSize = 14.sp)
     }
 }
 
@@ -488,7 +541,7 @@ private fun InfluencerStatChip(label: String, value: String, modifier: Modifier 
 }
 
 @Composable
-fun ActiveCollaborationsSection(collaborations: List<Collaboration>) {
+fun ActiveCollaborationsSection(collaborations: List<Collaboration>, navController: NavController) {
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -571,6 +624,9 @@ fun ActiveCollaborationsSection(collaborations: List<Collaboration>) {
                         modifier = Modifier
                             .width(300.dp)
                             .fillMaxHeight()
+                            .clickable {
+                                navController.navigate("collaboration_analytics/${collaboration.id}")
+                            }
                     ) {
                         CollaborationItem(
                             brandName = collaboration.brand?.name ?: "Brand",
@@ -728,7 +784,7 @@ fun CampaignCardInfluencer(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
         modifier = modifier.clickable { onCardClick() }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
