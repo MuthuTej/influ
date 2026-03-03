@@ -2,6 +2,7 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,11 +65,30 @@ fun InfluencerCreateProposal(
     var selectedCampaignId by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     
-    val platforms = listOf("Instagram", "Facebook", "YouTube")
+    // Get target platforms from the selected campaign
+    val selectedCampaign = remember(selectedCampaignId, myCampaigns) {
+        myCampaigns.find { it.id == selectedCampaignId }
+    }
+    
+    val targetPlatforms = remember(selectedCampaign) {
+        selectedCampaign?.platforms?.map { it.platform } ?: emptyList()
+    }
+    
+    // Get target deliverables (formats) from the selected campaign
+    val targetDeliverables = remember(selectedCampaign) {
+        selectedCampaign?.platforms?.flatMap { it.formats ?: emptyList() }?.distinct() ?: emptyList()
+    }
+    
     val selectedPlatforms = remember { mutableStateListOf<String>() }
-    val deliverables = listOf("Post", "Reels", "Story", "Videos")
-    var deliverableQuantities by remember { mutableStateOf(deliverables.associateWith { 0 }) }
+    var deliverableQuantities by remember { mutableStateOf(emptyMap<String, Int>()) }
     var pricing by remember { mutableStateOf(mapOf<String, Map<String, String>>()) }
+
+    // Synchronize selectedPlatforms and deliverables when campaign changes
+    LaunchedEffect(selectedCampaignId) {
+        selectedPlatforms.clear()
+        deliverableQuantities = targetDeliverables.associateWith { 0 }
+        pricing = emptyMap()
+    }
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
@@ -165,7 +185,7 @@ fun InfluencerCreateProposal(
 
             Text("Campaign", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
             var campaignExpanded by remember { mutableStateOf(false) }
-            val selectedCampaignTitle = myCampaigns.find { it.id == selectedCampaignId }?.title ?: "Select Campaign"
+            val selectedCampaignTitle = selectedCampaign?.title ?: "Select Campaign"
             
             ExposedDropdownMenuBox(expanded = campaignExpanded, onExpandedChange = { campaignExpanded = !campaignExpanded }) {
                 OutlinedTextField(
@@ -197,62 +217,66 @@ fun InfluencerCreateProposal(
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Platform", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-            FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                platforms.forEach { platform ->
-                    val isSelected = selectedPlatforms.contains(platform)
-                    val icon = when (platform) {
-                        "Instagram" -> painterResource(id = R.drawable.ic_instagram)
-                        "Facebook" -> painterResource(id = R.drawable.ic_facebook)
-                        "YouTube" -> painterResource(id = R.drawable.ic_youtube)
-                        else -> null
-                    }
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { if (isSelected) selectedPlatforms.remove(platform) else selectedPlatforms.add(platform) },
-                        label = { Text(platform) },
-                        leadingIcon = {
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "$platform selected",
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            } else if (icon != null) {
-                                Image(
-                                    painter = icon,
-                                    contentDescription = "$platform logo",
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+            if (targetPlatforms.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Target Platform", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    targetPlatforms.forEach { platform ->
+                        val isSelected = selectedPlatforms.contains(platform)
+                        val icon = when (platform.lowercase()) {
+                            "instagram" -> painterResource(id = R.drawable.ic_instagram)
+                            "facebook" -> painterResource(id = R.drawable.ic_facebook)
+                            "youtube" -> painterResource(id = R.drawable.ic_youtube)
+                            else -> null
                         }
-                    )
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { if (isSelected) selectedPlatforms.remove(platform) else selectedPlatforms.add(platform) },
+                            label = { Text(platform) },
+                            leadingIcon = {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "$platform selected",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                } else if (icon != null) {
+                                    Image(
+                                        painter = icon,
+                                        contentDescription = "$platform logo",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Deliverables Offered", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                deliverables.forEach { deliverable ->
-                    DeliverableRow(
-                        deliverable = deliverable,
-                        quantity = deliverableQuantities[deliverable] ?: 0,
-                        onQuantityChange = { quantity ->
-                            deliverableQuantities = deliverableQuantities.toMutableMap().apply {
-                                this[deliverable] = quantity
+            if (targetDeliverables.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Deliverables Offered", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    targetDeliverables.forEach { deliverable ->
+                        DeliverableRow(
+                            deliverable = deliverable,
+                            quantity = deliverableQuantities[deliverable] ?: 0,
+                            onQuantityChange = { quantity ->
+                                deliverableQuantities = deliverableQuantities.toMutableMap().apply {
+                                    this[deliverable] = quantity
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
             Text("Pricing", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
 
-            val selectedDeliverables = deliverableQuantities.filter { it.value > 0 }.keys.toList()
+            val selectedDeliverablesList = deliverableQuantities.filter { it.value > 0 }.keys.toList()
 
-            if (selectedPlatforms.isNotEmpty() && selectedDeliverables.isNotEmpty()) {
+            if (selectedPlatforms.isNotEmpty() && selectedDeliverablesList.isNotEmpty()) {
                 selectedPlatforms.forEach { platform ->
                     Column(
                         modifier = Modifier
@@ -260,10 +284,10 @@ fun InfluencerCreateProposal(
                             .padding(bottom = 12.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            val icon = when (platform) {
-                                "Instagram" -> painterResource(id = R.drawable.ic_instagram)
-                                "Facebook" -> painterResource(id = R.drawable.ic_facebook)
-                                "YouTube" -> painterResource(id = R.drawable.ic_youtube)
+                            val icon = when (platform.lowercase()) {
+                                "instagram" -> painterResource(id = R.drawable.ic_instagram)
+                                "facebook" -> painterResource(id = R.drawable.ic_facebook)
+                                "youtube" -> painterResource(id = R.drawable.ic_youtube)
                                 else -> null
                             }
                             if (icon != null) {
@@ -275,10 +299,13 @@ fun InfluencerCreateProposal(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        val platformDeliverables = when (platform) {
-                            "Instagram" -> selectedDeliverables.filter { it != "Video" }
-                            "YouTube" -> selectedDeliverables.filter { it != "Story" && it != "Post" }
-                            else -> selectedDeliverables
+                        // Filter deliverables specifically allowed for this platform in the campaign
+                        val platformAllowedDeliverables = selectedCampaign?.platforms
+                            ?.find { it.platform.equals(platform, ignoreCase = true) }
+                            ?.formats ?: emptyList()
+
+                        val platformDeliverables = selectedDeliverablesList.filter { 
+                            platformAllowedDeliverables.any { allowed -> it.equals(allowed, ignoreCase = true) }
                         }
 
                         if (platformDeliverables.isNotEmpty()) {
@@ -304,7 +331,7 @@ fun InfluencerCreateProposal(
                             }
                         } else {
                             Text(
-                                text = "No applicable deliverables selected for this platform.",
+                                text = "No applicable deliverables selected for $platform in this campaign.",
                                 color = Color.Gray,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier
@@ -404,11 +431,11 @@ fun DeliverableRow(deliverable: String, quantity: Int, onQuantityChange: (Int) -
     var expanded by remember { mutableStateOf(false) }
     val quantityOptions = (0..10).toList()
 
-    val iconRes = when (deliverable) {
-        "Post" -> R.drawable.brand2 // Replace with actual icons
-        "Reels" -> R.drawable.brand2
-        "Story" -> R.drawable.brand2
-        "Videos" -> R.drawable.brand2
+    val iconRes = when (deliverable.lowercase()) {
+        "post" -> R.drawable.brand2 // Replace with actual icons if available
+        "reels" -> R.drawable.brand2
+        "story" -> R.drawable.brand2
+        "videos" -> R.drawable.brand2
         else -> R.drawable.brand2
     }
 
@@ -456,10 +483,5 @@ fun DeliverableRow(deliverable: String, quantity: Int, onQuantityChange: (Int) -
 @Preview(showBackground = true)
 @Composable
 fun InfluencerCreateProposalPreview() {
-    InfluencerCreateProposal(
-        onBack = {}, onCreateProposal = {},
-        influencerId = TODO(),
-        brandViewModel = TODO(),
-        authViewModel = TODO()
-    )
+    // Note: This preview requires dummy data for the ViewModels and influencerId.
 }
