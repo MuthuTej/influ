@@ -46,7 +46,6 @@ import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
-import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -60,8 +59,7 @@ fun InfluencerHomePage(
     navController: NavController,
     authViewModel: AuthViewModel,
     influencerViewModel: InfluencerViewModel,
-    campaignViewModel: CampaignViewModel,
-    notificationViewModel: NotificationViewModel
+    campaignViewModel: CampaignViewModel
 ) {
     val authState = authViewModel.authState.observeAsState()
     val collaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
@@ -71,18 +69,16 @@ fun InfluencerHomePage(
     val influencerProfile by influencerViewModel.influencerProfile.observeAsState()
     val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
-    val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
 
     LaunchedEffect(Unit) {
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        currentUser?.getIdToken(true)
+        FirebaseAuth.getInstance().currentUser
+            ?.getIdToken(true)
             ?.addOnSuccessListener { result ->
                 firebaseToken = result.token
                 firebaseToken?.let { token ->
                     influencerViewModel.fetchInfluencerDetails(token)
                     influencerViewModel.fetchCollaborations(token)
                     campaignViewModel.fetchCampaigns(token)
-                    notificationViewModel.fetchUnreadCount(currentUser.uid, token)
                 }
             }
     }
@@ -96,14 +92,32 @@ fun InfluencerHomePage(
     }
 
     var selectedBottomNavItem by remember { mutableStateOf("Home") }
+    var selectedPlatform by remember { mutableStateOf("YouTube") }
+    val platforms = listOf("YouTube", "Instagram", "Facebook")
+
+    // Filter campaigns based on selected platform
+    val filteredCampaigns = remember(selectedPlatform, campaigns) {
+        campaigns.filter { campaign ->
+            val matchesInCampaign = campaign.platforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
+            val matchesInBrand = campaign.brand?.preferredPlatforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
+            matchesInCampaign || matchesInBrand
+        }.take(10)
+    }
 
     Scaffold(
         bottomBar = {
-            CmnBottomNavigationBar(
-                selectedItem = selectedBottomNavItem,
-                onItemSelected = { selectedBottomNavItem = it },
-                navController = navController
-            )
+            Surface(
+                color = Color.White,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.navigationBarsPadding()) {
+                    CmnBottomNavigationBar(
+                        selectedItem = selectedBottomNavItem,
+                        onItemSelected = { selectedBottomNavItem = it },
+                        navController = navController
+                    )
+                }
+            }
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
@@ -120,7 +134,11 @@ fun InfluencerHomePage(
                     .background(Color.White)
             ) {
 
-                item { InfluencerHeaderAndReachSection(influencerProfile, navController, unreadCount) }
+                item { 
+                    Box(modifier = Modifier.background(brandThemeColor)) {
+                        InfluencerHeaderAndReachSection(influencerProfile, navController) 
+                    }
+                }
 
                 item {
                     Column(
@@ -129,27 +147,86 @@ fun InfluencerHomePage(
                             .padding(top = 16.dp)
                     ) {
                         ActiveCollaborationsSection(collaborations)
-                        TopPicksSectionInfluencer()
-                    }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Top Picks",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                }
-                items(campaigns.take(10)) { campaign ->
-                    CampaignCardInfluencer(
-                        campaign = campaign,
-                        isWishlisted = wishlistedCampaigns.any { it.id == campaign.id },
-                        onWishlistToggle = { 
-                            firebaseToken?.let { token ->
-                                campaignViewModel.toggleWishlist(campaign, token)
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        ) {
+                            TabRow(
+                                selectedTabIndex = platforms.indexOf(selectedPlatform),
+                                containerColor = Color.Transparent,
+                                indicator = { tabPositions ->
+                                    TabRowDefaults.SecondaryIndicator(
+                                        modifier = Modifier.tabIndicatorOffset(tabPositions[platforms.indexOf(selectedPlatform)]),
+                                        color = brandThemeColor
+                                    )
+                                }
+                            ) {
+                                platforms.forEach { platform ->
+                                    val iconRes = when (platform) {
+                                        "YouTube" -> R.drawable.ic_youtube
+                                        "Instagram" -> R.drawable.ic_instagram
+                                        "Facebook" -> R.drawable.ic_facebook
+                                        else -> R.drawable.ic_youtube
+                                    }
+                                    Tab(
+                                        selected = selectedPlatform == platform,
+                                        onClick = { selectedPlatform = platform },
+                                        icon = {
+                                            Icon(
+                                                painter = painterResource(id = iconRes),
+                                                contentDescription = platform,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+                                    )
+                                }
                             }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        onCardClick = {
-                             navController.navigate("campaign_detail/${campaign.id}")
                         }
-                    )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                 }
+
+                if (filteredCampaigns.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("No campaigns found for $selectedPlatform", color = Color.Gray)
+                        }
+                    }
+                } else {
+                    items(filteredCampaigns) { campaign ->
+                        CampaignCardInfluencer(
+                            campaign = campaign,
+                            isWishlisted = wishlistedCampaigns.any { it.id == campaign.id },
+                            onWishlistToggle = { 
+                                firebaseToken?.let { token ->
+                                    campaignViewModel.toggleWishlist(campaign, token)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            onCardClick = {
+                                 navController.navigate("campaign_detail/${campaign.id}")
+                            }
+                        )
+                    }
+                }
+
                 item {
                     Spacer(modifier = Modifier.height(40.dp))
                     Button(
@@ -167,7 +244,7 @@ fun InfluencerHomePage(
 }
 
 @Composable
-fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navController: NavController, unreadCount: Int) {
+fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navController: NavController) {
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -193,7 +270,8 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 40.dp, start = 16.dp, end = 16.dp),
+                    .statusBarsPadding()
+                    .padding(top = 16.dp, start = 16.dp, end = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
@@ -240,23 +318,11 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                     onClick = { navController.navigate("wishlist") }
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                
-                Box {
-                    IconBubbleInfluencer(
-                        icon = Icons.Default.Notifications,
-                        tint = Color.Black,
-                        onClick = { navController.navigate("notifications") }
-                    )
-                    if (unreadCount > 0) {
-                        Badge(
-                            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-                            containerColor = Color.Red,
-                            contentColor = Color.White
-                        ) {
-                            Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
-                        }
-                    }
-                }
+                IconBubbleInfluencer(
+                    icon = Icons.Default.Notifications,
+                    tint = Color.Black,
+                    onClick = { /* TODO: Navigate to Notifications */ }
+                )
             }
         }
 
@@ -435,7 +501,7 @@ fun ActiveCollaborationsSection(collaborations: List<Collaboration>) {
                 text = "No active collaborations found.",
                 fontStyle = FontStyle.Italic,
                 color = Color.Gray,
-                modifier = Modifier.padding(8.dp)
+                modifier = Modifier.padding(16.dp)
             )
         } else {
             val configuration = LocalConfiguration.current
@@ -452,7 +518,7 @@ fun ActiveCollaborationsSection(collaborations: List<Collaboration>) {
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(finalHeight)
+                    .height(finalHeight + 20.dp)
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -631,54 +697,6 @@ fun CollaborationItem(
 }
 
 @Composable
-fun TopPicksSectionInfluencer() {
-    var selectedPlatform by remember { mutableStateOf("YouTube") }
-    val platforms = listOf("YouTube", "Instagram", "Facebook")
-
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Top Picks", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            TabRow(
-                selectedTabIndex = platforms.indexOf(selectedPlatform),
-                containerColor = Color.Transparent,
-                indicator = {
-                    TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(it[platforms.indexOf(selectedPlatform)]),
-                        color = brandThemeColor
-                    )
-                }
-            ) {
-                platforms.forEach { platform ->
-                    val iconRes = when (platform) {
-                        "YouTube" -> R.drawable.ic_youtube
-                        "Instagram" -> R.drawable.ic_instagram
-                        "Facebook" -> R.drawable.ic_facebook
-                        else -> R.drawable.ic_youtube
-                    }
-                    Tab(
-                        selected = selectedPlatform == platform,
-                        onClick = { selectedPlatform = platform },
-                        icon = {
-                            Icon(
-                                painter = painterResource(id = iconRes),
-                                contentDescription = platform,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun CampaignCardInfluencer(
     campaign: CampaignDetail,
     isWishlisted: Boolean = false,
@@ -769,8 +787,27 @@ fun CampaignCardInfluencer(
                         fontSize = 12.sp,
                         color = Color.Gray
                     )
+                    
+                    val formatBudget = { amount: Int? ->
+                        when {
+                            amount == null -> "-"
+                            amount >= 10000 -> "${amount / 1000}k"
+                            else -> amount.toString()
+                        }
+                    }
+                    
+                    val budgetRange = when {
+                        campaign.budgetMin != null && campaign.budgetMax != null -> {
+                            val min = formatBudget(campaign.budgetMin)
+                            val max = formatBudget(campaign.budgetMax)
+                            "₹ $min - ₹ $max"
+                        }
+                        campaign.budgetMin != null -> "₹ ${formatBudget(campaign.budgetMin)}+"
+                        else -> "N/A"
+                    }
+                    
                     Text(
-                        text = "${campaign.budgetMin ?: "-"} - ${campaign.budgetMax ?: "-"}",
+                        text = budgetRange,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
