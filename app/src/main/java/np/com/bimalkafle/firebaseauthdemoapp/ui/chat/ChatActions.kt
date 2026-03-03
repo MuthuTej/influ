@@ -29,6 +29,7 @@ fun RestrictedActionPanel(
     collaborationId: String?,
     isBrand: Boolean,
     onSend: (String, String, Map<String, Any>) -> Unit,
+    onSendUpload: (String) -> Unit = {},
     onStatusUpdate: (String) -> Unit = {}
 ) {
     var showNegotiation by remember { mutableStateOf(false) }
@@ -208,7 +209,7 @@ fun RestrictedActionPanel(
             label = "Final Content Link",
             onDismiss = { showUpload = false },
             onSend = { link ->
-                onSend("Work Completed. Final Link: $link", "UPLOAD", mapOf("link" to link))
+                onSendUpload(link)
                 onStatusUpdate("WAITING_FOR_PAYMENT")
                 showUpload = false
             }
