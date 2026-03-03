@@ -46,8 +46,16 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
+import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.imePadding
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.Scope
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
@@ -81,6 +89,77 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     var profileUrls by remember { mutableStateOf(mapOf<String, String>()) }
     var pricing by remember { mutableStateOf(mapOf<String, Map<String, String>>()) }
 
+    // --- YouTube Connection State ---
+    var isYouTubeConnecting by remember { mutableStateOf(false) }
+    var isYouTubeConnected by remember { mutableStateOf(false) }
+    var youtubeAuthCode by remember { mutableStateOf<String?>(null) }
+
+    // --- Google Sign-In Launcher for Activity Result ---
+    val youtubeAuthLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        Log.d("InfluencerRegistration", "YouTube Connect launcher result code: ${result.resultCode}")
+        if (result.resultCode == Activity.RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                // Get the signed-in account details
+                val account = task.getResult(ApiException::class.java)
+                val authCode = account?.serverAuthCode
+                Log.d("InfluencerRegistration", "Account email: ${account?.email}")
+                Log.d("InfluencerRegistration", "Server Auth Code: $authCode")
+
+                if (authCode != null) {
+                    youtubeAuthCode = authCode
+
+                    coroutineScope.launch {
+                        val firebaseUser = FirebaseAuth.getInstance().currentUser
+                        Log.d("InfluencerRegistration", "Firebase User UID: ${firebaseUser?.uid}")
+                        firebaseUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                            val idToken = result.token
+                            Log.d("InfluencerRegistration", "ID Token retrieved: ${if (idToken != null) "Success" else "Null"}")
+
+                            if (idToken != null) {
+                                coroutineScope.launch {
+                                    Log.d("InfluencerRegistration", "Calling BackendRepository.connectYouTube...")
+                                    val response = BackendRepository.connectYouTube(authCode, idToken)
+
+                                    response.onSuccess {
+                                        Log.d("InfluencerRegistration", "connectYouTube SUCCESS")
+                                        isYouTubeConnected = true
+                                        Toast.makeText(
+                                            context,
+                                            "YouTube Connected & Saved",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }.onFailure {
+                                        Log.e("InfluencerRegistration", "connectYouTube FAILURE: ${it.message}", it)
+                                        Toast.makeText(
+                                            context,
+                                            "Failed: ${it.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            }
+                        }?.addOnFailureListener {
+                            Log.e("InfluencerRegistration", "Failed to get Firebase ID Token", it)
+                        }
+                    }
+                } else {
+                    Log.w("InfluencerRegistration", "Auth Code is NULL")
+                    Toast.makeText(context, "Failed to get server auth code", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: ApiException) {
+                // Handling API exception during Google Sign In
+                Log.e("InfluencerRegistration", "Google Sign-In ApiException: status code ${e.statusCode}, message: ${e.message}", e)
+                Toast.makeText(context, "YouTube Connect failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+             Log.d("InfluencerRegistration", "YouTube Connect cancelled or failed by user")
+            Toast.makeText(context, "YouTube Connect cancelled", Toast.LENGTH_SHORT).show()
+        }
+        isYouTubeConnecting = false
+    }
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -349,6 +428,55 @@ fun InfluencerRegistrationScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // --- CONNECT YOUTUBE BUTTON ---
+            Button(
+                onClick = {
+                    isYouTubeConnecting = true
+                    // Configure Google Sign-In options with required scopes
+                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestEmail() // Common requirement
+                        .requestScopes(
+                            Scope("https://www.googleapis.com/auth/yt-analytics.readonly"),
+                            Scope("https://www.googleapis.com/auth/youtube.readonly")
+                        )
+                        // Request server auth code using Web Client ID
+                        // Replace YOUR_WEB_CLIENT_ID with the actual Google Cloud Web Client ID
+                        .requestServerAuthCode("60831940637-pgkdgu5qe3htquot95fddf50rljm6er0.apps.googleusercontent.com", true)
+                        .build()
+
+
+
+                    val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                    // Launch the intent using the modern Activity Result API launcher
+                    youtubeAuthLauncher.launch(googleSignInClient.signInIntent)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                // Disable button if it's already connected or currently connecting
+                enabled = !isYouTubeConnected && !isYouTubeConnecting,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isYouTubeConnected) Color(0xFF4CAF50) else Color(0xFFFF0000), // Green when connected, Red otherwise
+                    disabledContainerColor = if (isYouTubeConnected) Color(0xFF4CAF50).copy(alpha = 0.5f) else Color.LightGray
+                )
+            ) {
+                // Display different content based on connection state
+                if (isYouTubeConnecting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Connecting...", color = Color.White, fontWeight = FontWeight.Bold)
+                } else if (isYouTubeConnected) {
+                    Icon(Icons.Default.Check, contentDescription = "Checked", tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("YouTube Connected ✓", color = Color.White, fontWeight = FontWeight.Bold)
+                } else {
+                    Text("Connect YouTube", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Button(
                 onClick = {
                     if (name.isEmpty() || location.isEmpty() || bio.isEmpty() || logoUrl.isEmpty() || selectedCategories.isEmpty() || selectedPlatforms.isEmpty() || pricing.isEmpty()) {
@@ -377,7 +505,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                                 put("location", location)
                                                 put("availability", true) // Default as discussed
                                                 put("logoUrl", logoUrl)
-                                                
+
                                                 val categoriesJson = JSONArray()
                                                 selectedCategories.forEach { cat ->
                                                     categoriesJson.put(JSONObject().apply {
@@ -412,7 +540,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                                     }
                                                 }
                                                 put("pricing", pricingJson)
-                                                
+
                                                 put("strengths", JSONArray())
                                                 put("audienceInsights", JSONObject.NULL)
                                             }

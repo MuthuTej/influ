@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.firebase.firestore.ktx)
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("com.google.firebase:firebase-messaging-ktx")
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
     implementation(libs.androidx.runtime.livedata)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation("androidx.compose.ui:ui:1.6.8")

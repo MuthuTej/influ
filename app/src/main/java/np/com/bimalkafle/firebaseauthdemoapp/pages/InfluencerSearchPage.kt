@@ -74,10 +74,10 @@ fun InfluencerSearchPage(
 
         val matchesBudget = when (selectedBudgetRange) {
             "All" -> true
-            "0-100" -> (campaign.budgetMax ?: 0) <= 100
-            "100-500" -> (campaign.budgetMin ?: 0) >= 100 && (campaign.budgetMax ?: 0) <= 500
-            "500-1000" -> (campaign.budgetMin ?: 0) >= 500 && (campaign.budgetMax ?: 0) <= 1000
-            "1000+" -> (campaign.budgetMin ?: 0) >= 1000
+            "1k to 10k" -> (campaign.budgetMin ?: 0) >= 1000 && (campaign.budgetMax ?: 0) <= 10000
+            "10k to 50k" -> (campaign.budgetMin ?: 0) >= 10000 && (campaign.budgetMax ?: 0) <= 50000
+            "50k to 100k" -> (campaign.budgetMin ?: 0) >= 50000 && (campaign.budgetMax ?: 0) <= 100000
+            "100k+" -> (campaign.budgetMin ?: 0) >= 100000
             else -> true
         }
 
@@ -88,12 +88,19 @@ fun InfluencerSearchPage(
 
     Scaffold(
         bottomBar = {
-            CmnBottomNavigationBar(
-                selectedItem = selectedBottomNavItem,
-                onItemSelected = { selectedBottomNavItem = it },
-                navController = navController,
-                isBrand = false
-            )
+            Surface(
+                color = Color.White,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(modifier = Modifier.navigationBarsPadding()) {
+                    CmnBottomNavigationBar(
+                        selectedItem = selectedBottomNavItem,
+                        onItemSelected = { selectedBottomNavItem = it },
+                        navController = navController,
+                        isBrand = false
+                    )
+                }
+            }
         }
     ) { padding ->
         Column(
@@ -101,7 +108,7 @@ fun InfluencerSearchPage(
                 .fillMaxSize()
                 .background(Color.White)
         ) {
-            // ---------------- REFINED HEADER ----------------
+            // ---------------- HEADER ----------------
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -207,6 +214,7 @@ fun InfluencerSearchPage(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Calculate counts for Categories
                 val categories = listOf("All", "Tech", "Fashion", "Food", "Lifestyle", "Beauty", "Sports")
                 val categoryOptions = categories.map { category ->
                     val count = if (category == "All") {
@@ -217,6 +225,7 @@ fun InfluencerSearchPage(
                     category to count
                 }
 
+                // Calculate counts for Platforms
                 val platforms = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK")
                 val platformOptions = platforms.map { platform ->
                     val count = if (platform == "All") {
@@ -229,7 +238,19 @@ fun InfluencerSearchPage(
                     platform to count
                 }
                 
-                val budgetOptions = listOf("All", "0-100", "100-500", "500-1000", "1000+").map { it to null }
+                // Calculate counts for Budget
+                val budgetRanges = listOf("All", "1k to 10k", "10k to 50k", "50k to 100k", "100k+")
+                val budgetOptions = budgetRanges.map { range ->
+                    val count = when (range) {
+                        "All" -> campaigns.size
+                        "1k to 10k" -> campaigns.count { (it.budgetMin ?: 0) >= 1000 && (it.budgetMax ?: 0) <= 10000 }
+                        "10k to 50k" -> campaigns.count { (it.budgetMin ?: 0) >= 10000 && (it.budgetMax ?: 0) <= 50000 }
+                        "50k to 100k" -> campaigns.count { (it.budgetMin ?: 0) >= 50000 && (it.budgetMax ?: 0) <= 100000 }
+                        "100k+" -> campaigns.count { (it.budgetMin ?: 0) >= 100000 }
+                        else -> 0
+                    }
+                    range to count
+                }
 
                 FilterDropdown(
                     label = "Platform",
@@ -254,18 +275,37 @@ fun InfluencerSearchPage(
                     onOptionSelected = { selectedBudgetRange = it },
                     modifier = Modifier.weight(1f)
                 )
+            }
 
-                // Filter Settings Icon
-               Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFFF8383).copy(alpha = 0.8f),
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        IconButton(onClick = { /* Open detailed filters */ }) {
-                            Icon(Icons.Default.Tune, contentDescription = "Filters", tint = Color.White)
+            // Results count and header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${filteredCampaigns.size} Campaigns Found",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color.Black
+                )
+
+                // Clear Filters Button
+                if (selectedPlatform != "All" || selectedCategory != "All" || selectedBudgetRange != "All" || searchQuery.isNotEmpty()) {
+                    Text(
+                        text = "Clear All",
+                        color = Color(0xFFFF8383),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable {
+                            selectedPlatform = "All"
+                            selectedCategory = "All"
+                            selectedBudgetRange = "All"
+                            searchQuery = ""
                         }
-                    }
+                    )
                 }
             }
 
