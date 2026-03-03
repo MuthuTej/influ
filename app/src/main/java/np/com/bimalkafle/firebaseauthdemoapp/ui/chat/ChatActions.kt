@@ -28,6 +28,7 @@ fun RestrictedActionPanel(
     status: String?,
     isBrand: Boolean,
     onSend: (String, String, Map<String, Any>) -> Unit,
+    onSendUpload: (String) -> Unit = {},
     onStatusUpdate: (String) -> Unit = {}
 ) {
     var showNegotiation by remember { mutableStateOf(false) }
@@ -194,7 +195,7 @@ fun RestrictedActionPanel(
             label = "Final Content Link",
             onDismiss = { showUpload = false },
             onSend = { link ->
-                onSend("Content Uploaded", "UPLOAD", mapOf("link" to link))
+                onSendUpload(link)
                 showUpload = false
             }
         )

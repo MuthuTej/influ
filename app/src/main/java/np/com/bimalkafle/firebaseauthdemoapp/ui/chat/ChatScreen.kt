@@ -399,6 +399,9 @@ fun ChatScreen(
                             onSend = { text, type, metadata ->
                                 viewModel.sendMessage(text, type, metadata)
                             },
+                            onSendUpload = { link ->
+                                viewModel.sendUpload(link)
+                            },
                             onStatusUpdate = { newStatus ->
                                 FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                                     val token = result.token ?: return@addOnSuccessListener
