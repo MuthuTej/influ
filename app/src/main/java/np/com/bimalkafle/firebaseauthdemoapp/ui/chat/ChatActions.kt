@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -143,8 +145,9 @@ fun RestrictedActionPanel(
     if (showNegotiation) {
         NegotiationDialog(
             onDismiss = { showNegotiation = false },
-            onSend = { amount ->
-                onSend("Proposed Budget: $$amount", "NEGOTIATION", mapOf("amount" to amount))
+            onSend = { amount, platform, deliverables ->
+                val delStr = deliverables.entries.joinToString { "${it.key} (x${it.value})" }
+                onSend("Negotiated Proposal: $$amount on $platform - $delStr", "NEGOTIATION", mapOf("amount" to amount, "platform" to platform, "items" to deliverables))
                 onStatusUpdate("NEGOTIATION")
                 showNegotiation = false
             }
@@ -265,36 +268,140 @@ fun ActionCard(
 @Composable
 fun NegotiationDialog(
     initialAmount: Int = 100,
+    initialPlatform: String = "Instagram",
+    initialDeliverables: Map<String, Int> = emptyMap(),
     onDismiss: () -> Unit,
-    onSend: (Int) -> Unit
+    onSend: (Int, String, Map<String, Int>) -> Unit
 ) {
-    var budget by remember { mutableFloatStateOf(initialAmount.toFloat()) }
+    var budget by remember { mutableStateOf(initialAmount.toString()) }
+    var selectedPlatform by remember { mutableStateOf(initialPlatform) }
+    val platforms = listOf("Instagram", "YouTube", "TikTok", "X", "Facebook")
+    var showPlatformDropdown by remember { mutableStateOf(false) }
+
+    val deliverableOptions = listOf("Reel", "IG Story", "YouTube Short", "TikTok", "Post", "Video")
+    val selectedDeliverables = remember { mutableStateMapOf<String, Int>().apply { putAll(initialDeliverables) } }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Propose Budget") },
+        title = { Text("Propose Negotiation") },
         text = {
-            Column {
-                Text("Budget: $${budget.toInt()}")
-                Slider(
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                // Platform Selection
+                Text("Select Platform", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Box {
+                    OutlinedButton(
+                        onClick = { showPlatformDropdown = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(selectedPlatform, color = Color.Black)
+                            Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray)
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = showPlatformDropdown,
+                        onDismissRequest = { showPlatformDropdown = false },
+                        modifier = Modifier.fillMaxWidth(0.6f)
+                    ) {
+                        platforms.forEach { platform ->
+                            DropdownMenuItem(
+                                text = { Text(platform) },
+                                onClick = {
+                                    selectedPlatform = platform
+                                    showPlatformDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // Price Field
+                Text("Budget ($)", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                OutlinedTextField(
                     value = budget,
                     onValueChange = { budget = it },
-                    valueRange = 0f..5000f,
-                    steps = 49
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFFFF8383),
+                        cursorColor = Color(0xFFFF8383)
+                    ),
+                    singleLine = true
                 )
+
+                Spacer(Modifier.height(16.dp))
+
+                // Deliverables Section
+                Text("Select Deliverables & Counts", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                deliverableOptions.forEach { option ->
+                    val count = selectedDeliverables[option] ?: 0
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Checkbox(
+                                checked = count > 0,
+                                onCheckedChange = {
+                                    if (it) selectedDeliverables[option] = 1 else selectedDeliverables.remove(option)
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFF8383))
+                            )
+                            Text(text = option, fontSize = 14.sp)
+                        }
+
+                        if (count > 0) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { if (count > 1) selectedDeliverables[option] = count - 1 else selectedDeliverables.remove(option) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(18.dp))
+                                }
+                                Text(
+                                    text = "$count",
+                                    modifier = Modifier.padding(horizontal = 8.dp),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                IconButton(
+                                    onClick = { selectedDeliverables[option] = count + 1 },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSend(budget.toInt()) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                onClick = {
+                    val finalBudget = budget.toIntOrNull() ?: initialAmount
+                    onSend(finalBudget, selectedPlatform, selectedDeliverables.toMap())
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383)),
+                shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Send Proposal")
+                Text("Send Proposal", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Cancel", color = Color.Gray)
             }
         }
     )
