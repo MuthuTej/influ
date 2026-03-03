@@ -2,6 +2,7 @@ package np.com.bimalkafle.firebaseauthdemoapp.ui.chat
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -358,6 +359,23 @@ fun ChatScreen(
                             ) {
                                 Text("Select Collaboration", fontWeight = FontWeight.Bold)
                             }
+
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    if (isBrand) {
+                                        navController.navigate("influencer_create_proposal/$chatId")
+                                    } else {
+                                        navController.navigate("influencer_search")
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.height(48.dp).fillMaxWidth(0.7f),
+                                border = BorderStroke(1.dp, Color(0xFFFF8383)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8383))
+                            ) {
+                                Text(if (isBrand) "Invite to Campaign" else "Apply to Campaign", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 } else {
@@ -395,6 +413,7 @@ fun ChatScreen(
                     ) {
                         RestrictedActionPanel(
                             status = currentCollaboration?.status,
+                            collaborationId = collaborationId,
                             isBrand = isBrand,
                             onSend = { text, type, metadata ->
                                 viewModel.sendMessage(text, type, metadata)
