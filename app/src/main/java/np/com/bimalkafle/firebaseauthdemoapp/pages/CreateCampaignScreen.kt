@@ -12,8 +12,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.sp
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -50,6 +49,14 @@ fun CreateCampaignScreen(
         "Youtube" to listOf("reels/shorts", "post", "video")
     )
 
+    val categoriesMap = mapOf(
+        "Fashion" to listOf("Clothing", "Footwear", "Accessories"),
+        "Tech" to listOf("Gadgets", "Software", "Hardware"),
+        "Food" to listOf("Organic", "Fast Food", "Dining"),
+        "Beauty" to listOf("Skincare", "Makeup", "Haircare"),
+        "Health" to listOf("Fitness", "Supplements", "Wellness")
+    )
+
     var showDatePicker by remember { mutableStateOf(false) }
     var dateField by remember { mutableStateOf<String?>(null) }
 
@@ -61,6 +68,8 @@ fun CreateCampaignScreen(
     // Validation
     val isFormValid = campaignViewModel.title.isNotBlank() &&
             campaignViewModel.description.isNotBlank() &&
+            campaignViewModel.category.isNotBlank() &&
+            campaignViewModel.subCategory.isNotBlank() &&
             campaignViewModel.selectedPlatforms.isNotEmpty() &&
             campaignViewModel.selectedPlatforms.all { platform -> 
                 campaignViewModel.platformFormats[platform]?.isNotEmpty() == true 
@@ -151,6 +160,30 @@ fun CreateCampaignScreen(
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
             )
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Category & Subcategory Dropdowns - Vertical Layout
+            DropdownField(
+                label = "Category *",
+                selectedOption = campaignViewModel.category,
+                options = categoriesMap.keys.toList(),
+                modifier = Modifier.fillMaxWidth(),
+                onOptionSelected = { 
+                    campaignViewModel.category = it
+                    campaignViewModel.subCategory = "" // Reset subcategory when category changes
+                }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            DropdownField(
+                label = "Sub-Category *",
+                selectedOption = campaignViewModel.subCategory,
+                options = categoriesMap[campaignViewModel.category] ?: emptyList(),
+                modifier = Modifier.fillMaxWidth(),
+                onOptionSelected = { campaignViewModel.subCategory = it }
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
             Text("Target Platforms & Formats *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
@@ -217,10 +250,23 @@ fun CreateCampaignScreen(
             Spacer(modifier = Modifier.height(24.dp))
             Text("Campaign Timeline", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                DateSelector(label = "Start Date *", date = campaignViewModel.startDate, modifier = Modifier.weight(1f), onClick = { dateField = "start"; showDatePicker = true })
-                DateSelector(label = "End Date (Optional)", date = campaignViewModel.endDate, modifier = Modifier.weight(1f), onClick = { dateField = "end"; showDatePicker = true })
-            }
+            
+            // Timeline - Vertical Layout
+            DateSelector(
+                label = "Start Date *", 
+                date = campaignViewModel.startDate, 
+                modifier = Modifier.fillMaxWidth(), 
+                onClick = { dateField = "start"; showDatePicker = true }
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            DateSelector(
+                label = "End Date (Optional)", 
+                date = campaignViewModel.endDate, 
+                modifier = Modifier.fillMaxWidth(), 
+                onClick = { dateField = "end"; showDatePicker = true }
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -258,6 +304,57 @@ fun CreateCampaignScreen(
                     TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
                 }
             ) { DatePicker(state = datePickerState) }
+        }
+    }
+}
+
+@Composable
+fun DropdownField(
+    label: String,
+    selectedOption: String,
+    options: List<String>,
+    modifier: Modifier = Modifier,
+    onOptionSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier) {
+        Text(label, fontSize = 12.sp, color = Color.Gray)
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
+                .clickable { expanded = true }
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (selectedOption.isEmpty()) "Select" else selectedOption,
+                    fontSize = 14.sp,
+                    color = if (selectedOption.isEmpty()) Color.Gray else Color.Black
+                )
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.Gray)
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.fillMaxWidth(0.85f).background(Color.White)
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            onOptionSelected(option)
+                            expanded = false
+                        }
+                    )
+                }
+            }
         }
     }
 }
