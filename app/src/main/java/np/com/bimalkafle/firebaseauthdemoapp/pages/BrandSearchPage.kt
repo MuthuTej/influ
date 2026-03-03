@@ -35,13 +35,15 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.FilterDropdown
 import np.com.bimalkafle.firebaseauthdemoapp.components.IconBubbleSearch
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 
 @Composable
 fun BrandSearchPage(
     modifier: Modifier = Modifier,
     navController: NavController,
     authViewModel: AuthViewModel,
-    brandViewModel: BrandViewModel
+    brandViewModel: BrandViewModel,
+    notificationViewModel: NotificationViewModel
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedPlatform by remember { mutableStateOf("All") }
@@ -52,12 +54,15 @@ fun BrandSearchPage(
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
     val wishlistedInfluencers by brandViewModel.wishlistedInfluencers.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
+    val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
 
     LaunchedEffect(Unit) {
-        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
             firebaseToken = result.token
             if (firebaseToken != null) {
                 brandViewModel.fetchInfluencers(firebaseToken!!)
+                notificationViewModel.fetchUnreadCount(currentUser.uid, firebaseToken!!)
             }
         }
     }
@@ -103,6 +108,7 @@ fun BrandSearchPage(
         onCreateCampaignClick = { navController.navigate("create_campaign") },
         navController = navController,
         wishlistedInfluencers = wishlistedInfluencers,
+        unreadCount = unreadCount,
         onWishlistToggle = { influencer ->
             firebaseToken?.let { token ->
                 brandViewModel.toggleWishlist(influencer, token)
@@ -129,6 +135,7 @@ fun BrandSearchPageContent(
     onInfluencerClick: (String) -> Unit,
     onCreateCampaignClick: () -> Unit,
     navController: NavController,
+    unreadCount: Int,
     wishlistedInfluencers: List<InfluencerProfile> = emptyList(),
     onWishlistToggle: (InfluencerProfile) -> Unit = {}
 ) {
@@ -213,7 +220,22 @@ fun BrandSearchPageContent(
                                 onClick = { navController.navigate("brand_wishlist") }
                             )
                             Spacer(modifier = Modifier.width(10.dp))
-                            IconBubbleSearch(Icons.Default.Notifications, Color.Black)
+                            Box {
+                                IconBubbleSearch(
+                                    icon = Icons.Default.Notifications, 
+                                    tint = Color.Black,
+                                    onClick = { navController.navigate("notifications") }
+                                )
+                                if (unreadCount > 0) {
+                                    Badge(
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                                        containerColor = Color.Red,
+                                        contentColor = Color.White
+                                    ) {
+                                        Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
+                                    }
+                                }
+                            }
                         }
                     }
 

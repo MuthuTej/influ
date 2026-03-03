@@ -106,8 +106,6 @@ object BackendRepository {
                     val data = jsonResponse.getJSONObject("data").getJSONObject("me")
                     val role = data.getString("role")
                     val isProfileCompleted = data.optBoolean("profileCompleted", false)
-                    // Return both role and completion status as a formatted string or pair
-                    // Since Result returns String, we'll pack it: "ROLE|TRUE"
                     Result.success("$role|$isProfileCompleted")
                 }
             } else {
@@ -169,6 +167,7 @@ object BackendRepository {
             Result.failure(e)
         }
     }
+
     suspend fun updateFcmToken(token: String, fcmToken: String): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             val url = URL(BACKEND_URL)
@@ -223,6 +222,186 @@ object BackendRepository {
             }
         } catch (e: Exception) {
             Log.e("BackendRepository", "Exception: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getNotifications(token: String, limit: Int = 20): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                query GetNotifications(${'$'}limit: Int) {
+                    getNotifications(limit: ${'$'}limit) {
+                        id
+                        userId
+                        title
+                        body
+                        data
+                        isRead
+                        createdAt
+                    }
+                }
+            """.trimIndent()
+
+            val variables = JSONObject().apply {
+                put("limit", limit)
+            }
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+                put("variables", variables)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    Result.success(response)
+                }
+            } else {
+                val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getUnreadNotificationCount(token: String): Result<Int> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                query {
+                    getUnreadNotificationCount
+                }
+            """.trimIndent()
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    val count = jsonResponse.getJSONObject("data").getInt("getUnreadNotificationCount")
+                    Result.success(count)
+                }
+            } else {
+                Result.failure(Exception("Server error ${connection.responseCode}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun markNotificationAsRead(token: String, id: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                mutation MarkNotificationAsRead(${'$'}id: ID!) {
+                    markNotificationAsRead(id: ${'$'}id)
+                }
+            """.trimIndent()
+
+            val variables = JSONObject().apply {
+                put("id", id)
+            }
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+                put("variables", variables)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    Result.success(jsonResponse.getJSONObject("data").getBoolean("markNotificationAsRead"))
+                }
+            } else {
+                Result.failure(Exception("Server error ${connection.responseCode}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun markAllNotificationsAsRead(token: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                mutation {
+                    markAllNotificationsAsRead
+                }
+            """.trimIndent()
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    Result.success(jsonResponse.getJSONObject("data").getBoolean("markAllNotificationsAsRead"))
+                }
+            } else {
+                Result.failure(Exception("Server error ${connection.responseCode}"))
+            }
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
