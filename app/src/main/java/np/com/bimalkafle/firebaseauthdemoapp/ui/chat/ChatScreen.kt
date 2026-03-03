@@ -43,6 +43,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.delay
 
 
 @Composable
@@ -82,12 +83,19 @@ fun ChatScreen(
         if (authState.value is AuthState.Authenticated) {
             val role = (authState.value as AuthState.Authenticated).role
             isBrand = role.equals("BRAND", ignoreCase = true)
-            
-            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-                result.token?.let { token ->
-                    if (isBrand) brandViewModel.fetchCollaborations(token)
-                    else influencerViewModel.fetchCollaborations(token)
+        }
+    }
+
+    LaunchedEffect(authState.value, isBrand) {
+        if (authState.value is AuthState.Authenticated) {
+            while (true) {
+                FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { result ->
+                    result.token?.let { token ->
+                        if (isBrand) brandViewModel.fetchCollaborations(token)
+                        else influencerViewModel.fetchCollaborations(token)
+                    }
                 }
+                delay(5000)
             }
         }
     }
@@ -116,14 +124,25 @@ fun ChatScreen(
         when (msg.type) {
             "NEGOTIATION" -> {
                 val currentAmount = msg.metadata["amount"]?.toString()?.toIntOrNull() ?: 0
+                val currentPlatform = msg.metadata["platform"]?.toString() ?: "Instagram"
+                @Suppress("UNCHECKED_CAST")
+                val currentItems = msg.metadata["items"] as? Map<String, Int> ?: emptyMap()
+
                 NegotiationDialog(
                     initialAmount = currentAmount,
+                    initialPlatform = currentPlatform,
+                    initialDeliverables = currentItems,
                     onDismiss = { modificationMessage = null },
-                    onSend = { amount ->
+                    onSend = { amount, platform, deliverables ->
+                        val delStr = deliverables.entries.joinToString { "${it.key} (x${it.value})" }
                         viewModel.sendMessage(
-                            text = "Proposed Budget: $$amount", 
+                            text = "Negotiated Proposal: $$amount on $platform - $delStr", 
                             type = "NEGOTIATION", 
-                            metadata = mapOf("amount" to amount)
+                            metadata = mapOf(
+                                "amount" to amount,
+                                "platform" to platform,
+                                "items" to deliverables
+                            )
                         )
                         viewModel.updateMessageStatus(msg.id, "MODIFIED")
                         modificationMessage = null
@@ -454,7 +473,8 @@ fun ChatScreen(
                     Surface(
                         modifier = Modifier
                             .size(300.dp)
-                            .clip(CircleShape),
+                            .clip(CircleShape)
+                        ,
                         color = MaterialTheme.colorScheme.surface
                     ) {
                         Icon(
