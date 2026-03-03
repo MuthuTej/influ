@@ -21,6 +21,8 @@ class CampaignViewModel : ViewModel() {
     // Screen 1 Fields
     var title by mutableStateOf("")
     var description by mutableStateOf("")
+    var category by mutableStateOf("")
+    var subCategory by mutableStateOf("")
     var selectedPlatforms by mutableStateOf(setOf<String>())
     var platformFormats by mutableStateOf(mapOf<String, Set<String>>())
     var startDate by mutableStateOf<Date?>(null)
@@ -361,9 +363,12 @@ class CampaignViewModel : ViewModel() {
                 "locations" to selectedLocations.toList()
             )
 
+            val categoriesJson = listOf(mapOf("category" to category, "subCategory" to subCategory))
+
             val input = mutableMapOf<String, Any>(
                 "title" to title,
                 "description" to description,
+                "categories" to categoriesJson,
                 "platforms" to platformsJson,
                 "budgetMin" to budgetMin,
                 "budgetMax" to budgetMax,
