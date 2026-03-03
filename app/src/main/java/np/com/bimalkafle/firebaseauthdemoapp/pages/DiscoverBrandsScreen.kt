@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -28,8 +29,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 
 data class DiscoverBrand(
     val name: String,
@@ -51,7 +54,10 @@ val discoverBrands = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DiscoverBrandsScreen(navController: NavController) {
+fun DiscoverBrandsScreen(
+    navController: NavController,
+    notificationViewModel: NotificationViewModel
+) {
     var selectedPlatform by remember { mutableStateOf("Platform") }
     val platforms = listOf("YouTube", "Instagram", "Facebook")
     var selectedCategory by remember { mutableStateOf("Category") }
@@ -61,6 +67,18 @@ fun DiscoverBrandsScreen(navController: NavController) {
     val themeColor = Color(0xFFFF8383)
     var selectedBottomNavItem by remember { mutableStateOf("Search") }
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
+
+    LaunchedEffect(Unit) {
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+            val token = result.token
+            val userId = currentUser.uid
+            if (token != null) {
+                notificationViewModel.fetchUnreadCount(userId, token)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -93,8 +111,19 @@ fun DiscoverBrandsScreen(navController: NavController) {
                                 IconButton(onClick = { navController.navigate("wishlist") }) {
                                     Icon(Icons.Default.FavoriteBorder, contentDescription = "Favorite", tint = Color.White)
                                 }
-                                IconButton(onClick = { /*TODO: Implement notification logic*/ }) {
-                                    Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
+                                Box {
+                                    IconButton(onClick = { navController.navigate("notifications") }) {
+                                        Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
+                                    }
+                                    if (unreadCount > 0) {
+                                        Badge(
+                                            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                                            containerColor = Color.Red,
+                                            contentColor = Color.White
+                                        ) {
+                                            Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -169,7 +198,7 @@ fun DiscoverBrandsScreen(navController: NavController) {
                 items.forEach { item ->
                     if (item.isEmpty()) {
                         FloatingActionButton(
-                            onClick = { navController.navigate("influencer_create_proposal") },
+                            onClick = { /* Navigate to create proposal or similar */ },
                             containerColor = themeColor,
                             shape = CircleShape,
                             modifier = Modifier.offset(y = (-16).dp)
@@ -228,105 +257,138 @@ fun SearchBar(placeholder: String) {
     TextField(
         value = text,
         onValueChange = { text = it },
-        placeholder = { Text(placeholder) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+        placeholder = { Text(placeholder, color = Color.Gray) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(RoundedCornerShape(12.dp)),
         colors = TextFieldDefaults.textFieldColors(
             containerColor = Color.White,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
             disabledIndicatorColor = Color.Transparent
         ),
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth()
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+        singleLine = true
     )
 }
 
 @Composable
-fun FilterChip(
-    label: String,
-    options: List<String>,
-    selectedOption: String,
-    onOptionSelected: (String) -> Unit
-) {
+fun FilterChip(label: String, options: List<String>, selectedOption: String, onOptionSelected: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
     Box {
-        OutlinedButton(
+        Surface(
             onClick = { expanded = true },
             shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-            border = BorderStroke(1.dp, Color.White)
+            color = if (selectedOption != label) Color(0xFFFF8383).copy(alpha = 0.1f) else Color.White.copy(alpha = 0.2f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
         ) {
-            Text(selectedOption)
-            Icon(Icons.Default.ArrowDropDown, contentDescription = "Dropdown")
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (selectedOption != label) selectedOption else label,
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Icon(
+                    Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            options.forEach {
-                DropdownMenuItem(text = { Text(it) }, onClick = { onOptionSelected(it); expanded = false })
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onOptionSelected(option)
+                        expanded = false
+                    }
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BrandDiscoverCard(brand: DiscoverBrand, modifier: Modifier = Modifier, navController: NavController) {
-    var isFavorite by remember { mutableStateOf(brand.isFavorite) }
-    val themeColor = Color(0xFFFF8383)
+fun BrandDiscoverCard(brand: DiscoverBrand, navController: NavController) {
     Card(
+        onClick = { /* Navigate to brand detail */ },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = modifier.padding(vertical = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            Box(contentAlignment = Alignment.TopEnd) {
+            Box(modifier = Modifier.height(120.dp)) {
                 Image(
                     painter = painterResource(id = brand.logo),
                     contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f),
+                    modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-                IconButton(onClick = { 
-                    isFavorite = !isFavorite 
-                    if(isFavorite) navController.navigate("wishlist")
-                }) {
+                IconButton(
+                    onClick = { /* Toggle favorite */ },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(32.dp)
+                        .background(Color.White.copy(alpha = 0.7f), CircleShape)
+                ) {
                     Icon(
-                        if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        imageVector = if (brand.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = "Favorite",
-                        tint = if (isFavorite) Color.Red else themeColor
+                        tint = if (brand.isFavorite) Color.Red else Color.Gray,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
             Column(modifier = Modifier.padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(brand.name, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = brand.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        maxLines = 1
+                    )
                     if (brand.isVerified) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
-                            Icons.Filled.CheckCircle,
+                            Icons.Default.CheckCircle,
                             contentDescription = "Verified",
-                            tint = themeColor,
-                            modifier = Modifier.size(16.dp)
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                 }
-                Text(brand.description, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
-                Text(brand.category, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
-                Text(brand.location, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
+                Text(
+                    text = brand.category,
+                    color = Color.Gray,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = brand.location,
+                        color = Color.Gray,
+                        fontSize = 11.sp,
+                        maxLines = 1
+                    )
+                }
             }
         }
-    }
-}
-
-@Preview(showBackground = true, device = "spec:width=411dp,height=891dp")
-@Composable
-fun DiscoverBrandsScreenPreview() {
-    FirebaseAuthDemoAppTheme {
-        DiscoverBrandsScreen(navController = rememberNavController())
     }
 }

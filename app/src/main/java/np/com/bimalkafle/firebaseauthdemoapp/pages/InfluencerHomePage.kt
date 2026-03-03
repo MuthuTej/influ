@@ -46,6 +46,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -59,7 +60,8 @@ fun InfluencerHomePage(
     navController: NavController,
     authViewModel: AuthViewModel,
     influencerViewModel: InfluencerViewModel,
-    campaignViewModel: CampaignViewModel
+    campaignViewModel: CampaignViewModel,
+    notificationViewModel: NotificationViewModel
 ) {
     val authState = authViewModel.authState.observeAsState()
     val collaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
@@ -69,16 +71,18 @@ fun InfluencerHomePage(
     val influencerProfile by influencerViewModel.influencerProfile.observeAsState()
     val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
+    val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
 
     LaunchedEffect(Unit) {
-        FirebaseAuth.getInstance().currentUser
-            ?.getIdToken(true)
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        currentUser?.getIdToken(true)
             ?.addOnSuccessListener { result ->
                 firebaseToken = result.token
                 firebaseToken?.let { token ->
                     influencerViewModel.fetchInfluencerDetails(token)
                     influencerViewModel.fetchCollaborations(token)
                     campaignViewModel.fetchCampaigns(token)
+                    notificationViewModel.fetchUnreadCount(currentUser.uid, token)
                 }
             }
     }
@@ -116,7 +120,7 @@ fun InfluencerHomePage(
                     .background(Color.White)
             ) {
 
-                item { InfluencerHeaderAndReachSection(influencerProfile, navController) }
+                item { InfluencerHeaderAndReachSection(influencerProfile, navController, unreadCount) }
 
                 item {
                     Column(
@@ -163,7 +167,7 @@ fun InfluencerHomePage(
 }
 
 @Composable
-fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navController: NavController) {
+fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navController: NavController, unreadCount: Int) {
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -236,11 +240,23 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                     onClick = { navController.navigate("wishlist") }
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                IconBubbleInfluencer(
-                    icon = Icons.Default.Notifications,
-                    tint = Color.Black,
-                    onClick = { /* TODO: Navigate to Notifications */ }
-                )
+                
+                Box {
+                    IconBubbleInfluencer(
+                        icon = Icons.Default.Notifications,
+                        tint = Color.Black,
+                        onClick = { navController.navigate("notifications") }
+                    )
+                    if (unreadCount > 0) {
+                        Badge(
+                            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                            containerColor = Color.Red,
+                            contentColor = Color.White
+                        ) {
+                            Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
+                        }
+                    }
+                }
             }
         }
 

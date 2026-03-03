@@ -38,6 +38,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.MainActivity
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -63,7 +64,8 @@ fun BrandHomePage(
     modifier: Modifier = Modifier,
     navController: NavController,
     authViewModel: AuthViewModel,
-    brandViewModel: BrandViewModel
+    brandViewModel: BrandViewModel,
+    notificationViewModel: NotificationViewModel
 ) {
 
     val authState = authViewModel.authState.observeAsState()
@@ -74,6 +76,7 @@ fun BrandHomePage(
     val wishlistedInfluencers by brandViewModel.wishlistedInfluencers.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
 
     val brandProfile by brandViewModel.brandProfile.observeAsState()
 
@@ -86,14 +89,15 @@ fun BrandHomePage(
     }
 
     LaunchedEffect(Unit) {
-        FirebaseAuth.getInstance().currentUser
-            ?.getIdToken(true)
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        currentUser?.getIdToken(true)
             ?.addOnSuccessListener { result ->
                 firebaseToken = result.token
                 firebaseToken?.let { token ->
                     brandViewModel.fetchCollaborations(token)
                     brandViewModel.fetchInfluencers(token)
                     brandViewModel.fetchBrandDetails(token)
+                    notificationViewModel.fetchNotifications(currentUser.uid, token)
                 }
             }
     }
@@ -145,7 +149,7 @@ fun BrandHomePage(
                     .background(Color.White)
             ) {
 
-                item { BrandHeaderAndReachSection(brandProfile, navController) }
+                item { BrandHeaderAndReachSection(brandProfile, navController, unreadCount) }
 
                 item {
                     Column(
@@ -192,7 +196,7 @@ fun BrandHomePage(
 }
 
 @Composable
-fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoapp.model.Brand?, navController: NavController) {
+fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoapp.model.Brand?, navController: NavController, unreadCount: Int) {
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -268,7 +272,21 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                     navController.navigate("brand_wishlist")
                 }
                 Spacer(modifier = Modifier.width(10.dp))
-                IconBubble(Icons.Default.Notifications, Color.Black)
+                
+                Box {
+                    IconBubble(Icons.Default.Notifications, Color.Black) {
+                        navController.navigate("notifications")
+                    }
+                    if (unreadCount > 0) {
+                        Badge(
+                            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                            containerColor = Color.Red,
+                            contentColor = Color.White
+                        ) {
+                            Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
+                        }
+                    }
+                }
             }
         }
 

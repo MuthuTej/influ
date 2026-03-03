@@ -15,6 +15,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -24,7 +25,8 @@ fun MyAppNavigation(
     splashViewModel: SplashViewModel,
     brandViewModel: BrandViewModel,
     influencerViewModel: InfluencerViewModel,
-    campaignViewModel: CampaignViewModel
+    campaignViewModel: CampaignViewModel,
+    notificationViewModel: NotificationViewModel
 ) {
     val navController = rememberNavController()
 
@@ -122,7 +124,8 @@ fun MyAppNavigation(
                 modifier = modifier, 
                 navController = navController, 
                 authViewModel = authViewModel, 
-                brandViewModel = brandViewModel
+                brandViewModel = brandViewModel,
+                notificationViewModel = notificationViewModel
             )
         }
         composable("all_campaigns") {
@@ -143,7 +146,8 @@ fun MyAppNavigation(
                 modifier = modifier, 
                 navController = navController, 
                 authViewModel = authViewModel, 
-                brandViewModel = brandViewModel
+                brandViewModel = brandViewModel,
+                notificationViewModel = notificationViewModel
             )
         }
         composable("brand_history") {
@@ -210,7 +214,8 @@ fun MyAppNavigation(
                 navController = navController,
                 authViewModel = authViewModel,
                 influencerViewModel = influencerViewModel,
-                campaignViewModel = campaignViewModel
+                campaignViewModel = campaignViewModel,
+                notificationViewModel = notificationViewModel
             )
         }
         composable("influencer_search") {
@@ -240,7 +245,7 @@ fun MyAppNavigation(
             )
         }
         composable("discover") {
-            DiscoverBrandsScreen(navController)
+            DiscoverBrandsScreen(navController, notificationViewModel)
         }
         composable("campaign_analytics") {
             CampaignAnalyticsPage(navController)
@@ -284,6 +289,9 @@ fun MyAppNavigation(
                 collaborationId = collaborationId,
                 brandViewModel = brandViewModel
             )
+        }
+        composable("notifications") {
+            NotificationPage(navController, notificationViewModel)
         }
     })
 }

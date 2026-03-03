@@ -23,6 +23,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModelFactory
 
@@ -35,6 +36,8 @@ class MainActivity : ComponentActivity() {
         val brandViewModel: BrandViewModel by viewModels()
         val influencerViewModel: InfluencerViewModel by viewModels()
         val campaignViewModel: CampaignViewModel by viewModels()
+        val notificationViewModel: NotificationViewModel by viewModels()
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -58,7 +61,8 @@ class MainActivity : ComponentActivity() {
                     splashViewModel = splashViewModel,
                     brandViewModel = brandViewModel,
                     influencerViewModel = influencerViewModel,
-                    campaignViewModel = campaignViewModel
+                    campaignViewModel = campaignViewModel,
+                    notificationViewModel = notificationViewModel
                 )
             }
         }
