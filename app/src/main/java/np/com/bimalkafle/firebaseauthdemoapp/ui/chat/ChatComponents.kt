@@ -13,17 +13,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Reply
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,20 +32,100 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatItem
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatMessage
-import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Feedback
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.ui.graphics.vector.ImageVector
 import kotlin.math.roundToInt
-import androidx.compose.material.icons.filled.Remove
 
 val BrandThemeColor = Color(0xFFFF8383)
 val ChatBubbleSelfColor = BrandThemeColor
-val ChatBubbleOtherColor = Color(0xFFF2F2F7) // Light Gray for iOS-like feel
+val ChatBubbleOtherColor = Color(0xFFF2F2F7)
+
+@Composable
+fun ChatListItem(
+    chat: ChatItem,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Profile Image
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray.copy(alpha = 0.3f))
+            ) {
+                if (chat.profileImageUrl != null) {
+                    AsyncImage(
+                        model = chat.profileImageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp).align(Alignment.Center),
+                        tint = Color.Gray
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Name and Last Message
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = chat.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color.Black
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = chat.lastMessage,
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Time and Unread count
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = chat.time,
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+                if (chat.unreadCount > 0) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Surface(
+                        color = BrandThemeColor,
+                        shape = CircleShape,
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = chat.unreadCount.toString(),
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun ActionButtons(
@@ -76,7 +154,7 @@ fun ActionButtons(
 
             Button(
                 onClick = onReject,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)), // Softer Red
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.height(36.dp)
@@ -97,191 +175,19 @@ fun ActionButtons(
                 Text("Modify", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
-    } else if (status != "PENDING") {
+    } else if (status != "PENDING" && status != "MODIFIED") {
         Surface(
             color = if (status == "ACCEPTED") Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.padding(top = 8.dp)
         ) {
             Text(
-                text = "${status.lowercase().replaceFirstChar { it.uppercase() }}",
+                text = status.lowercase().replaceFirstChar { it.uppercase() },
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (status == "ACCEPTED") Color(0xFF2E7D32) else Color(0xFFC62828),
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
             )
-        }
-    }
-}
-
-@Composable
-fun ChatListItem(
-    chat: ChatItem,
-    onClick: () -> Unit
-) {
-    Surface(
-        color = Color.White,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            // 👤 Profile icon/image
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray.copy(alpha = 0.3f)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (chat.profileImageUrl != null) {
-                    AsyncImage(
-                        model = chat.profileImageUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp),
-                        tint = Color.Gray
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // 📝 Name + last message
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = chat.name,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = Color(0xFF1A1A1A)
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = chat.lastMessage,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = if (chat.unreadCount > 0) Color.Black else Color.Gray,
-                    fontWeight = if (chat.unreadCount > 0) FontWeight.Medium else FontWeight.Normal,
-                    fontSize = 14.sp
-                )
-            }
-
-            // ⏰ Time + unread count
-            Column(
-                horizontalAlignment = Alignment.End
-            ) {
-                Text(
-                    text = chat.time,
-                    fontSize = 12.sp,
-                    color = if (chat.unreadCount > 0) BrandThemeColor else Color.Gray,
-                    fontWeight = if (chat.unreadCount > 0) FontWeight.SemiBold else FontWeight.Normal
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                if (chat.unreadCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .background(BrandThemeColor, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = chat.unreadCount.toString(),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ChatTopBar(
-    chatName: String,
-    onBackClick: () -> Unit,
-    onProfileClick: () -> Unit
-) {
-    Surface(
-        shadowElevation = 4.dp,
-        color = Color.White,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            // 🔙 Back button
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.Black
-                )
-            }
-
-            // 👤 Profile image (clickable)
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray.copy(alpha = 0.2f))
-                    .clickable { onProfileClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Profile",
-                    modifier = Modifier.fillMaxSize().padding(4.dp),
-                    tint = Color.Gray
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // 👤 Name + status
-            Column {
-                Text(
-                    text = chatName,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    color = Color.Black
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(Color(0xFF4CAF50), CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Online", 
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                }
-            }
         }
     }
 }
@@ -299,7 +205,6 @@ fun MessageBubble(
     val scope = rememberCoroutineScope()
     val swipeThreshold = 100f
 
-    // Find the message being replied to
     val repliedMessage = remember(message.replyToId, allMessages) {
         allMessages.find { it.id == message.replyToId }
     }
@@ -355,12 +260,11 @@ fun MessageBubble(
                 shape = bubbleShape,
                 color = if (isMe) ChatBubbleSelfColor else ChatBubbleOtherColor,
                 shadowElevation = 1.dp,
-                modifier = Modifier.widthIn(max = 280.dp)
+                modifier = Modifier.widthIn(max = 300.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(12.dp)
                 ) {
-                    // --- Quotation Box for Replies ---
                     if (repliedMessage != null) {
                         Row(
                             modifier = Modifier
@@ -396,7 +300,6 @@ fun MessageBubble(
                             }
                         }
                     }
-                    // ---------------------------------
 
                     if (message.type == "TEXT") {
                         Text(
@@ -433,175 +336,102 @@ fun MessageBubble(
 }
 
 @Composable
-fun MessageInputBar(
-    replyingTo: ChatMessage?,
-    chatName: String,
-    onCancelReply: () -> Unit,
-    onSend: (String) -> Unit,
-    onCreateProposal: () -> Unit
+fun NegotiationBubble(
+    message: ChatMessage,
+    isMe: Boolean,
+    onUpdateStatus: (String, String) -> Unit,
+    onModify: () -> Unit
 ) {
-    var text by remember { mutableStateOf("") }
+    val amount = message.metadata["amount"]?.toString() ?: "0"
+    val platform = message.metadata["platform"]?.toString() ?: "Instagram"
+    @Suppress("UNCHECKED_CAST")
+    val itemsMap = message.metadata["items"] as? Map<String, Any> ?: emptyMap()
 
-    Surface(
-        shadowElevation = 8.dp,
-        color = Color.White,
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isMe) Color.White.copy(alpha = 0.15f) else Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 10.dp, horizontal = 12.dp)
-        ) {
-            AnimatedVisibility(visible = replyingTo != null) {
-                if (replyingTo != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                            .padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(if (isMe) Color.White.copy(alpha = 0.2f) else BrandThemeColor.copy(alpha = 0.1f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.AttachMoney,
+                        contentDescription = null,
+                        tint = if (isMe) Color.White else BrandThemeColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Negotiation Proposal",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = if (isMe) Color.White.copy(alpha = 0.9f) else Color.Gray
+                    )
+                    Text(
+                        text = "$$amount",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 18.sp,
+                        color = if (isMe) Color.White else BrandThemeColor
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = if (isMe) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Platform info
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Platform:",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isMe) Color.White.copy(alpha = 0.7f) else Color.Gray,
+                    modifier = Modifier.width(70.dp)
+                )
+                Text(
+                    text = platform,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isMe) Color.White else Color.Black
+                )
+            }
+
+            // Deliverables info
+            if (itemsMap.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Column {
+                    Text(
+                        text = "Deliverables:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isMe) Color.White.copy(alpha = 0.7f) else Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    itemsMap.forEach { (name, count) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+                        ) {
+                            Box(modifier = Modifier.size(4.dp).background(if (isMe) Color.White.copy(alpha = 0.5f) else Color.Gray, CircleShape))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Replying to ${if (replyingTo.isMe) "You" else chatName}",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp,
-                                color = BrandThemeColor
-                            )
-                            Text(
-                                text = replyingTo.text,
-                                maxLines = 1,
-                                fontSize = 12.sp,
-                                overflow = TextOverflow.Ellipsis,
-                                color = Color.Gray
-                            )
-                        }
-                        IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = Color.Gray
+                                text = "$name (x$count)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isMe) Color.White else Color.Black
                             )
                         }
                     }
                 }
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onCreateProposal,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(Color(0xFFF5F5F5), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Create Proposal",
-                        tint = BrandThemeColor
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                TextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    placeholder = { Text("Write a message...", color = Color.Gray) },
-                    textStyle = TextStyle(color = Color.Black, fontSize = 15.sp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 50.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFFF5F5F5),
-                        unfocusedContainerColor = Color(0xFFF5F5F5),
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = BrandThemeColor
-                    ),
-                    maxLines = 4
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                val isTextEmpty = text.isBlank()
-                IconButton(
-                    onClick = {
-                        if (!isTextEmpty) {
-                            onSend(text)
-                            text = ""
-                        }
-                    },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            if (isTextEmpty) Color(0xFFE0E0E0) else BrandThemeColor,
-                            CircleShape
-                        ),
-                    enabled = !isTextEmpty
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-
-@Composable
-fun NegotiationBubble(
-    message: ChatMessage, 
-    isMe: Boolean,
-    onUpdateStatus: (String, String) -> Unit,
-    onModify: () -> Unit
-) {
-    val amount = message.metadata?.get("amount")?.toString() ?: "0"
-    
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if(isMe) Color.White.copy(alpha = 0.2f) else Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.AttachMoney, 
-                    contentDescription = null, 
-                    tint = if(isMe) Color.White else BrandThemeColor,
-                    modifier = Modifier.background(
-                        if(isMe) Color.Transparent else BrandThemeColor.copy(alpha = 0.1f), 
-                        CircleShape
-                    ).padding(4.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = "Proposal",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = if (isMe) Color.White else Color.Black
-                    )
-                    Text(
-                        text = "$$amount",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 20.sp,
-                        color = if (isMe) Color.White else BrandThemeColor
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(color = if(isMe) Color.White.copy(alpha=0.2f) else Color.LightGray.copy(alpha=0.2f))
-            
             ActionButtons(
                 status = message.status,
                 isMe = isMe,
@@ -615,61 +445,64 @@ fun NegotiationBubble(
 
 @Composable
 fun DeliverablesBubble(
-    message: ChatMessage, 
+    message: ChatMessage,
     isMe: Boolean,
     onUpdateStatus: (String, String) -> Unit,
     onModify: () -> Unit
 ) {
-    val itemsMap = message.metadata?.get("items") as? Map<String, Any> ?: emptyMap()
-    
-    val displayItems = if (itemsMap.isNotEmpty()) {
-        itemsMap.entries.map { "${it.key} k(x${it.value})" }
-    } else {
-        message.metadata?.get("items") as? List<String> ?: emptyList()
-    }
+    @Suppress("UNCHECKED_CAST")
+    val itemsMap = message.metadata["items"] as? Map<String, Any> ?: emptyMap()
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if(isMe) Color.White.copy(alpha = 0.2f) else Color.White),
+        colors = CardDefaults.cardColors(containerColor = if (isMe) Color.White.copy(alpha = 0.15f) else Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.List, 
-                    contentDescription = null, 
-                    tint = if(isMe) Color.White else BrandThemeColor,
-                    modifier = Modifier.background(
-                        if(isMe) Color.Transparent else BrandThemeColor.copy(alpha = 0.1f), 
-                        CircleShape
-                    ).padding(4.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(if (isMe) Color.White.copy(alpha = 0.2f) else BrandThemeColor.copy(alpha = 0.1f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.List,
+                        contentDescription = null,
+                        tint = if (isMe) Color.White else BrandThemeColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Deliverables",
+                    text = "Proposed Deliverables",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     color = if (isMe) Color.White else Color.Black
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
-            displayItems.forEach { item ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-                    Box(modifier = Modifier.size(6.dp).background(if(isMe) Color.White.copy(alpha=0.7f) else Color.Gray, CircleShape))
-                    Spacer(modifier = Modifier.width(8.dp))
+            itemsMap.forEach { (name, count) ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 4.dp, horizontal = 4.dp)
+                ) {
+                    Box(modifier = Modifier.size(6.dp).background(if (isMe) Color.White.copy(alpha = 0.5f) else BrandThemeColor.copy(alpha = 0.4f), CircleShape))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = item,
-                        color = if (isMe) Color.White.copy(alpha = 0.9f) else Color.DarkGray,
-                        fontSize = 14.sp
+                        text = "$name (x$count)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isMe) Color.White else Color.Black,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(color = if(isMe) Color.White.copy(alpha=0.2f) else Color.LightGray.copy(alpha=0.2f))
+            HorizontalDivider(color = if (isMe) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.3f))
 
             ActionButtons(
                 status = message.status,
@@ -684,9 +517,9 @@ fun DeliverablesBubble(
 
 @Composable
 fun ActionBubble(
-    message: ChatMessage, 
-    title: String, 
-    icon: ImageVector, 
+    message: ChatMessage,
+    title: String,
+    icon: ImageVector,
     isMe: Boolean,
     onUpdateStatus: (String, String) -> Unit,
     onModify: () -> Unit
@@ -697,26 +530,30 @@ fun ActionBubble(
         "FEEDBACK" -> "feedback"
         else -> "text"
     }
-    val content = message.metadata?.get(contentKey)?.toString() ?: message.text
+    val content = message.metadata[contentKey]?.toString() ?: message.text
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if(isMe) Color.White.copy(alpha = 0.2f) else Color.White),
+        colors = CardDefaults.cardColors(containerColor = if (isMe) Color.White.copy(alpha = 0.15f) else Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (isMe) Color.White else BrandThemeColor,
-                    modifier = Modifier.background(
-                        if(isMe) Color.Transparent else BrandThemeColor.copy(alpha = 0.1f), 
-                        CircleShape
-                    ).padding(4.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(if (isMe) Color.White.copy(alpha = 0.2f) else BrandThemeColor.copy(alpha = 0.1f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (isMe) Color.White else BrandThemeColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = title,
                     fontWeight = FontWeight.Bold,
@@ -724,16 +561,17 @@ fun ActionBubble(
                     color = if (isMe) Color.White else Color.Black
                 )
             }
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = content,
                 color = if (isMe) Color.White.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.8f),
                 fontSize = 14.sp,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                modifier = Modifier.padding(horizontal = 4.dp)
             )
             
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(color = if(isMe) Color.White.copy(alpha=0.2f) else Color.LightGray.copy(alpha=0.2f))
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = if (isMe) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.3f))
             
             ActionButtons(
                 status = message.status,
