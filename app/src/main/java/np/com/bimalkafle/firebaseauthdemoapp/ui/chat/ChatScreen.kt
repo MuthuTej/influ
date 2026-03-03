@@ -29,7 +29,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
@@ -100,7 +99,6 @@ fun ChatScreen(
 
     val messages by viewModel.messages.collectAsState()
     val chatName by viewModel.chatName.collectAsState()
-    val replyingTo by viewModel.replyingTo.collectAsState()
 
     var isProfileExpanded by remember { mutableStateOf(false) }
     var modificationMessage by remember { mutableStateOf<ChatMessage?>(null) }
@@ -116,14 +114,26 @@ fun ChatScreen(
         when (msg.type) {
             "NEGOTIATION" -> {
                 val currentAmount = msg.metadata["amount"]?.toString()?.toIntOrNull() ?: 0
+                val currentPlatform = msg.metadata["platform"]?.toString() ?: "Instagram"
+                @Suppress("UNCHECKED_CAST")
+                val currentItems = msg.metadata["items"] as? Map<String, Int> ?: emptyMap()
+
                 NegotiationDialog(
                     initialAmount = currentAmount,
+                    initialPlatform = currentPlatform,
+                    initialDeliverables = currentItems,
+                    collaboration = currentCollaboration,
                     onDismiss = { modificationMessage = null },
-                    onSend = { amount ->
+                    onSend = { amount, platform, deliverables ->
+                        val delStr = deliverables.entries.joinToString { "${it.key} (x${it.value})" }
                         viewModel.sendMessage(
-                            text = "Proposed Budget: $$amount", 
+                            text = "Negotiated Proposal: ₹$amount on $platform - $delStr", 
                             type = "NEGOTIATION", 
-                            metadata = mapOf("amount" to amount)
+                            metadata = mapOf(
+                                "amount" to amount,
+                                "platform" to platform,
+                                "items" to deliverables
+                            )
                         )
                         viewModel.updateMessageStatus(msg.id, "MODIFIED")
                         modificationMessage = null
@@ -135,6 +145,7 @@ fun ChatScreen(
                 val currentItems = msg.metadata["items"] as? Map<String, Int> ?: emptyMap()
                 DeliverablesDialog(
                     initialDeliverables = currentItems,
+                    collaboration = currentCollaboration,
                     onDismiss = { modificationMessage = null },
                     onSend = { deliverables ->
                         val text = "Deliverables: ${deliverables.entries.joinToString { "${it.key} (x${it.value})" }}"
@@ -153,12 +164,19 @@ fun ChatScreen(
 
     Scaffold(
         bottomBar = {
-            CmnBottomNavigationBar(
-                selectedItem = "Connect",
-                onItemSelected = { /* Handled in component */ },
-                navController = navController,
-                isBrand = isBrand
-            )
+            Surface(
+                color = Color.White,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(modifier = Modifier.navigationBarsPadding()) {
+                    CmnBottomNavigationBar(
+                        selectedItem = "Connect",
+                        onItemSelected = { /* Handled in component */ },
+                        navController = navController,
+                        isBrand = isBrand
+                    )
+                }
+            }
         }
     ) { innerPadding ->
         Box(
@@ -276,7 +294,7 @@ fun ChatScreen(
                                         }
                                     }
                                     
-                                    Divider()
+                                    HorizontalDivider()
                                     
                                     DropdownMenuItem(
                                         text = { Text("General Discussion", color = Color.Gray) },
@@ -384,8 +402,8 @@ fun ChatScreen(
                         messages = messages,
                         collaboration = currentCollaboration,
                         isBrand = isBrand,
-                        onReply = { message ->
-                            viewModel.setReplyingTo(message)
+                        onReply = { _ ->
+                            // Replying functionality placeholder
                         },
                         onUpdateStatus = { messageId, status ->
                             viewModel.updateMessageStatus(messageId, status)
@@ -430,7 +448,8 @@ fun ChatScreen(
                                         influencerViewModel.updateCollaborationStatus(token, collaborationId, newStatus) { }
                                     }
                                 }
-                            }
+                            },
+                            collaboration = currentCollaboration
                         )
                     }
                 }
@@ -454,7 +473,8 @@ fun ChatScreen(
                     Surface(
                         modifier = Modifier
                             .size(300.dp)
-                            .clip(CircleShape),
+                            .clip(CircleShape)
+                        ,
                         color = MaterialTheme.colorScheme.surface
                     ) {
                         Icon(
@@ -500,7 +520,6 @@ fun MessagesList(
         }
 
         var lastDate = ""
-        val dateFormat = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
 
         messages.forEach { message ->
             val readableDate = calculateReadableDate(message.timestamp)
@@ -620,7 +639,7 @@ fun ProposalSummaryCard(
             }
 
             Spacer(Modifier.height(12.dp))
-            Divider(color = Color(0xFFF5F5F5))
+            HorizontalDivider(color = Color(0xFFF5F5F5))
             Spacer(Modifier.height(12.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

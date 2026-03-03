@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,9 +20,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 
 @Composable
 fun RestrictedActionPanel(
@@ -30,7 +33,8 @@ fun RestrictedActionPanel(
     isBrand: Boolean,
     onSend: (String, String, Map<String, Any>) -> Unit,
     onSendUpload: (String) -> Unit = {},
-    onStatusUpdate: (String) -> Unit = {}
+    onStatusUpdate: (String) -> Unit = {},
+    collaboration: Collaboration? = null
 ) {
     var showNegotiation by remember { mutableStateOf(false) }
     var showDeliverables by remember { mutableStateOf(false) }
@@ -100,7 +104,7 @@ fun RestrictedActionPanel(
                 contentPadding = PaddingValues(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Negotiation Phase
+                // Negotiation Phase - Available for BOTH brand and influencer
                 if (status == "PENDING" || status == "NEGOTIATION") {
                     item { ActionCard("Negotiate", Icons.Default.AttachMoney) { showNegotiation = true } }
                     item { ActionCard("Deliverables", Icons.Default.List) { showDeliverables = true } }
@@ -143,8 +147,10 @@ fun RestrictedActionPanel(
     if (showNegotiation) {
         NegotiationDialog(
             onDismiss = { showNegotiation = false },
-            onSend = { amount ->
-                onSend("Proposed Budget: $$amount", "NEGOTIATION", mapOf("amount" to amount))
+            collaboration = collaboration,
+            onSend = { amount, platform, deliverables ->
+                val delStr = deliverables.entries.joinToString { "${it.key} (x${it.value})" }
+                onSend("Negotiated Proposal: ₹$amount on $platform - $delStr", "NEGOTIATION", mapOf("amount" to amount, "platform" to platform, "items" to deliverables))
                 onStatusUpdate("NEGOTIATION")
                 showNegotiation = false
             }
@@ -154,6 +160,7 @@ fun RestrictedActionPanel(
     if (showDeliverables) {
         DeliverablesDialog(
             onDismiss = { showDeliverables = false },
+            collaboration = collaboration,
             onSend = { deliverables ->
                 val text = "Deliverables: ${deliverables.entries.joinToString { "${it.key} (x${it.value})" }}"
                 onSend(text, "DELIVERABLES", mapOf("items" to deliverables))
@@ -265,36 +272,147 @@ fun ActionCard(
 @Composable
 fun NegotiationDialog(
     initialAmount: Int = 100,
+    initialPlatform: String = "Instagram",
+    initialDeliverables: Map<String, Int> = emptyMap(),
     onDismiss: () -> Unit,
-    onSend: (Int) -> Unit
+    onSend: (Int, String, Map<String, Int>) -> Unit,
+    collaboration: Collaboration? = null
 ) {
-    var budget by remember { mutableFloatStateOf(initialAmount.toFloat()) }
+    // Extract strictly allowed platforms and deliverables from original collaboration proposal
+    val allowedPlatforms = remember(collaboration) {
+        collaboration?.pricing?.map { it.platform }?.distinct() ?: listOf(initialPlatform)
+    }
+    val allowedDeliverables = remember(collaboration) {
+        collaboration?.pricing?.map { it.deliverable }?.distinct() ?: listOf("Post", "Reel", "Story", "Video")
+    }
+
+    var budget by remember { mutableStateOf(initialAmount.toString()) }
+    var selectedPlatform by remember { mutableStateOf(if (allowedPlatforms.contains(initialPlatform)) initialPlatform else allowedPlatforms.firstOrNull() ?: "") }
+    var showPlatformDropdown by remember { mutableStateOf(false) }
+
+    val selectedDeliverables = remember { mutableStateMapOf<String, Int>().apply { putAll(initialDeliverables) } }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Propose Budget") },
+        title = { Text("Propose Negotiation") },
         text = {
-            Column {
-                Text("Budget: $${budget.toInt()}")
-                Slider(
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                // Platform Selection
+                Text("Select Platform", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Box {
+                    OutlinedButton(
+                        onClick = { showPlatformDropdown = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(selectedPlatform, color = Color.Black)
+                            Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray)
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = showPlatformDropdown,
+                        onDismissRequest = { showPlatformDropdown = false },
+                        modifier = Modifier.fillMaxWidth(0.6f)
+                    ) {
+                        allowedPlatforms.forEach { platform ->
+                            DropdownMenuItem(
+                                text = { Text(platform) },
+                                onClick = {
+                                    selectedPlatform = platform
+                                    showPlatformDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // Price Field
+                Text("Proposed Budget (₹)", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                OutlinedTextField(
                     value = budget,
                     onValueChange = { budget = it },
-                    valueRange = 0f..5000f,
-                    steps = 49
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFFFF8383),
+                        cursorColor = Color(0xFFFF8383)
+                    ),
+                    singleLine = true
                 )
+
+                Spacer(Modifier.height(16.dp))
+
+                // Deliverables Section
+                Text("Select Deliverables & Counts", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                allowedDeliverables.forEach { option ->
+                    val count = selectedDeliverables[option] ?: 0
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Checkbox(
+                                checked = count > 0,
+                                onCheckedChange = {
+                                    if (it) selectedDeliverables[option] = 1 else selectedDeliverables.remove(option)
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFF8383))
+                            )
+                            Text(text = option, fontSize = 14.sp)
+                        }
+
+                        if (count > 0) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { if (count > 1) selectedDeliverables[option] = count - 1 else selectedDeliverables.remove(option) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(18.dp))
+                                }
+                                Text(
+                                    text = "$count",
+                                    modifier = Modifier.padding(horizontal = 8.dp),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                IconButton(
+                                    onClick = { selectedDeliverables[option] = count + 1 },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSend(budget.toInt()) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                onClick = {
+                    val finalBudget = budget.toIntOrNull() ?: initialAmount
+                    onSend(finalBudget, selectedPlatform, selectedDeliverables.toMap())
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383)),
+                shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Send Proposal")
+                Text("Send Proposal", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Cancel", color = Color.Gray)
             }
         }
     )
@@ -304,9 +422,14 @@ fun NegotiationDialog(
 fun DeliverablesDialog(
     initialDeliverables: Map<String, Int> = emptyMap(),
     onDismiss: () -> Unit,
-    onSend: (Map<String, Int>) -> Unit
+    onSend: (Map<String, Int>) -> Unit,
+    collaboration: Collaboration? = null
 ) {
-    val options = listOf("Reel", "IG Story", "YouTube Short", "TikTok", "Post")
+    // Extract strictly allowed deliverables from collaboration proposal
+    val allowedOptions = remember(collaboration) {
+        collaboration?.pricing?.map { it.deliverable }?.distinct() ?: listOf("Post", "Reel", "Story", "Video")
+    }
+    
     val selected = remember { mutableStateMapOf<String, Int>().apply { putAll(initialDeliverables) } }
 
     AlertDialog(
@@ -314,7 +437,7 @@ fun DeliverablesDialog(
         title = { Text("Select Deliverables") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                options.forEach { option ->
+                allowedOptions.forEach { option ->
                     val count = selected[option] ?: 0
                     Row(
                         modifier = Modifier
