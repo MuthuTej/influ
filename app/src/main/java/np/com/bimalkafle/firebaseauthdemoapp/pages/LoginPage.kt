@@ -1,7 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import android.widget.Toast
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -28,8 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -59,7 +55,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                             false
                         }
 
-
                     if (isProfileCompleted) {
                         val route = if (isBrand) "brand_home" else "influencer_home"
                         navController.navigate(route) {
@@ -78,41 +73,30 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         }
     }
 
-    val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    val imeDp = with(density) { imeBottom.toDp() }
-
-    val offset by animateDpAsState(
-        targetValue = if (imeDp > 0.dp) (-imeDp * 0.35f) else 0.dp,
-        label = "keyboard-offset"
-    )
-    val topPadding by animateDpAsState(
-        targetValue = if (imeDp > 0.dp) 190.dp else 140.dp,
-        label = "text-padding-offset"
-    )
-
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.White)
-            .offset(y = offset)
-            .verticalScroll(rememberScrollState())
             .imePadding()
     ) {
-        LoginPageContent(
-            authState = authState.value,
-            onLoginClicked = { email, password ->
-                authViewModel.login(email, password)
-            },
-            onSignUpClicked = {
-                navController.navigate("signup")
-            },
-            onForgotPasswordClicked = {
-                navController.navigate("forgot_password")
-            },
-            modifier = Modifier,
-            headerTopPadding = topPadding
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            LoginPageContent(
+                authState = authState.value,
+                onLoginClicked = { email, password ->
+                    authViewModel.login(email, password)
+                },
+                onSignUpClicked = {
+                    navController.navigate("signup")
+                },
+                onForgotPasswordClicked = {
+                    navController.navigate("forgot_password")
+                }
+            )
+        }
     }
 }
 
@@ -122,9 +106,7 @@ fun LoginPageContent(
     authState: AuthState?,
     onLoginClicked: (String, String) -> Unit,
     onSignUpClicked: () -> Unit,
-    onForgotPasswordClicked: () -> Unit,
-    modifier: Modifier = Modifier,
-    headerTopPadding: Dp
+    onForgotPasswordClicked: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -134,17 +116,21 @@ fun LoginPageContent(
     val themeColor = Color(0xFFFF8383)
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
+        modifier = Modifier
+            .fillMaxWidth()
             .background(Color.White)
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(280.dp)
+        ) {
             Image(
                 painter = painterResource(id = R.drawable.vector3),
                 contentDescription = "Header background",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(280.dp), // Fixed height for immersive feel
+                    .height(280.dp),
                 contentScale = ContentScale.FillBounds
             )
             Text(
@@ -152,7 +138,7 @@ fun LoginPageContent(
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
-                modifier = Modifier.padding(start = 32.dp, top = headerTopPadding)
+                modifier = Modifier.padding(start = 32.dp, top = 140.dp)
             )
         }
 
@@ -162,7 +148,7 @@ fun LoginPageContent(
                 .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedTextField(
                 value = email,
@@ -170,7 +156,8 @@ fun LoginPageContent(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Email") },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColor)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -190,7 +177,8 @@ fun LoginPageContent(
                         )
                     }
                 },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColor)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -201,7 +189,11 @@ fun LoginPageContent(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
+                    Checkbox(
+                        checked = rememberMe,
+                        onCheckedChange = { rememberMe = it },
+                        colors = CheckboxDefaults.colors(checkedColor = themeColor)
+                    )
                     Text("Remember Me")
                 }
                 Text(
@@ -251,6 +243,8 @@ fun LoginPageContent(
                 fontSize = 14.sp,
                 modifier = Modifier.clickable { onSignUpClicked() }
             )
+            
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
