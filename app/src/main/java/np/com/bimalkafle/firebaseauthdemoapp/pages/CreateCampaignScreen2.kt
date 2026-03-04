@@ -150,10 +150,10 @@ fun CreateCampaignScreen2(
                 .verticalScroll(rememberScrollState())
         ) {
             // Budget Range
-            Text("Budget Range (₹K) *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text("Budget Range *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "₹${formatBudgetValue(campaignViewModel.budgetMin.toFloat())} - ${formatBudgetValue(campaignViewModel.budgetMax.toFloat())}",
+                "${campaignViewModel.budgetMin} - ${campaignViewModel.budgetMax}",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -166,7 +166,7 @@ fun CreateCampaignScreen2(
                     campaignViewModel.budgetMin = it.start.toInt()
                     campaignViewModel.budgetMax = it.endInclusive.toInt()
                 },
-                valueRange = 1f..1000f,
+                valueRange = 0f..1000000f,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
                     thumbColor = Color(0xFFFF8383),
@@ -308,19 +308,6 @@ fun GenderButton(text: String, isSelected: Boolean, onClick: () -> Unit, modifie
         )
     ) {
         Text(text)
-    }
-}
-
-private fun formatBudgetValue(value: Float): String {
-    return if (value >= 100) {
-        val lakhs = value / 100f
-        if (lakhs.rem(1) == 0f) {
-            "${lakhs.toInt()}L"
-        } else {
-            String.format("%.1f", lakhs) + "L"
-        }
-    } else {
-        "${value.toInt()}K"
     }
 }
 

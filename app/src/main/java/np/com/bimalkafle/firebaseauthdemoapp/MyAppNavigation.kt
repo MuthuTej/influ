@@ -94,7 +94,11 @@ fun MyAppNavigation(
         }
         composable("campaign_details") {
             CampaignDetailsPage(
-                onBack = { navController.popBackStack() },
+                onBack = {
+                    navController.navigate("brand_home") {
+                        popUpTo("brand_home") { inclusive = true }
+                    }
+                },
                 onSearchInfluencer = { navController.navigate("brand_home") },
                 campaignViewModel = campaignViewModel
             )
