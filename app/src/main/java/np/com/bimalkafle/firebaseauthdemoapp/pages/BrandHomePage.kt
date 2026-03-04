@@ -177,16 +177,12 @@ fun BrandHomePage(
 
 @Composable
 fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoapp.model.Brand?, navController: NavController, unreadCount: Int) {
-    val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
-    val headerHeight = screenHeight * 0.35f
-    val cardHeight = screenHeight * 0.28f
-
-    Box(modifier = Modifier.fillMaxWidth().height(headerHeight + cardHeight * 0.75f)) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        // Decorative background area
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(headerHeight)
+                .height(260.dp)
                 .background(brandThemeColor)
                 .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
         ) {
@@ -196,11 +192,21 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 modifier = Modifier.fillMaxSize().alpha(0.15f),
                 contentScale = ContentScale.Crop
             )
+        }
+
+        // Adaptive content Column
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Header Row (Hello and Icons)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(top = 16.dp, start = 16.dp, end = 16.dp),
+                    .padding(top = 16.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
@@ -252,45 +258,52 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                     }
                 }
             }
-        }
-        Card(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = headerHeight - (cardHeight * 0.50f))
-                .padding(horizontal = 16.dp)
-                .fillMaxWidth()
-                .height(cardHeight),
-            shape = RoundedCornerShape(30.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 25.dp)
-        ) {
-            Box(modifier = Modifier.background(brush = Brush.verticalGradient(listOf(Color(0xFFFFAFBD), brandThemeColor)))) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+
+            // Attached Section: Card + Button centered on the bottom edge
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                // Total Reach Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 27.dp), // exactly half of button height
+                    shape = RoundedCornerShape(30.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 15.dp)
                 ) {
-                    Text("Total Reach", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                    Text("2.4 M", fontSize = 50.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        BrandStatChip("Engagement", "6.1 %", Modifier.weight(1f))
-                        BrandStatChip("Leads", "1.2 K", Modifier.weight(1f))
-                        BrandStatChip("Spent", "18.4K", Modifier.weight(1f))
+                    Box(modifier = Modifier.background(brush = Brush.verticalGradient(listOf(Color(0xFFFFAFBD), brandThemeColor)))) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("Total Reach", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                            Text("2.4 M", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                BrandStatChip("Engagement", "6.1 %", Modifier.weight(1f))
+                                BrandStatChip("Leads", "1.2 K", Modifier.weight(1f))
+                                BrandStatChip("Spent", "18.4K", Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
+
+                // Find Influencer Button attached to the bottom center of the card
+                Button(
+                    onClick = { navController.navigate("brand_search") },
+                    shape = RoundedCornerShape(30.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(54.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 10.dp)
+                ) {
+                    Text("Find Influencer", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
             }
-        }
-        Button(
-            onClick = { navController.navigate("brand_search") },
-            shape = RoundedCornerShape(30.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = headerHeight + (cardHeight * 0.40f))
-                .fillMaxWidth(0.65f)
-                .height(52.dp),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 10.dp)
-        ) {
-            Text("Find Influencer", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
