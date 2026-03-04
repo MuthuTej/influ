@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -19,16 +19,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
@@ -38,7 +38,6 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.Brand
 import np.com.bimalkafle.firebaseauthdemoapp.model.BrandCategory
 import np.com.bimalkafle.firebaseauthdemoapp.model.PreferredPlatform
 import np.com.bimalkafle.firebaseauthdemoapp.model.TargetAudience
-import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 
 @Composable
@@ -148,18 +147,7 @@ fun BrandProfileContent(
     val themeColor = Color(0xFFFF8383)
 
     Scaffold(
-        bottomBar = bottomBar,
-        floatingActionButton = {
-            if (!isEditMode) {
-                FloatingActionButton(
-                    onClick = onNavigateToCreateCampaign,
-                    containerColor = themeColor,
-                    shape = CircleShape
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White)
-                }
-            }
-        }
+        bottomBar = bottomBar
     ) { padding ->
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -171,20 +159,22 @@ fun BrandProfileContent(
                     .fillMaxSize()
                     .background(Color.White)
                     .verticalScroll(rememberScrollState())
+                    .padding(bottom = padding.calculateBottomPadding())
             ) {
-                // Profile Header
+                // Reduced and more elegant header
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(340.dp)
-                        .background(themeColor),
+                        .wrapContentHeight()
+                        .background(themeColor)
+                        .clip(RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.vector),
                         contentDescription = null,
                         modifier = Modifier
-                            .fillMaxSize()
+                            .matchParentSize()
                             .alpha(0.15f),
                         contentScale = ContentScale.Crop
                     )
@@ -194,12 +184,13 @@ fun BrandProfileContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
-                            .padding(top = 24.dp)
+                            .padding(top = 24.dp, bottom = 32.dp)
                     ) {
                         Surface(
-                            modifier = Modifier.size(100.dp),
+                            modifier = Modifier.size(90.dp),
                             shape = CircleShape,
-                            color = Color.White
+                            color = Color.White,
+                            shadowElevation = 8.dp
                         ) {
                             if (logoUrl.isNotEmpty()) {
                                 AsyncImage(
@@ -211,16 +202,18 @@ fun BrandProfileContent(
                                     contentScale = ContentScale.Crop
                                 )
                             } else {
-                                Icon(
-                                    Icons.Default.Business,
-                                    contentDescription = null,
-                                    modifier = Modifier.padding(24.dp),
-                                    tint = themeColor
-                                )
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Business,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(40.dp),
+                                        tint = themeColor
+                                    )
+                                }
                             }
                         }
                         
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         
                         if (isEditMode) {
                             OutlinedTextField(
@@ -237,224 +230,238 @@ fun BrandProfileContent(
                                     unfocusedLabelColor = Color.White.copy(alpha = 0.7f)
                                 ),
                                 label = { Text("Brand Name") },
-                                textStyle = TextStyle(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                textStyle = TextStyle(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             )
                         } else {
                             Text(
                                 text = name.ifEmpty { "Brand Name" },
                                 color = Color.White,
-                                fontSize = 22.sp,
+                                fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = role.ifEmpty { "BRAND" },
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontSize = 14.sp
-                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Surface(
+                            color = Color.White.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text(
+                                text = role.ifEmpty { "BRAND" },
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
 
-                // Profile Details
-                Column(modifier = Modifier
-                    .padding(16.dp)
-                    .padding(bottom = padding.calculateBottomPadding())) {
-                    ProfileSectionTitle("Email Address")
-                    if (isEditMode) {
-                        OutlinedTextField(
-                            value = email,
-                            onValueChange = { email = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            label = { Text("Email") }
-                        )
-                    } else {
-                        Text(text = email.ifEmpty { "N/A" }, color = Color.DarkGray, fontSize = 14.sp)
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    ProfileSectionTitle("About Brand")
-                    if (isEditMode) {
-                        OutlinedTextField(
-                            value = about,
-                            onValueChange = { about = it },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            label = { Text("Brand Description") }
-                        )
-                    } else {
-                        Text(
-                            text = about.ifEmpty { "No information available." },
-                            color = Color.DarkGray,
-                            fontSize = 14.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-
-                    ProfileSectionTitle("Category")
-                    if (isEditMode) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Attractive Details Section
+                Column(modifier = Modifier.padding(20.dp)) {
+                    
+                    DetailInfoSection(icon = Icons.Default.Email, title = "Email Address") {
+                        if (isEditMode) {
                             OutlinedTextField(
-                                value = category,
-                                onValueChange = { category = it },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                label = { Text("Category") }
-                            )
-                            OutlinedTextField(
-                                value = subCategory,
-                                onValueChange = { subCategory = it },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                label = { Text("Sub-Category") }
-                            )
-                        }
-                    } else {
-                        Text(text = "${category.ifEmpty { "N/A" }} - ${subCategory.ifEmpty { "N/A" }}", color = Color.DarkGray, fontSize = 14.sp)
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    ProfileSectionTitle("Target Audience")
-                    if (isEditMode) {
-                        Column {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = ageMin,
-                                    onValueChange = { ageMin = it },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp),
-                                    label = { Text("Min Age") }
-                                )
-                                OutlinedTextField(
-                                    value = ageMax,
-                                    onValueChange = { ageMax = it },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp),
-                                    label = { Text("Max Age") }
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = gender,
-                                onValueChange = { gender = it },
+                                value = email,
+                                onValueChange = { email = it },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
-                                label = { Text("Target Gender") }
+                                label = { Text("Email") }
                             )
+                        } else {
+                            Text(text = email.ifEmpty { "N/A" }, color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                         }
-                    } else {
-                        Text(text = "Age: ${ageMin.ifEmpty { "N/A" }} - ${ageMax.ifEmpty { "N/A" }} | Gender: ${gender.ifEmpty { "N/A" }}", color = Color.DarkGray, fontSize = 14.sp)
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    DetailInfoSection(icon = Icons.Default.Info, title = "About Brand") {
+                        if (isEditMode) {
+                            OutlinedTextField(
+                                value = about,
+                                onValueChange = { about = it },
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                label = { Text("Brand Description") }
+                            )
+                        } else {
+                            Text(
+                                text = about.ifEmpty { "No information available." },
+                                color = Color.Black,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Normal,
+                                lineHeight = 22.sp
+                            )
+                        }
+                    }
 
-                    ProfileSectionTitle("Preferred Platforms")
-                    if (isEditMode) {
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            platformOptions.forEach { platform ->
-                                val isSelected = selectedPlatforms.contains(platform)
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        if (isSelected) selectedPlatforms.remove(platform)
-                                        else selectedPlatforms.add(platform)
-                                    },
-                                    label = { Text(platform) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = themeColor.copy(alpha = 0.1f),
-                                        selectedLabelColor = themeColor,
-                                        selectedLeadingIconColor = themeColor
-                                    )
+                    DetailInfoSection(icon = Icons.Default.Category, title = "Category") {
+                        if (isEditMode) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = category,
+                                    onValueChange = { category = it },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    label = { Text("Category") }
+                                )
+                                OutlinedTextField(
+                                    value = subCategory,
+                                    onValueChange = { subCategory = it },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    label = { Text("Sub-Category") }
                                 )
                             }
-                        }
-                    } else {
-                        if (selectedPlatforms.isEmpty()) {
-                            Text(text = "No platforms selected.", color = Color.DarkGray, fontSize = 14.sp)
                         } else {
-                            Text(text = selectedPlatforms.joinToString(", "), color = Color.DarkGray, fontSize = 14.sp)
+                            Text(text = "${category.ifEmpty { "N/A" }} - ${subCategory.ifEmpty { "N/A" }}", color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+
+                    DetailInfoSection(icon = Icons.Default.Groups, title = "Target Audience") {
+                        if (isEditMode) {
+                            Column {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(
+                                        value = ageMin,
+                                        onValueChange = { ageMin = it },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp),
+                                        label = { Text("Min Age") }
+                                    )
+                                    OutlinedTextField(
+                                        value = ageMax,
+                                        onValueChange = { ageMax = it },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp),
+                                        label = { Text("Max Age") }
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = gender,
+                                    onValueChange = { gender = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    label = { Text("Target Gender") }
+                                )
+                            }
+                        } else {
+                            Text(text = "Age: ${ageMin.ifEmpty { "N/A" }} - ${ageMax.ifEmpty { "N/A" }} | Gender: ${gender.ifEmpty { "N/A" }}", color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+
+                    DetailInfoSection(icon = Icons.Default.Public, title = "Preferred Platforms") {
+                        if (isEditMode) {
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                platformOptions.forEach { platform ->
+                                    val isSelected = selectedPlatforms.contains(platform)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            if (isSelected) selectedPlatforms.remove(platform)
+                                            else selectedPlatforms.add(platform)
+                                        },
+                                        label = { Text(platform) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = themeColor.copy(alpha = 0.1f),
+                                            selectedLabelColor = themeColor,
+                                            selectedLeadingIconColor = themeColor
+                                        )
+                                    )
+                                }
+                            }
+                        } else {
+                            if (selectedPlatforms.isEmpty()) {
+                                Text(text = "No platforms selected.", color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                            } else {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    selectedPlatforms.forEach { platform ->
+                                        Surface(
+                                            color = themeColor.copy(alpha = 0.1f),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text(
+                                                text = platform,
+                                                color = themeColor,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Edit/Save Button
-                    Button(
-                        onClick = {
-                            if (isEditMode) {
-                                val updatedBrand = brandProfile?.copy(
-                                    name = name,
-                                    email = email,
-                                    role = role,
-                                    about = about,
-                                    brandCategory = BrandCategory(category, subCategory),
-                                    profileUrl = profileUrl,
-                                    logoUrl = logoUrl,
-                                    targetAudience = TargetAudience(
-                                        ageMin = ageMin.toIntOrNull(),
-                                        ageMax = ageMax.toIntOrNull(),
-                                        gender = gender,
-                                        locations = brandProfile.targetAudience?.locations
-                                    ),
-                                    preferredPlatforms = selectedPlatforms.map { platformName ->
-                                        PreferredPlatform(
-                                            platform = platformName,
-                                            profileUrl = null,
-                                            followers = null,
-                                            avgViews = null,
-                                            engagement = null,
-                                            formats = null,
-                                            connected = null,
-                                            minFollowers = null,
-                                            minEngagement = null
-                                        )
+                    // Redesigned Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                if (isEditMode) {
+                                    val updatedBrand = brandProfile?.copy(
+                                        name = name,
+                                        email = email,
+                                        role = role,
+                                        about = about,
+                                        brandCategory = BrandCategory(category, subCategory),
+                                        profileUrl = profileUrl,
+                                        logoUrl = logoUrl,
+                                        targetAudience = TargetAudience(
+                                            ageMin = ageMin.toIntOrNull(),
+                                            ageMax = ageMax.toIntOrNull(),
+                                            gender = gender,
+                                            locations = brandProfile.targetAudience?.locations
+                                        ),
+                                        preferredPlatforms = selectedPlatforms.map { platformName ->
+                                            PreferredPlatform(
+                                                platform = platformName,
+                                                profileUrl = null,
+                                                followers = null,
+                                                avgViews = null,
+                                                engagement = null,
+                                                formats = null,
+                                                connected = null,
+                                                minFollowers = null,
+                                                minEngagement = null
+                                            )
+                                        }
+                                    )
+                                    if (updatedBrand != null) {
+                                        onUpdateProfile(updatedBrand)
                                     }
-                                )
-                                if (updatedBrand != null) {
-                                    onUpdateProfile(updatedBrand)
                                 }
+                                isEditMode = !isEditMode
+                            },
+                            modifier = Modifier.weight(1f).height(56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColor),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                        ) {
+                            Icon(if (isEditMode) Icons.Default.Save else Icons.Default.Edit, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = if (isEditMode) "Save Changes" else "Edit Profile", fontWeight = FontWeight.Bold)
+                        }
+
+                        if (!isEditMode) {
+                            IconButton(
+                                onClick = onSignOut,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .background(Color(0xFFFEE2E2), RoundedCornerShape(16.dp))
+                            ) {
+                                Icon(Icons.Default.Logout, contentDescription = "Log Out", tint = Color.Red)
                             }
-                            isEditMode = !isEditMode
-                        },
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColor)
-                    ) {
-                        Icon(
-                            if (isEditMode) Icons.Default.Save else Icons.Default.Edit,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(id = if (isEditMode) R.string.btn_save else R.string.btn_edit),
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Log Out Button
-                    Button(
-                        onClick = onSignOut,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f))
-                    ) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Log Out", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
                     }
                     
                     Spacer(modifier = Modifier.height(32.dp))
@@ -465,26 +472,39 @@ fun BrandProfileContent(
 }
 
 @Composable
-fun ProfileSectionTitle(title: String) {
-    Text(
-        text = title,
-        color = Color.Black,
-        fontSize = 16.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(bottom = 8.dp)
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun BrandProfilePreview() {
-    FirebaseAuthDemoAppTheme {
-        BrandProfileContent(
-            brandProfile = null,
-            isLoading = false,
-            onSignOut = {},
-            onNavigateToCreateCampaign = {},
-            onUpdateProfile = {}
-        )
+fun DetailInfoSection(
+    icon: ImageVector,
+    title: String,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color(0xFFFF8383),
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray
+                    )
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            content()
+        }
     }
 }
