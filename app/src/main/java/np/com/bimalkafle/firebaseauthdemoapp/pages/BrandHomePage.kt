@@ -143,6 +143,9 @@ fun BrandHomePage(
                             brandName = brandProfile?.name ?: "Brand",
                             onCollaborationClick = { id ->
                                 navController.navigate("collaboration_analytics/$id")
+                            },
+                            onViewAllClick = {
+                                navController.navigate("brand_history")
                             }
                         )
                         TopPicksSectionBrand(
@@ -333,7 +336,8 @@ fun ActiveCampaignSection(
     collaborations: List<Collaboration>,
     brandViewModel: BrandViewModel,
     brandName: String,
-    onCollaborationClick: (String) -> Unit
+    onCollaborationClick: (String) -> Unit,
+    onViewAllClick: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -342,6 +346,14 @@ fun ActiveCampaignSection(
             Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(brandThemeColor.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
                 Text(collaborations.size.toString(), color = brandThemeColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "View All",
+                color = brandThemeColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                modifier = Modifier.clickable { onViewAllClick() }
+            )
         }
         Spacer(modifier = Modifier.height(8.dp))
         if (collaborations.isEmpty()) {
