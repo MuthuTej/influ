@@ -113,18 +113,17 @@ class InfluencerViewModel : ViewModel() {
         categories: List<Category>,
         platforms: List<Platform>,
         pricing: List<PricingInfo>,
+        availability: Boolean,
         onComplete: (Boolean) -> Unit
     ) {
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
             val mutation = """
-                mutation UpdateInfluencerProfile(${'$'}input: InfluencerProfileInput!) {
-                  updateInfluencerProfile(input: ${'$'}input) {
+                mutation SetupInfluencerProfile(${'$'}input: InfluencerProfileInput!) {
+                  setupInfluencerProfile(input: ${'$'}input) {
                     id
                     name
-                    bio
-                    location
                     profileCompleted
                   }
                 }
@@ -143,7 +142,8 @@ class InfluencerViewModel : ViewModel() {
                             "profileUrl" to (it.profileUrl ?: ""),
                             "followers" to (it.followers ?: 0),
                             "avgViews" to (it.avgViews ?: 0),
-                            "engagement" to (it.engagement ?: 0f).toDouble()
+                            "engagement" to (it.engagement ?: 0f).toDouble(),
+                            "formats" to (it.formats ?: emptyList<String>())
                         )
                     },
                     "pricing" to pricing.map { 
@@ -154,14 +154,15 @@ class InfluencerViewModel : ViewModel() {
                             "currency" to it.currency
                         )
                     },
-                    "availability" to "Available"
+                    "availability" to availability
                 )
             )
 
             val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
             result.onSuccess { jsonObject ->
                 val data = jsonObject.optJSONObject("data")
-                if (data != null && data.optJSONObject("updateInfluencerProfile") != null) {
+                if (data != null && data.optJSONObject("setupInfluencerProfile") != null) {
+                    fetchInfluencerDetails(token)
                     onComplete(true)
                 } else {
                     val errors = jsonObject.optJSONArray("errors")
