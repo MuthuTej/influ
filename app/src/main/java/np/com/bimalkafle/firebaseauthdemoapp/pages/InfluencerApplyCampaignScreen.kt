@@ -4,8 +4,6 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -14,8 +12,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -69,15 +65,15 @@ fun InfluencerApplyCampaignScreen(
     }
 
     LaunchedEffect(campaignDetail) {
-        campaignDetail?.brand?.preferredPlatforms?.forEach { pref ->
+        campaignDetail?.platforms?.forEach { platform ->
             val platformPricing = pricingMap.toMutableMap()
-            val priceMap = platformPricing[pref.platform] ?: mutableMapOf()
-            pref.formats?.forEach { format ->
+            val priceMap = platformPricing[platform.platform] ?: mutableMapOf()
+            platform.formats?.forEach { format ->
                 if (!priceMap.containsKey(format)) {
                     priceMap[format] = ""
                 }
             }
-            platformPricing[pref.platform] = priceMap
+            platformPricing[platform.platform] = priceMap
             pricingMap = platformPricing
         }
     }
@@ -186,16 +182,16 @@ fun InfluencerApplyCampaignScreen(
             Text("Your Pricing", fontWeight = FontWeight.Bold, color = Color.Gray, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(8.dp))
 
-            campaignDetail?.brand?.preferredPlatforms?.forEach { pref ->
+            campaignDetail?.platforms?.forEach { platform ->
                 Text(
-                    text = pref.platform.uppercase(),
+                    text = platform.platform.uppercase(),
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 14.sp,
                     color = Color(0xFFFF8383),
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
                 
-                pref.formats?.forEach { format ->
+                platform.formats?.forEach { format ->
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                         shape = RoundedCornerShape(16.dp),
@@ -206,12 +202,12 @@ fun InfluencerApplyCampaignScreen(
                             Text(format, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             Spacer(modifier = Modifier.height(12.dp))
                             OutlinedTextField(
-                                value = pricingMap[pref.platform]?.get(format) ?: "",
+                                value = pricingMap[platform.platform]?.get(format) ?: "",
                                 onValueChange = { newVal ->
                                     val pMap = pricingMap.toMutableMap()
-                                    val dPriceMap = pMap[pref.platform]?.toMutableMap() ?: mutableMapOf()
+                                    val dPriceMap = pMap[platform.platform]?.toMutableMap() ?: mutableMapOf()
                                     dPriceMap[format] = newVal
-                                    pMap[pref.platform] = dPriceMap
+                                    pMap[platform.platform] = dPriceMap
                                     pricingMap = pMap
                                 },
                                 modifier = Modifier.fillMaxWidth(),

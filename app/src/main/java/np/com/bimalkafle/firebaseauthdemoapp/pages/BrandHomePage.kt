@@ -372,7 +372,7 @@ fun ActiveCampaignSection(
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
-            Text("Active Campaigns", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Active Collaborations", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(modifier = Modifier.width(8.dp))
             Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(brandThemeColor.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
                 Text(collaborations.size.toString(), color = brandThemeColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
