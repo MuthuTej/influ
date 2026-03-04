@@ -202,59 +202,77 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Row (Hello and Icons)
-            Row(
+            // Header Section: Box used to layer Icons and Logo+Name Row
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(top = 8.dp, bottom = 12.dp)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color.White,
-                    modifier = Modifier.size(54.dp)
+                // Icons Row: Pushed to the top and moved up relative to name
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(y = (-4).dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (!brandProfile?.logoUrl.isNullOrEmpty()) {
-                        AsyncImage(
-                            model = brandProfile?.logoUrl,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Image(
-                            painter = painterResource(id = R.drawable.brand_profile),
-                            contentDescription = null,
-                            modifier = Modifier.padding(6.dp).clip(CircleShape)
-                        )
+                    IconBubble(Icons.Default.Campaign, Color(0xFF1877F2)) { navController.navigate("all_campaigns") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconBubble(Icons.Default.Favorite, Color(0xFFE1306C)) { navController.navigate("brand_wishlist") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box {
+                        IconBubble(Icons.Default.Notifications, Color.Black) { navController.navigate("notifications") }
+                        if (unreadCount > 0) {
+                            Badge(
+                                modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
+                                containerColor = Color.Red,
+                                contentColor = Color.White
+                            ) {
+                                Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
+                            }
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
-                    Text(
-                        brandProfile?.name ?: "Guest",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
+
+                // Logo and Name: Aligned start, Name allowed to wrap
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxWidth(0.65f) // Give name 65% width to prevent collision
+                        .padding(top = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
                         color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                IconBubble(Icons.Default.Campaign, Color.Blue) { navController.navigate("all_campaigns") }
-                Spacer(modifier = Modifier.width(10.dp))
-                IconBubble(Icons.Default.Favorite, Color.Red) { navController.navigate("brand_wishlist") }
-                Spacer(modifier = Modifier.width(10.dp))
-                Box {
-                    IconBubble(Icons.Default.Notifications, Color.Black) { navController.navigate("notifications") }
-                    if (unreadCount > 0) {
-                        Badge(
-                            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-                            containerColor = Color.Red,
-                            contentColor = Color.White
-                        ) {
-                            Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
+                        modifier = Modifier.size(54.dp)
+                    ) {
+                        if (!brandProfile?.logoUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = brandProfile?.logoUrl,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(id = R.drawable.brand_profile),
+                                contentDescription = null,
+                                modifier = Modifier.padding(6.dp).clip(CircleShape)
+                            )
                         }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
+                        Text(
+                            brandProfile?.name ?: "Guest",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 2, // Now adaptive: wraps if too long
+                            lineHeight = 22.sp,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
@@ -492,12 +510,29 @@ fun TopPicksSectionBrand(
     val filteredInfluencers = remember(selectedPlatform, influencers) {
         influencers.filter { influencer -> influencer.platforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true }.take(10)
     }
+    
+    val youtubeColor = Color(0xFFFF0000)
+    val instagramColor = Color(0xFFE1306C) // Instagram Pinkish-Red
+    val facebookColor = Color(0xFF1877F2)
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Top Influencers", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(horizontal = 16.dp))
         Spacer(modifier = Modifier.height(16.dp))
         Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
-            TabRow(selectedTabIndex = platforms.indexOf(selectedPlatform), containerColor = Color.Transparent, indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(modifier = Modifier.tabIndicatorOffset(tabPositions[platforms.indexOf(selectedPlatform)]), color = brandThemeColor)
+            TabRow(
+                selectedTabIndex = platforms.indexOf(selectedPlatform), 
+                containerColor = Color.Transparent, 
+                indicator = { tabPositions ->
+                    val currentTabColor = when (selectedPlatform) {
+                        "YouTube" -> youtubeColor
+                        "Instagram" -> instagramColor
+                        "Facebook" -> facebookColor
+                        else -> brandThemeColor
+                    }
+                    TabRowDefaults.SecondaryIndicator(
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[platforms.indexOf(selectedPlatform)]), 
+                        color = currentTabColor
+                    )
                 }
             ) {
                 platforms.forEach { platform ->
@@ -507,7 +542,24 @@ fun TopPicksSectionBrand(
                         "Facebook" -> R.drawable.ic_facebook
                         else -> R.drawable.ic_youtube
                     }
-                    Tab(selected = selectedPlatform == platform, onClick = { selectedPlatform = platform }, icon = { Icon(painter = painterResource(id = iconRes), contentDescription = platform, modifier = Modifier.size(24.dp)) })
+                    val iconColor = when (platform) {
+                        "YouTube" -> youtubeColor
+                        "Instagram" -> instagramColor
+                        "Facebook" -> facebookColor
+                        else -> Color.Gray
+                    }
+                    Tab(
+                        selected = selectedPlatform == platform, 
+                        onClick = { selectedPlatform = platform }, 
+                        icon = { 
+                            Icon(
+                                painter = painterResource(id = iconRes), 
+                                contentDescription = platform, 
+                                modifier = Modifier.size(24.dp),
+                                tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f)
+                            ) 
+                        }
+                    )
                 }
             }
         }
@@ -539,6 +591,12 @@ fun BrandCardBrand(
     onCardClick: () -> Unit,
     selectedPlatform: String? = null
 ) {
+    val youtubeColor = Color(0xFFFF0000)
+    val facebookColor = Color(0xFF1877F2)
+    val instaGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFF833AB4), Color(0xFFE1306C), Color(0xFFFD1D1D))
+    )
+
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -628,15 +686,32 @@ fun BrandCardBrand(
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 val platformToShow = if (selectedPlatform != null) influencer.platforms?.find { it.platform.equals(selectedPlatform, ignoreCase = true) } else influencer.platforms?.firstOrNull()
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    val platformIcon = when(platformToShow?.platform?.uppercase()) {
+                    val platformType = platformToShow?.platform?.uppercase()
+                    val platformIcon = when(platformType) {
                         "YOUTUBE" -> R.drawable.ic_youtube
                         "INSTAGRAM" -> R.drawable.ic_instagram
                         "FACEBOOK" -> R.drawable.ic_facebook
                         else -> R.drawable.ic_instagram 
                     }
-                    Surface(shape = CircleShape, color = brandThemeColor, modifier = Modifier.size(24.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(painter = painterResource(id = platformIcon), contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp)) }
+                    
+                    if (platformType == "INSTAGRAM") {
+                        Box(
+                            modifier = Modifier.size(24.dp).clip(CircleShape).background(instaGradient),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(painter = painterResource(id = platformIcon), contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        }
+                    } else {
+                        val platformColor = when(platformType) {
+                            "YOUTUBE" -> youtubeColor
+                            "FACEBOOK" -> facebookColor
+                            else -> Color.Gray
+                        }
+                        Surface(shape = CircleShape, color = platformColor, modifier = Modifier.size(24.dp)) {
+                            Box(contentAlignment = Alignment.Center) { Icon(painter = painterResource(id = platformIcon), contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp)) }
+                        }
                     }
+
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(text = "${formatCount(platformToShow?.followers ?: 0)} Followers", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 }
