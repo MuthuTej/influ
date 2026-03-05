@@ -699,4 +699,132 @@ object BackendRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun createCollaborationPaymentOrder(
+        collaborationId: String,
+        paymentType: String,
+        token: String
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                mutation CreateCollaborationPaymentOrder(${'$'}collaborationId: ID!, ${'$'}paymentType: PaymentType!) {
+                    createCollaborationPaymentOrder(collaborationId: ${'$'}collaborationId, paymentType: ${'$'}paymentType) {
+                        success
+                        collaborationId
+                        razorpayOrderId
+                        totalAmount
+                    }
+                }
+            """.trimIndent()
+
+            val variables = JSONObject().apply {
+                put("collaborationId", collaborationId)
+                put("paymentType", paymentType)
+            }
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+                put("variables", variables)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    val data = jsonResponse.getJSONObject("data").getJSONObject("createCollaborationPaymentOrder")
+                    Result.success(data)
+                }
+            } else {
+                val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun verifyPayment(
+        collaborationId: String,
+        razorpayPaymentId: String,
+        razorpaySignature: String,
+        paymentType: String,
+        token: String
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                mutation VerifyPayment(
+                    ${'$'}collaborationId: ID!, 
+                    ${'$'}razorpayPaymentId: String!, 
+                    ${'$'}razorpaySignature: String!, 
+                    ${'$'}paymentType: PaymentType!
+                ) {
+                    verifyPayment(
+                        collaborationId: ${'$'}collaborationId, 
+                        razorpayPaymentId: ${'$'}razorpayPaymentId, 
+                        razorpaySignature: ${'$'}razorpaySignature, 
+                        paymentType: ${'$'}paymentType
+                    ) {
+                        id
+                        status
+                        paymentStatus
+                    }
+                }
+            """.trimIndent()
+
+            val variables = JSONObject().apply {
+                put("collaborationId", collaborationId)
+                put("razorpayPaymentId", razorpayPaymentId)
+                put("razorpaySignature", razorpaySignature)
+                put("paymentType", paymentType)
+            }
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+                put("variables", variables)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    Result.success(true)
+                }
+            } else {
+                val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

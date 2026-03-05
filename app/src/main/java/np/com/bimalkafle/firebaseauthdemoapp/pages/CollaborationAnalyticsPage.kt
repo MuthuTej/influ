@@ -88,7 +88,7 @@ fun CollaborationAnalyticsPage(
                 if (collaboration.status == "PENDING") {
                     item { StatusPlaceholder("Proposal not accepted till now", Icons.Default.HourglassEmpty) }
                 } else if (collaboration.status == "ACCEPTED") {
-                    item { StatusPlaceholder("Advance payment is not completed", Icons.Default.Payment) }
+                    item { StatusPlaceholder("Payment is not completed", Icons.Default.Payment) }
                 } else {
                     item {
                         Column(modifier = Modifier.padding(horizontal = 16.dp)) {

@@ -449,7 +449,8 @@ fun ChatScreen(
                                     }
                                 }
                             },
-                            collaboration = currentCollaboration
+                            collaboration = currentCollaboration,
+                            brandViewModel = brandViewModel
                         )
                     }
                 }
@@ -706,3 +707,4 @@ private fun calculateReadableDate(timestamp: Long): String {
         else -> SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(msgTime.time)
     }
 }
+

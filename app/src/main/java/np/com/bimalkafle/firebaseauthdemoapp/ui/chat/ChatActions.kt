@@ -24,6 +24,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
+import com.google.firebase.auth.FirebaseAuth
+import np.com.bimalkafle.firebaseauthdemoapp.utils.RazorpayService
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 
 @Composable
@@ -34,7 +40,8 @@ fun RestrictedActionPanel(
     onSend: (String, String, Map<String, Any>) -> Unit,
     onSendUpload: (String, String) -> Unit = { _, _ -> },
     onStatusUpdate: (String) -> Unit = {},
-    collaboration: Collaboration? = null
+    collaboration: Collaboration? = null,
+    brandViewModel: BrandViewModel? = null
 ) {
     var showNegotiation by remember { mutableStateOf(false) }
     var showDeliverables by remember { mutableStateOf(false) }
@@ -42,7 +49,10 @@ fun RestrictedActionPanel(
     var showScript by remember { mutableStateOf(false) }
     var showFeedback by remember { mutableStateOf(false) }
     var showUpload by remember { mutableStateOf(false) }
-
+    
+    val context = LocalContext.current
+    val activity = context as? Activity
+    
     if (status == null) return
 
     val statusMessage = when (status) {
@@ -131,8 +141,26 @@ fun RestrictedActionPanel(
                     item { ActionCard("Complete Work", Icons.Default.CloudUpload) { showUpload = true } }
                 }
                 
-                if (status == "WAITING_FOR_PAYMENT" && isBrand) {
-                    item { ActionCard("Release Payment", Icons.Default.Payments) { onStatusUpdate("COMPLETED") } }
+                if (isBrand && (status == "ACCEPTED" || status == "WAITING_FOR_PAYMENT") && collaborationId != null && brandViewModel != null) {
+                    item { 
+                        ActionCard("Pay Now", Icons.Default.Payments) {
+                            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                val token = result.token
+                                if (token != null) {
+                                    brandViewModel.createCollaborationPaymentOrder(token, collaborationId, "FULL") { orderData ->
+                                        if (orderData != null && activity != null) {
+                                            RazorpayService.startPayment(
+                                                activity = activity,
+                                                orderData = orderData,
+                                                userEmail = FirebaseAuth.getInstance().currentUser?.email,
+                                                userContact = null
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        } 
+                    }
                 }
 
                 // Always available (except when completed)
