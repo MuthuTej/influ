@@ -61,6 +61,7 @@ class InfluencerViewModel : ViewModel() {
                       pricing {
                         platform
                         deliverable
+                        count
                         price
                         currency
                       }
@@ -150,6 +151,7 @@ class InfluencerViewModel : ViewModel() {
                         mapOf(
                             "platform" to it.platform,
                             "deliverable" to it.deliverable,
+                            "count" to it.count,
                             "price" to it.price,
                             "currency" to it.currency
                         )
@@ -253,6 +255,7 @@ class InfluencerViewModel : ViewModel() {
                     pricing {
                       platform
                       deliverable
+                      count
                       price
                       currency
                     }
@@ -369,6 +372,7 @@ class InfluencerViewModel : ViewModel() {
                         PricingInfo(
                             platform = prObj.optString("platform", ""),
                             deliverable = prObj.optString("deliverable", ""),
+                            count = if (prObj.isNull("count")) null else prObj.optInt("count"),
                             price = prObj.optInt("price", 0),
                             currency = prObj.optString("currency", "")
                         )
@@ -515,6 +519,7 @@ class InfluencerViewModel : ViewModel() {
                     pricing {
                       platform
                       deliverable
+                      count
                       price
                       currency
                     }
@@ -766,6 +771,7 @@ class InfluencerViewModel : ViewModel() {
                             Pricing(
                                 platform = pObj.optString("platform"),
                                 deliverable = pObj.optString("deliverable"),
+                                count = if (pObj.isNull("count")) null else pObj.optInt("count"),
                                 price = pObj.optInt("price"),
                                 currency = pObj.optString("currency")
                             )

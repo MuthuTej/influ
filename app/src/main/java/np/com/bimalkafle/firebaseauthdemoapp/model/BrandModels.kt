@@ -100,6 +100,7 @@ data class Campaign(
 data class Pricing(
     val platform: String,
     val deliverable: String,
+    val count: Int? = null,
     val price: Int,
     val currency: String,
     val status: String? = null,
