@@ -73,8 +73,16 @@ fun InfluencerHomePage(
     val authState = authViewModel.authState.observeAsState()
     val collaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
     val campaigns by campaignViewModel.campaigns.observeAsState(initial = emptyList())
-    val isLoading by influencerViewModel.loading.observeAsState(initial = false)
-    val error by influencerViewModel.error.observeAsState()
+    
+    // Combine loading states
+    val isInfluencerLoading by influencerViewModel.loading.observeAsState(initial = false)
+    val isCampaignLoading by campaignViewModel.loading.observeAsState(initial = false)
+    val isLoading = isInfluencerLoading || isCampaignLoading
+    
+    // Combine error states
+    val influencerError by influencerViewModel.error.observeAsState()
+    val campaignError by campaignViewModel.error.observeAsState()
+    
     val influencerProfile by influencerViewModel.influencerProfile.observeAsState()
     val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
@@ -132,7 +140,7 @@ fun InfluencerHomePage(
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
 
-        if (isLoading) {
+        if (isLoading && campaigns.isEmpty() && collaborations.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = brandThemeColor)
             }
@@ -146,14 +154,16 @@ fun InfluencerHomePage(
 
                 item { InfluencerHeaderAndReachSection(influencerProfile, navController, unreadCount) }
 
-                // Checklist item for debugging (only shows if error or empty collab)
+                // Checklist item for debugging
                 item {
-                    if (error != null || collaborations.isEmpty()) {
+                    if (influencerError != null || campaignError != null || collaborations.isEmpty() || campaigns.isEmpty()) {
                         FetchStatusChecklist(
                             influencerId = influencerProfile?.id,
                             tokenPresent = firebaseToken != null,
                             collabCount = collaborations.size,
-                            error = error
+                            campaignCount = campaigns.size,
+                            influencerError = influencerError,
+                            campaignError = campaignError
                         )
                     }
                 }
@@ -241,7 +251,8 @@ fun InfluencerHomePage(
                             modifier = Modifier.fillMaxWidth().height(200.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No campaigns found for $selectedPlatform", color = Color.Gray)
+                            val emptyMessage = if (campaigns.isEmpty()) "No campaigns available." else "No campaigns found for $selectedPlatform"
+                            Text(emptyMessage, color = Color.Gray)
                         }
                     }
                 } else {
@@ -286,7 +297,9 @@ fun FetchStatusChecklist(
     influencerId: String?,
     tokenPresent: Boolean,
     collabCount: Int,
-    error: String?
+    campaignCount: Int,
+    influencerError: String?,
+    campaignError: String?
 ) {
     Card(
         modifier = Modifier
@@ -301,9 +314,15 @@ fun FetchStatusChecklist(
             StatusItem("Influencer ID Detected", influencerId != null)
             StatusItem("Auth Token Present", tokenPresent)
             StatusItem("Collaborations Count", collabCount > 0, suffix = ": $collabCount")
-            if (error != null) {
+            StatusItem("Campaigns Count", campaignCount > 0, suffix = ": $campaignCount")
+            
+            if (influencerError != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Error: $error", color = Color.Red, fontSize = 12.sp)
+                Text("Influencer Error: $influencerError", color = Color.Red, fontSize = 12.sp)
+            }
+            if (campaignError != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Campaign Error: $campaignError", color = Color.Red, fontSize = 12.sp)
             }
         }
     }

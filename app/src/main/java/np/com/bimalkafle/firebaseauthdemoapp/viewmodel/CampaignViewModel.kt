@@ -220,6 +220,10 @@ class CampaignViewModel : ViewModel() {
                     brand {
                       id
                       name
+                      email
+                      role
+                      profileCompleted
+                      updatedAt
                       about
                       profileUrl
                       logoUrl
@@ -242,6 +246,15 @@ class CampaignViewModel : ViewModel() {
 
             val result = GraphQLClient.query(query = query, token = token)
             result.onSuccess { jsonObject ->
+                val errors = jsonObject.optJSONArray("errors")
+                if (errors != null && errors.length() > 0) {
+                    val errorMsg = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
+                    Log.e("CampaignViewModel", "GraphQL Error: ${'$'}errorMsg")
+                    _error.postValue(errorMsg)
+                    _loading.postValue(false)
+                    return@onSuccess
+                }
+
                 try {
                     val data = jsonObject.optJSONObject("data")
                     val campaignsArray = data?.optJSONArray("getCampaigns")
@@ -261,11 +274,12 @@ class CampaignViewModel : ViewModel() {
                     Log.e("CampaignViewModel", "Parsing error", e)
                     _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
+                _loading.postValue(false)
             }.onFailure {
                 Log.e("CampaignViewModel", "Network error", it)
                 _error.postValue("Network error: ${'$'}{it.message}")
+                _loading.postValue(false)
             }
-            _loading.postValue(false)
         }
     }
 
@@ -302,6 +316,10 @@ class CampaignViewModel : ViewModel() {
                     brand {
                       id
                       name
+                      email
+                      role
+                      profileCompleted
+                      updatedAt
                       about
                       profileUrl
                       logoUrl
@@ -325,6 +343,14 @@ class CampaignViewModel : ViewModel() {
             val variables = mapOf("id" to id)
             val result = GraphQLClient.query(query = query, variables = variables, token = token)
             result.onSuccess { jsonObject ->
+                val errors = jsonObject.optJSONArray("errors")
+                if (errors != null && errors.length() > 0) {
+                    val errorMsg = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
+                    _error.postValue(errorMsg)
+                    _loading.postValue(false)
+                    return@onSuccess
+                }
+
                 try {
                     val data = jsonObject.optJSONObject("data")
                     val campaignObj = data?.optJSONObject("getCampaignById")
@@ -337,11 +363,12 @@ class CampaignViewModel : ViewModel() {
                     Log.e("CampaignViewModel", "Parsing error", e)
                     _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
+                _loading.postValue(false)
             }.onFailure {
                 Log.e("CampaignViewModel", "Network error", it)
                 _error.postValue("Network error: ${'$'}{it.message}")
+                _loading.postValue(false)
             }
-            _loading.postValue(false)
         }
     }
 
@@ -381,6 +408,10 @@ class CampaignViewModel : ViewModel() {
                     brand {
                       id
                       name
+                      email
+                      role
+                      profileCompleted
+                      updatedAt
                       about
                       profileUrl
                       logoUrl
@@ -451,11 +482,12 @@ class CampaignViewModel : ViewModel() {
                     val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Failed to create campaign"
                     _error.postValue(errorMsg)
                 }
+                _loading.postValue(false)
             }.onFailure {
                 Log.e("CampaignViewModel", "Error creating campaign", it)
                 _error.postValue(it.message ?: "Network error")
+                _loading.postValue(false)
             }
-            _loading.postValue(false)
         }
     }
 
@@ -494,7 +526,7 @@ class CampaignViewModel : ViewModel() {
                 TargetAudience(
                     ageMin = if (targetAudienceObj.isNull("ageMin")) null else targetAudienceObj.optInt("ageMin"),
                     ageMax = if (targetAudienceObj.isNull("ageMax")) null else targetAudienceObj.optInt("ageMax"),
-                    gender = targetAudienceObj.optString("gender", null),
+                    gender = targetAudienceObj.optString("gender", null as String?),
                     locations = locations
                 )
             } else null
@@ -504,16 +536,16 @@ class CampaignViewModel : ViewModel() {
                 email = it.optString("email"),
                 name = it.optString("name"),
                 role = it.optString("role"),
-                profileCompleted = it.optBoolean("profileCompleted"),
-                updatedAt = it.optString("updatedAt"),
+                profileCompleted = if (it.has("profileCompleted")) it.optBoolean("profileCompleted") else null,
+                updatedAt = it.optString("updatedAt", null as String?),
                 brandCategories = brandCategories,
                 about = it.optString("about"),
                 profileUrl = it.optString("profileUrl"),
                 logoUrl = it.optString("logoUrl"),
                 govtId = it.optString("govtId"),
-                isVerified = it.optBoolean("isVerified"),
+                isVerified = if (it.has("isVerified")) it.optBoolean("isVerified") else null,
                 reviews = null,
-                averageRating = it.optDouble("averageRating").takeIf { it != 0.0 },
+                averageRating = if (it.has("averageRating")) it.optDouble("averageRating").takeIf { it != 0.0 } else null,
                 fcmToken = it.optString("fcmToken"),
                 preferredPlatforms = null, // Use campaign level platforms
                 targetAudience = brandTargetAudience
