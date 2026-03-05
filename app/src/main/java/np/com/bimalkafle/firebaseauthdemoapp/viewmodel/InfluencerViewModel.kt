@@ -241,6 +241,14 @@ class InfluencerViewModel : ViewModel() {
                       }
                       lastSynced
                     }
+                    instagramMetrics {
+                      avgComments
+                      avgLikes
+                      avgViews
+                      postingFrequencyDays
+                      totalPostsAnalyzed
+                      updatedAt
+                    }
                     strengths
                     pricing {
                       platform
@@ -454,6 +462,19 @@ class InfluencerViewModel : ViewModel() {
             )
         }
 
+        val instaObj = obj.optJSONObject("instagramMetrics")
+        var instagramMetrics: InstagramMetrics? = null
+        if (instaObj != null) {
+            instagramMetrics = InstagramMetrics(
+                avgComments = if (instaObj.isNull("avgComments")) null else instaObj.optDouble("avgComments").toFloat(),
+                avgLikes = if (instaObj.isNull("avgLikes")) null else instaObj.optDouble("avgLikes").toFloat(),
+                avgViews = if (instaObj.isNull("avgViews")) null else instaObj.optDouble("avgViews").toFloat(),
+                postingFrequencyDays = if (instaObj.isNull("postingFrequencyDays")) null else instaObj.optDouble("postingFrequencyDays").toFloat(),
+                totalPostsAnalyzed = if (instaObj.isNull("totalPostsAnalyzed")) null else instaObj.optInt("totalPostsAnalyzed"),
+                updatedAt = if (instaObj.isNull("updatedAt")) null else instaObj.optString("updatedAt")
+            )
+        }
+
         return InfluencerProfile(
             id = obj.optString("id", ""),
             email = obj.optString("email", ""),
@@ -470,7 +491,8 @@ class InfluencerViewModel : ViewModel() {
             availability = if (obj.has("availability")) obj.optBoolean("availability") else null,
             logoUrl = obj.optString("logoUrl", null),
             audienceInsights = audienceInsights,
-            youtubeInsights = youtubeInsights
+            youtubeInsights = youtubeInsights,
+            instagramMetrics = instagramMetrics
         )
     }
 
