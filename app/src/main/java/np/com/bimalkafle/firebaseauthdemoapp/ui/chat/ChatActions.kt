@@ -37,7 +37,6 @@ fun RestrictedActionPanel(
     collaboration: Collaboration? = null
 ) {
     var showNegotiation by remember { mutableStateOf(false) }
-    var showDeliverables by remember { mutableStateOf(false) }
     var showBrief by remember { mutableStateOf(false) }
     var showScript by remember { mutableStateOf(false) }
     var showFeedback by remember { mutableStateOf(false) }
@@ -104,10 +103,9 @@ fun RestrictedActionPanel(
                 contentPadding = PaddingValues(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Negotiation Phase - Available for BOTH brand and influencer
+                // Negotiation Phase
                 if (status == "PENDING" || status == "NEGOTIATION") {
                     item { ActionCard("Negotiate", Icons.Default.AttachMoney) { showNegotiation = true } }
-                    item { ActionCard("Deliverables", Icons.Default.List) { showDeliverables = true } }
                 }
 
                 // Briefing Phase
@@ -150,22 +148,9 @@ fun RestrictedActionPanel(
             collaboration = collaboration,
             onSend = { amount, platform, deliverables ->
                 val delStr = deliverables.entries.joinToString { "${it.key} (x${it.value})" }
-                onSend("Negotiated Proposal: \u20B9$amount on $platform - $delStr", "NEGOTIATION", mapOf("amount" to amount, "platform" to platform, "items" to deliverables))
+                onSend("Negotiated Proposal: ₹$amount on $platform - $delStr", "NEGOTIATION", mapOf("amount" to amount, "platform" to platform, "items" to deliverables))
                 onStatusUpdate("NEGOTIATION")
                 showNegotiation = false
-            }
-        )
-    }
-
-    if (showDeliverables) {
-        DeliverablesDialog(
-            onDismiss = { showDeliverables = false },
-            collaboration = collaboration,
-            onSend = { deliverables ->
-                val text = "Deliverables: ${deliverables.entries.joinToString { "${it.key} (x${it.value})" }}"
-                onSend(text, "DELIVERABLES", mapOf("items" to deliverables))
-                onStatusUpdate("NEGOTIATION")
-                showDeliverables = false
             }
         )
     }
@@ -213,8 +198,10 @@ fun RestrictedActionPanel(
     if (showUpload) {
         ContentUploadDialog(
             onDismiss = { showUpload = false },
-            onSend = { link, platform ->
-                onSendUpload(link, platform)
+            onSend = { links, platform ->
+                links.forEach { link ->
+                    onSendUpload(link, platform)
+                }
                 onStatusUpdate("WAITING_FOR_PAYMENT")
                 showUpload = false
             }
@@ -225,9 +212,9 @@ fun RestrictedActionPanel(
 @Composable
 fun ContentUploadDialog(
     onDismiss: () -> Unit,
-    onSend: (String, String) -> Unit
+    onSend: (List<String>, String) -> Unit
 ) {
-    var link by remember { mutableStateOf("") }
+    val links = remember { mutableStateListOf("") }
     var selectedPlatform by remember { mutableStateOf("YouTube") }
     var showPlatformDropdown by remember { mutableStateOf(false) }
     val platforms = listOf("YouTube", "Instagram")
@@ -236,7 +223,7 @@ fun ContentUploadDialog(
         onDismissRequest = onDismiss,
         title = { Text("Complete Work") },
         text = {
-            Column {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 Text("Select Platform", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(
@@ -273,21 +260,44 @@ fun ContentUploadDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                TextField(
-                    value = link,
-                    onValueChange = { link = it },
-                    label = { Text("Final Content Link") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = Color(0xFFFF8383),
-                        cursorColor = Color(0xFFFF8383)
-                    )
-                )
+                Text("Final Content Links", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 
+                links.forEachIndexed { index, link ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        TextField(
+                            value = link,
+                            onValueChange = { links[index] = it },
+                            placeholder = { Text("Enter link...") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            colors = TextFieldDefaults.colors(
+                                focusedIndicatorColor = Color(0xFFFF8383),
+                                cursorColor = Color(0xFFFF8383)
+                            )
+                        )
+                        if (links.size > 1) {
+                            IconButton(onClick = { links.removeAt(index) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.Red)
+                            }
+                        }
+                    }
+                }
+                
+                TextButton(
+                    onClick = { links.add("") },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Add Another Link", color = Color(0xFFFF8383))
+                }
+
                 if (selectedPlatform == "Instagram") {
                     Text(
-                        "Note: Entering an Instagram link will trigger an automated verification of post statistics.",
+                        "Note: Entering Instagram links will trigger automated verification of post statistics.",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.Gray,
                         modifier = Modifier.padding(top = 8.dp)
@@ -298,9 +308,10 @@ fun ContentUploadDialog(
         confirmButton = {
             Button(
                 onClick = { 
-                    if (link.isNotBlank()) onSend(link, selectedPlatform) 
+                    val filteredLinks = links.filter { it.isNotBlank() }
+                    if (filteredLinks.isNotEmpty()) onSend(filteredLinks, selectedPlatform) 
                 },
-                enabled = link.isNotBlank(),
+                enabled = links.any { it.isNotBlank() },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
             ) {
                 Text("Upload")
@@ -368,7 +379,6 @@ fun NegotiationDialog(
     onSend: (Int, String, Map<String, Int>) -> Unit,
     collaboration: Collaboration? = null
 ) {
-    // Extract strictly allowed platforms and deliverables from original collaboration proposal
     val allowedPlatforms = remember(collaboration) {
         collaboration?.pricing?.map { it.platform }?.distinct() ?: listOf(initialPlatform)
     }
@@ -387,7 +397,6 @@ fun NegotiationDialog(
         title = { Text("Propose Negotiation") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                // Platform Selection
                 Text("Select Platform", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 Box {
                     OutlinedButton(
@@ -424,8 +433,7 @@ fun NegotiationDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                // Price Field
-                Text("Proposed Budget (\u20B9)", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Text("Proposed Budget (₹)", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 OutlinedTextField(
                     value = budget,
                     onValueChange = { budget = it },
@@ -441,7 +449,6 @@ fun NegotiationDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                // Deliverables Section
                 Text("Select Deliverables & Counts", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 allowedDeliverables.forEach { option ->
                     val count = selectedDeliverables[option] ?: 0
@@ -515,20 +522,20 @@ fun DeliverablesDialog(
     onSend: (Map<String, Int>) -> Unit,
     collaboration: Collaboration? = null
 ) {
-    // Extract strictly allowed deliverables from collaboration proposal
-    val allowedOptions = remember(collaboration) {
+    val allowedDeliverables = remember(collaboration) {
         collaboration?.pricing?.map { it.deliverable }?.distinct() ?: listOf("Post", "Reel", "Story", "Video")
     }
-    
-    val selected = remember { mutableStateMapOf<String, Int>().apply { putAll(initialDeliverables) } }
+
+    val selectedDeliverables = remember { mutableStateMapOf<String, Int>().apply { putAll(initialDeliverables) } }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Deliverables") },
+        title = { Text("Update Deliverables") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                allowedOptions.forEach { option ->
-                    val count = selected[option] ?: 0
+                Text("Select Deliverables & Counts", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                allowedDeliverables.forEach { option ->
+                    val count = selectedDeliverables[option] ?: 0
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -536,34 +543,35 @@ fun DeliverablesDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             Checkbox(
                                 checked = count > 0,
-                                onCheckedChange = { 
-                                    if (it) selected[option] = 1 else selected.remove(option)
+                                onCheckedChange = {
+                                    if (it) selectedDeliverables[option] = 1 else selectedDeliverables.remove(option)
                                 },
                                 colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFF8383))
                             )
-                            Text(text = option)
+                            Text(text = option, fontSize = 14.sp)
                         }
 
                         if (count > 0) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(
-                                    onClick = { if (count > 1) selected[option] = count - 1 else selected.remove(option) },
-                                    modifier = Modifier.size(24.dp)
+                                    onClick = { if (count > 1) selectedDeliverables[option] = count - 1 else selectedDeliverables.remove(option) },
+                                    modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(Icons.Default.Remove, contentDescription = "Decrease")
+                                    Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(18.dp))
                                 }
                                 Text(
                                     text = "$count",
-                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp),
+                                    fontWeight = FontWeight.Bold
                                 )
                                 IconButton(
-                                    onClick = { selected[option] = count + 1 },
-                                    modifier = Modifier.size(24.dp)
+                                    onClick = { selectedDeliverables[option] = count + 1 },
+                                    modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = "Increase")
+                                    Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(18.dp))
                                 }
                             }
                         }
@@ -573,18 +581,18 @@ fun DeliverablesDialog(
         },
         confirmButton = {
             Button(
-                onClick = { 
-                    if (selected.isNotEmpty()) onSend(selected.toMap()) 
+                onClick = {
+                    onSend(selectedDeliverables.toMap())
                 },
-                enabled = selected.isNotEmpty(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383)),
+                shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Confirm")
+                Text("Update Deliverables", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Cancel", color = Color.Gray)
             }
         }
     )
