@@ -93,6 +93,16 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     var isYouTubeConnecting by remember { mutableStateOf(false) }
     var isYouTubeConnected by remember { mutableStateOf(false) }
     var youtubeAuthCode by remember { mutableStateOf<String?>(null) }
+    
+    // --- Instagram Connection State ---
+    var instagramUrl by remember { mutableStateOf("") }
+    var isInstagramConnecting by remember { mutableStateOf(false) }
+    var isInstagramConnected by remember { mutableStateOf(false) }
+
+    // --- Facebook Connection State (Dummy) ---
+    var isFacebookConnecting by remember { mutableStateOf(false) }
+    var isFacebookConnected by remember { mutableStateOf(false) }
+    var facebookUrl by remember { mutableStateOf("") }
 
     // --- Google Sign-In Launcher for Activity Result ---
     val youtubeAuthLauncher = rememberLauncherForActivityResult(
@@ -142,7 +152,9 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                 }
                             }
                         }?.addOnFailureListener {
-                            Log.e("InfluencerRegistration", "Failed to get Firebase ID Token", it)
+                            isYouTubeConnecting = false
+                            Log.e("InfluencerRegistration", "YouTube Connect: Failed to get Firebase ID Token. Error: ${it.message}", it)
+                            Toast.makeText(context, "Auth Error: ${it.message}", Toast.LENGTH_LONG).show()
                         }
                     }
                 } else {
@@ -331,27 +343,215 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 }
             }
 
-            if (selectedPlatforms.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Profile URLs", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-                selectedPlatforms.forEach { platform ->
-                    OutlinedTextField(
-                        value = profileUrls[platform] ?: "",
-                        onValueChange = {
-                            profileUrls = profileUrls.toMutableMap().apply { this[platform] = it }
-                        },
-                        label = { Text("$platform Profile URL") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // --- CONNECTION SECTION ---
+            Text("Connect Platforms", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.padding(bottom = 16.dp))
+
+            // YOUTUBE CONNECTION
+            if (selectedPlatforms.contains("YouTube")) {
+                Button(
+                    onClick = {
+                        isYouTubeConnecting = true
+                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestEmail()
+                            .requestScopes(
+                                Scope("https://www.googleapis.com/auth/yt-analytics.readonly"),
+                                Scope("https://www.googleapis.com/auth/youtube.readonly")
+                            )
+                            .requestServerAuthCode("60831940637-pgkdgu5qe3htquot95fddf50rljm6er0.apps.googleusercontent.com", true)
+                            .build()
+
+                        val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                        youtubeAuthLauncher.launch(googleSignInClient.signInIntent)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    enabled = !isYouTubeConnected && !isYouTubeConnecting,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isYouTubeConnected) Color(0xFF4CAF50) else Color(0xFFFF0000),
+                        disabledContainerColor = if (isYouTubeConnected) Color(0xFF4CAF50).copy(alpha = 0.5f) else Color.LightGray
                     )
+                ) {
+                    if (isYouTubeConnecting) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Connecting YouTube...", color = Color.White, fontWeight = FontWeight.Bold)
+                    } else if (isYouTubeConnected) {
+                        Icon(Icons.Default.Check, contentDescription = "Checked", tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("YouTube Connected ✓", color = Color.White, fontWeight = FontWeight.Bold)
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_youtube),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Connect YouTube", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // INSTAGRAM CONNECTION
+            if (selectedPlatforms.contains("Instagram")) {
+                OutlinedTextField(
+                    value = instagramUrl,
+                    onValueChange = { instagramUrl = it },
+                    label = { Text("Instagram Profile URL") },
+                    placeholder = { Text("https://www.instagram.com/your_profile/") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383)),
+                    enabled = !isInstagramConnected && !isInstagramConnecting
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (instagramUrl.isEmpty()) {
+                            Toast.makeText(context, "Please enter your Instagram profile URL", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        isInstagramConnecting = true
+                        val firebaseUser = FirebaseAuth.getInstance().currentUser
+                        if (firebaseUser == null) {
+                            isInstagramConnecting = false
+                            Toast.makeText(context, "User not authenticated", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+
+                        firebaseUser.getIdToken(false).addOnSuccessListener { result ->
+                            val idToken = result.token
+                            if (idToken != null) {
+                                coroutineScope.launch {
+                                    val response = BackendRepository.scrapeInstagramProfile(
+                                        profileUrl = instagramUrl,
+                                        influencerId = firebaseUser.uid,
+                                        token = idToken
+                                    )
+                                    response.onSuccess { success ->
+                                        isInstagramConnected = success
+                                        if (success) {
+                                            Toast.makeText(context, "Instagram Connected Successfully", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Failed to connect Instagram", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }.onFailure {
+                                        Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                    isInstagramConnecting = false
+                                }
+                            } else {
+                                isInstagramConnecting = false
+                                Toast.makeText(context, "Failed to get auth token", Toast.LENGTH_SHORT).show()
+                            }
+                        }.addOnFailureListener {
+                            isInstagramConnecting = false
+                            if (it.message?.contains("Connection reset", ignoreCase = true) == true) {
+                                firebaseUser.getIdToken(true).addOnSuccessListener { retryResult ->
+                                    Toast.makeText(context, "Connection settled. Please tap 'Connect' again.", Toast.LENGTH_SHORT).show()
+                                }.addOnFailureListener { retryError ->
+                                    Toast.makeText(context, "Connection Error: ${retryError.message}", Toast.LENGTH_LONG).show()
+                                }
+                            } else {
+                                Toast.makeText(context, "Auth Error: ${it.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    enabled = !isInstagramConnected && !isInstagramConnecting,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isInstagramConnected) Color(0xFF4CAF50) else Color(0xFFE1306C),
+                        disabledContainerColor = if (isInstagramConnected) Color(0xFF4CAF50).copy(alpha = 0.5f) else Color.LightGray
+                    )
+                ) {
+                    if (isInstagramConnecting) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Connecting Instagram...", color = Color.White, fontWeight = FontWeight.Bold)
+                    } else if (isInstagramConnected) {
+                        Icon(Icons.Default.Check, contentDescription = "Checked", tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Instagram Connected ✓", color = Color.White, fontWeight = FontWeight.Bold)
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_instagram),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Connect Instagram", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // FACEBOOK CONNECTION (DUMMY)
+            if (selectedPlatforms.contains("Facebook")) {
+                OutlinedTextField(
+                    value = facebookUrl,
+                    onValueChange = { facebookUrl = it },
+                    label = { Text("Facebook Profile URL") },
+                    placeholder = { Text("https://www.facebook.com/your_profile/") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383)),
+                    enabled = !isFacebookConnected && !isFacebookConnecting
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (facebookUrl.isEmpty()) {
+                            Toast.makeText(context, "Please enter your Facebook profile URL", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        isFacebookConnecting = true
+                        coroutineScope.launch {
+                            kotlinx.coroutines.delay(1500) // Dummy delay
+                            isFacebookConnected = true
+                            isFacebookConnecting = false
+                            Toast.makeText(context, "Facebook Connected (Dummy)", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    enabled = !isFacebookConnected && !isFacebookConnecting,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isFacebookConnected) Color(0xFF4CAF50) else Color(0xFF1877F2),
+                        disabledContainerColor = if (isFacebookConnected) Color(0xFF4CAF50).copy(alpha = 0.5f) else Color.LightGray
+                    )
+                ) {
+                    if (isFacebookConnecting) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Connecting Facebook...", color = Color.White, fontWeight = FontWeight.Bold)
+                    } else if (isFacebookConnected) {
+                        Icon(Icons.Default.Check, contentDescription = "Checked", tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Facebook Connected ✓", color = Color.White, fontWeight = FontWeight.Bold)
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_facebook),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Connect Facebook", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Pricing", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+            Text("Pricing", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.padding(bottom = 16.dp))
 
             if (selectedPlatforms.isNotEmpty() && selectedDeliverables.isNotEmpty()) {
                 selectedPlatforms.forEach { platform ->
@@ -428,54 +628,10 @@ fun InfluencerRegistrationScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // --- CONNECT YOUTUBE BUTTON ---
-            Button(
-                onClick = {
-                    isYouTubeConnecting = true
-                    // Configure Google Sign-In options with required scopes
-                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                        .requestEmail() // Common requirement
-                        .requestScopes(
-                            Scope("https://www.googleapis.com/auth/yt-analytics.readonly"),
-                            Scope("https://www.googleapis.com/auth/youtube.readonly")
-                        )
-                        // Request server auth code using Web Client ID
-                        // Replace YOUR_WEB_CLIENT_ID with the actual Google Cloud Web Client ID
-                        .requestServerAuthCode("60831940637-pgkdgu5qe3htquot95fddf50rljm6er0.apps.googleusercontent.com", true)
-                        .build()
-
-
-
-                    val googleSignInClient = GoogleSignIn.getClient(context, gso)
-                    // Launch the intent using the modern Activity Result API launcher
-                    youtubeAuthLauncher.launch(googleSignInClient.signInIntent)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                // Disable button if it's already connected or currently connecting
-                enabled = !isYouTubeConnected && !isYouTubeConnecting,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isYouTubeConnected) Color(0xFF4CAF50) else Color(0xFFFF0000), // Green when connected, Red otherwise
-                    disabledContainerColor = if (isYouTubeConnected) Color(0xFF4CAF50).copy(alpha = 0.5f) else Color.LightGray
-                )
-            ) {
-                // Display different content based on connection state
-                if (isYouTubeConnecting) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Connecting...", color = Color.White, fontWeight = FontWeight.Bold)
-                } else if (isYouTubeConnected) {
-                    Icon(Icons.Default.Check, contentDescription = "Checked", tint = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("YouTube Connected ✓", color = Color.White, fontWeight = FontWeight.Bold)
-                } else {
-                    Text("Connect YouTube", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            // --- OLD CONNECTION BUTTONS (REPLACED ABOVE) ---
+            // (Removed legacy Connect YouTube and Connect Instagram sections from here)
+            
+            Spacer(modifier = Modifier.height(32.dp))
 
             Button(
                 onClick = {
@@ -503,14 +659,14 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                                 put("name", name)
                                                 put("bio", bio)
                                                 put("location", location)
-                                                put("availability", true) // Default as discussed
+                                                put("availability", true)
                                                 put("logoUrl", logoUrl)
 
                                                 val categoriesJson = JSONArray()
                                                 selectedCategories.forEach { cat ->
                                                     categoriesJson.put(JSONObject().apply {
                                                         put("category", cat)
-                                                        put("subCategory", "General") // Default
+                                                        put("subCategory", "General")
                                                     })
                                                 }
                                                 put("categories", categoriesJson)
@@ -519,10 +675,16 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                                 selectedPlatforms.forEach { plat ->
                                                     platformsJson.put(JSONObject().apply {
                                                         put("platform", plat)
-                                                        put("profileUrl", profileUrls[plat] ?: "")
-                                                        put("followers", 0) // Default
-                                                        put("avgViews", 0) // Default
-                                                        put("engagement", 0.0) // Default
+                                                        // Use connected URLs if available
+                                                        val profileUrl = when(plat) {
+                                                            "Instagram" -> instagramUrl
+                                                            "Facebook" -> facebookUrl
+                                                            else -> profileUrls[plat] ?: ""
+                                                        }
+                                                        put("profileUrl", profileUrl)
+                                                        put("followers", 0)
+                                                        put("avgViews", 0)
+                                                        put("engagement", 0.0)
                                                         put("formats", JSONArray())
                                                     })
                                                 }
@@ -535,7 +697,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                                             put("platform", plat)
                                                             put("deliverable", deliverable)
                                                             put("price", price.toIntOrNull() ?: 0)
-                                                            put("currency", "INR") // Default
+                                                            put("currency", "INR")
                                                         })
                                                     }
                                                 }

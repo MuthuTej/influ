@@ -61,7 +61,6 @@ fun InfluencerCreateProposal(
     val myCampaigns by brandViewModel.myCampaigns.observeAsState(emptyList())
     val isLoading by brandViewModel.loading.observeAsState(false)
     val error by brandViewModel.error.observeAsState()
-
     var selectedCampaignId by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     
