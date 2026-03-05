@@ -30,6 +30,17 @@ data class YouTubeVideoData(
     val fetchedAt: String?
 )
 
+data class InstagramPostData(
+    val postId: String?,
+    val caption: String?,
+    val likeCount: Int?,
+    val commentCount: Int?,
+    val viewCount: Int?,
+    val mediaUrl: String?,
+    val timestamp: String?,
+    val fetchedAt: String?
+)
+
 data class CollaborationAnalytics(
     val platform: String?,
     val duration: Int?,
@@ -41,8 +52,8 @@ data class CollaborationAnalytics(
     val shares: Int?,
     val saves: Int?,
     val views: Int?,
-    val retweets: Int?,
-    val replies: Int?
+    val retweets: Int? = null,
+    val replies: Int? = null
 )
 
 data class OverallAnalytics(
@@ -53,8 +64,8 @@ data class OverallAnalytics(
     val shares: Int?,
     val saves: Int?,
     val views: Int?,
-    val retweets: Int?,
-    val replies: Int?
+    val retweets: Int? = null,
+    val replies: Int? = null
 )
 
 data class Collaboration(
@@ -79,6 +90,7 @@ data class Collaboration(
     val overallAnalytics: OverallAnalytics? = null,
     val platformAnalytics: List<CollaborationAnalytics>? = null,
     val yt: List<YouTubeVideoData>? = null,
+    val ig: List<InstagramPostData>? = null,
     val youtubeVideoId: String? = null
 )
 
