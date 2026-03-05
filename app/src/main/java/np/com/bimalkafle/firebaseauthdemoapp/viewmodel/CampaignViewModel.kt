@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
+import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -60,7 +61,64 @@ class CampaignViewModel : ViewModel() {
     private val _wishlistedCampaigns = MutableLiveData<List<CampaignDetail>>(emptyList())
     val wishlistedCampaigns: LiveData<List<CampaignDetail>> = _wishlistedCampaigns
 
+    // Recommendation Streams
+    private val _overallRecommendedCampaigns = MutableLiveData<List<CampaignDetail>>()
+    val overallRecommendedCampaigns: LiveData<List<CampaignDetail>> = _overallRecommendedCampaigns
+
+    private val _youtubeRecommendedCampaigns = MutableLiveData<List<CampaignDetail>>()
+    val youtubeRecommendedCampaigns: LiveData<List<CampaignDetail>> = _youtubeRecommendedCampaigns
+
+    private val _instagramRecommendedCampaigns = MutableLiveData<List<CampaignDetail>>()
+    val instagramRecommendedCampaigns: LiveData<List<CampaignDetail>> = _instagramRecommendedCampaigns
+
     private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    fun fetchRecommendedCampaigns(token: String, allCampaigns: List<CampaignDetail>? = null) {
+        viewModelScope.launch {
+            val query = """
+                query GetCampaignRecommendations {
+                  getOverallRecommendedCampaigns(topN: 10) { id score }
+                  getTopYoutubeRecommendedCampaigns(topN: 10) { id score }
+                  getTopInstagramRecommendedCampaigns(topN: 10) { id score }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null) {
+                    val overallRecs = parseRecs(data.optJSONArray("getOverallRecommendedCampaigns"))
+                    val youtubeRecs = parseRecs(data.optJSONArray("getTopYoutubeRecommendedCampaigns"))
+                    val instagramRecs = parseRecs(data.optJSONArray("getTopInstagramRecommendedCampaigns"))
+
+                    val availableCampaigns = allCampaigns ?: _campaigns.value ?: emptyList()
+
+                    _overallRecommendedCampaigns.postValue(sortCampaigns(availableCampaigns, overallRecs))
+                    _youtubeRecommendedCampaigns.postValue(sortCampaigns(availableCampaigns, youtubeRecs))
+                    _instagramRecommendedCampaigns.postValue(sortCampaigns(availableCampaigns, instagramRecs))
+                }
+            }.onFailure {
+                Log.e("CampaignViewModel", "Failed to fetch recommendations", it)
+            }
+        }
+    }
+
+    private fun parseRecs(array: JSONArray?): List<Pair<String, Double>> {
+        val list = mutableListOf<Pair<String, Double>>()
+        if (array != null) {
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i)
+                list.add(obj.optString("id") to obj.optDouble("score"))
+            }
+        }
+        return list
+    }
+
+    private fun sortCampaigns(all: List<CampaignDetail>, recs: List<Pair<String, Double>>): List<CampaignDetail> {
+        val idToScore = recs.toMap()
+        return all.filter { idToScore.containsKey(it.id) }
+            .sortedByDescending { idToScore[it.id] }
+    }
 
     fun toggleWishlist(campaign: CampaignDetail, token: String) {
         viewModelScope.launch {
@@ -267,6 +325,7 @@ class CampaignViewModel : ViewModel() {
                             }
                         }
                         _campaigns.postValue(list)
+                        fetchRecommendedCampaigns(token, list)
                     } else {
                         _campaigns.postValue(emptyList())
                     }
