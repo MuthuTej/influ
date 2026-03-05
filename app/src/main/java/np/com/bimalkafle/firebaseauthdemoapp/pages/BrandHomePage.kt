@@ -62,10 +62,15 @@ fun BrandHomePage(
 ) {
     val authState = authViewModel.authState.observeAsState()
     val collaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
-    val influencers by brandViewModel.influencers.observeAsState(initial = emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
     val errorMsg by brandViewModel.error.observeAsState()
     val wishlistedInfluencers by brandViewModel.wishlistedInfluencers.observeAsState(initial = emptyList())
+    
+    // Recommendations from ViewModel
+    val overallTopInfluencers by brandViewModel.overallTopInfluencers.observeAsState(initial = emptyList())
+    val youtubeTopInfluencers by brandViewModel.youtubeTopInfluencers.observeAsState(initial = emptyList())
+    val instagramTopInfluencers by brandViewModel.instagramTopInfluencers.observeAsState(initial = emptyList())
+    
     var firebaseToken by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
@@ -149,7 +154,9 @@ fun BrandHomePage(
                             }
                         )
                         TopPicksSectionBrand(
-                            influencers = influencers,
+                            overallTopInfluencers = overallTopInfluencers,
+                            youtubeTopInfluencers = youtubeTopInfluencers,
+                            instagramTopInfluencers = instagramTopInfluencers,
                             wishlistedInfluencers = wishlistedInfluencers,
                             onWishlistToggle = { influencer ->
                                 firebaseToken?.let { token ->
@@ -178,7 +185,6 @@ fun BrandHomePage(
 @Composable
 fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoapp.model.Brand?, navController: NavController, unreadCount: Int) {
     Box(modifier = Modifier.fillMaxWidth()) {
-        // Decorative background area
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -194,7 +200,6 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
             )
         }
 
-        // Adaptive content Column
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -202,13 +207,11 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Section: Box used to layer Icons and Logo+Name Row
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 12.dp)
             ) {
-                // Icons Row: Pushed to the top and moved up relative to name
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -233,11 +236,10 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                     }
                 }
 
-                // Logo and Name: Aligned start, Name allowed to wrap
                 Row(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .fillMaxWidth(0.65f) // Give name 65% width to prevent collision
+                        .fillMaxWidth(0.65f)
                         .padding(top = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -269,7 +271,7 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
-                            maxLines = 2, // Now adaptive: wraps if too long
+                            maxLines = 2,
                             lineHeight = 22.sp,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -277,16 +279,14 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                 }
             }
 
-            // Attached Section: Card + Button centered on the bottom edge
             Box(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                // Total Reach Card
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 27.dp), // exactly half of button height
+                        .padding(bottom = 27.dp),
                     shape = RoundedCornerShape(30.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 15.dp)
                 ) {
@@ -307,7 +307,6 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                     }
                 }
 
-                // Find Influencer Button attached to the bottom center of the card
                 Button(
                     onClick = { navController.navigate("brand_search") },
                     shape = RoundedCornerShape(30.dp),
@@ -500,19 +499,27 @@ fun CampaignItem(
 
 @Composable
 fun TopPicksSectionBrand(
-    influencers: List<InfluencerProfile>,
+    overallTopInfluencers: List<InfluencerProfile>,
+    youtubeTopInfluencers: List<InfluencerProfile>,
+    instagramTopInfluencers: List<InfluencerProfile>,
     wishlistedInfluencers: List<InfluencerProfile>,
     onWishlistToggle: (InfluencerProfile) -> Unit,
     navController: NavController
 ) {
-    var selectedPlatform by remember { mutableStateOf("YouTube") }
-    val platforms = listOf("YouTube", "Instagram", "Facebook")
-    val filteredInfluencers = remember(selectedPlatform, influencers) {
-        influencers.filter { influencer -> influencer.platforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true }.take(10)
+    var selectedPlatform by remember { mutableStateOf("All") }
+    val platforms = listOf("All", "YouTube", "Instagram", "Facebook")
+    
+    val filteredInfluencers = remember(selectedPlatform, overallTopInfluencers, youtubeTopInfluencers, instagramTopInfluencers) {
+        when (selectedPlatform) {
+            "YouTube" -> youtubeTopInfluencers
+            "Instagram" -> instagramTopInfluencers
+            "All" -> overallTopInfluencers
+            else -> overallTopInfluencers // Default or fallback
+        }
     }
     
     val youtubeColor = Color(0xFFFF0000)
-    val instagramColor = Color(0xFFE1306C) // Instagram Pinkish-Red
+    val instagramColor = Color(0xFFE1306C)
     val facebookColor = Color(0xFF1877F2)
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -540,32 +547,37 @@ fun TopPicksSectionBrand(
                         "YouTube" -> R.drawable.ic_youtube
                         "Instagram" -> R.drawable.ic_instagram
                         "Facebook" -> R.drawable.ic_facebook
-                        else -> R.drawable.ic_youtube
+                        else -> R.drawable.vector 
                     }
                     val iconColor = when (platform) {
                         "YouTube" -> youtubeColor
                         "Instagram" -> instagramColor
                         "Facebook" -> facebookColor
-                        else -> Color.Gray
+                        else -> brandThemeColor
                     }
                     Tab(
                         selected = selectedPlatform == platform, 
                         onClick = { selectedPlatform = platform }, 
                         icon = { 
-                            Icon(
-                                painter = painterResource(id = iconRes), 
-                                contentDescription = platform, 
-                                modifier = Modifier.size(24.dp),
-                                tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f)
-                            ) 
-                        }
+                            if (platform == "All") {
+                                Icon(Icons.Default.Groups, contentDescription = "All", modifier = Modifier.size(24.dp), tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f))
+                            } else {
+                                Icon(
+                                    painter = painterResource(id = iconRes), 
+                                    contentDescription = platform, 
+                                    modifier = Modifier.size(24.dp),
+                                    tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f)
+                                ) 
+                            }
+                        },
+                        text = { Text(platform, fontSize = 10.sp, fontWeight = if (selectedPlatform == platform) FontWeight.Bold else FontWeight.Normal) }
                     )
                 }
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
         if (filteredInfluencers.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { Text("No influencers found for $selectedPlatform", color = Color.Gray) }
+            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { Text("No recommendations found for $selectedPlatform", color = Color.Gray) }
         } else {
             filteredInfluencers.forEach { influencer ->
                 BrandCardBrand(
@@ -574,7 +586,7 @@ fun TopPicksSectionBrand(
                     onWishlistToggle = { onWishlistToggle(influencer) },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     onCardClick = { navController.navigate("brand_influencer_detail/${influencer.id}") },
-                    selectedPlatform = selectedPlatform
+                    selectedPlatform = if (selectedPlatform == "All") null else selectedPlatform
                 )
             }
         }
@@ -649,7 +661,6 @@ fun BrandCardBrand(
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Strengths using FlowRow for responsiveness - UPDATED COLORS
             influencer.strengths?.let { strengths ->
                 if (strengths.isNotEmpty()) {
                     FlowRow(

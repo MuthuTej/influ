@@ -7,26 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 
-import np.com.bimalkafle.firebaseauthdemoapp.model.AgeGroupInsight
-import np.com.bimalkafle.firebaseauthdemoapp.model.AudienceInsights
-import np.com.bimalkafle.firebaseauthdemoapp.model.Brand
-import np.com.bimalkafle.firebaseauthdemoapp.model.BrandCategory
-import np.com.bimalkafle.firebaseauthdemoapp.model.Campaign
-import np.com.bimalkafle.firebaseauthdemoapp.model.Category
-import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
-import np.com.bimalkafle.firebaseauthdemoapp.model.CollaborationAnalytics
-import np.com.bimalkafle.firebaseauthdemoapp.model.OverallAnalytics
-import np.com.bimalkafle.firebaseauthdemoapp.model.GenderSplit
-import np.com.bimalkafle.firebaseauthdemoapp.model.Influencer
-import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
-import np.com.bimalkafle.firebaseauthdemoapp.model.LocationInsight
-import np.com.bimalkafle.firebaseauthdemoapp.model.Platform
-import np.com.bimalkafle.firebaseauthdemoapp.model.Pricing
-import np.com.bimalkafle.firebaseauthdemoapp.model.PricingInfo
-import np.com.bimalkafle.firebaseauthdemoapp.model.PreferredPlatform
-import np.com.bimalkafle.firebaseauthdemoapp.model.TargetAudience
-import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeVideoData
-import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeVideoSummary
+import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
 import np.com.bimalkafle.firebaseauthdemoapp.network.BrandRepository
 import org.json.JSONArray
@@ -39,6 +20,15 @@ class BrandViewModel : ViewModel() {
 
     private val _influencers = MutableLiveData<List<InfluencerProfile>>()
     val influencers: LiveData<List<InfluencerProfile>> = _influencers
+
+    private val _overallTopInfluencers = MutableLiveData<List<InfluencerProfile>>()
+    val overallTopInfluencers: LiveData<List<InfluencerProfile>> = _overallTopInfluencers
+
+    private val _youtubeTopInfluencers = MutableLiveData<List<InfluencerProfile>>()
+    val youtubeTopInfluencers: LiveData<List<InfluencerProfile>> = _youtubeTopInfluencers
+
+    private val _instagramTopInfluencers = MutableLiveData<List<InfluencerProfile>>()
+    val instagramTopInfluencers: LiveData<List<InfluencerProfile>> = _instagramTopInfluencers
 
     private val _brandProfile = MutableLiveData<Brand?>()
     val brandProfile: LiveData<Brand?> = _brandProfile
@@ -55,191 +45,58 @@ class BrandViewModel : ViewModel() {
     private val _wishlistedInfluencers = MutableLiveData<List<InfluencerProfile>>(emptyList())
     val wishlistedInfluencers: LiveData<List<InfluencerProfile>> = _wishlistedInfluencers
 
-    fun createPaymentOrder(
-        token: String,
-        collaborationId: String,
-        paymentType: String,
-        onComplete: (String?, Int?) -> Unit
-    ) {
-        _loading.value = true
-        viewModelScope.launch {
-            Log.d("GraphQL", "Creating Order for Collab: $collaborationId")
-            
-            val mutation = """
-                mutation {
-                  createCollaborationPaymentOrder(collaborationId: "$collaborationId", paymentType: $paymentType) {
-                    success
-                    razorpayOrderId
-                    totalAmount
-                  }
-                }
-            """.trimIndent()
-
-            val result = GraphQLClient.query(query = mutation, token = token)
-            result.onSuccess { jsonObject ->
-                Log.d("GraphQL", "Response: $jsonObject")
-                val data = jsonObject.optJSONObject("data")?.optJSONObject("createCollaborationPaymentOrder")
-                if (data != null && data.optBoolean("success")) {
-                    onComplete(data.optString("razorpayOrderId"), data.optInt("totalAmount"))
-                } else {
-                    val errors = jsonObject.optJSONArray("errors")
-                    val msg = errors?.optJSONObject(0)?.optString("message") ?: "Payment creation failed"
-                    _error.postValue(msg)
-                    onComplete(null, null)
-                }
-            }.onFailure {
-                Log.e("GraphQL", "Error: ${it.message}")
-                _error.postValue(it.message)
-                onComplete(null, null)
-            }
-            _loading.postValue(false)
-        }
-    }
-
-    fun verifyPayment(
-        token: String,
-        collaborationId: String,
-        razorpayPaymentId: String,
-        razorpaySignature: String,
-        paymentType: String,
-        onComplete: (Boolean) -> Unit
-    ) {
-        _loading.value = true
-        viewModelScope.launch {
-            val mutation = """
-                mutation {
-                  verifyPayment(collaborationId: "$collaborationId", razorpayPaymentId: "$razorpayPaymentId", razorpaySignature: "$razorpaySignature", paymentType: $paymentType) {
-                    id
-                    status
-                    paymentStatus
-                  }
-                }
-            """.trimIndent()
-
-            val result = GraphQLClient.query(query = mutation, token = token)
-            result.onSuccess { jsonObject ->
-                val data = jsonObject.optJSONObject("data")?.optJSONObject("verifyPayment")
-                if (data != null) {
-                    fetchCollaborations(token)
-                    onComplete(true)
-                } else {
-                    val errors = jsonObject.optJSONArray("errors")
-                    _error.postValue(errors?.optJSONObject(0)?.optString("message") ?: "Verification failed")
-                    onComplete(false)
-                }
-            }.onFailure {
-                _error.postValue(it.message)
-                onComplete(false)
-            }
-            _loading.postValue(false)
-        }
-    }
-
-    fun toggleWishlist(influencer: InfluencerProfile, token: String) {
-        viewModelScope.launch {
-            val mutation = """
-                mutation ToggleWishlist(${'$'}targetId: ID!) {
-                  toggleWishlist(targetId: ${'$'}targetId)
-                }
-            """.trimIndent()
-
-            val variables = mapOf("targetId" to influencer.id)
-            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
-
-            result.onSuccess { jsonObject ->
-                val data = jsonObject.optJSONObject("data")
-                if (data != null) {
-                    val isWishlistedResult = data.optBoolean("toggleWishlist")
-                    
-                    val currentList = _wishlistedInfluencers.value?.toMutableList() ?: mutableListOf()
-                    if (isWishlistedResult) {
-                        if (!currentList.any { it.id == influencer.id }) {
-                            currentList.add(influencer)
-                        }
-                    } else {
-                        currentList.removeAll { it.id == influencer.id }
-                    }
-                    _wishlistedInfluencers.postValue(currentList)
-                }
-            }.onFailure {
-                Log.e("BrandViewModel", "Error toggling wishlist", it)
-            }
-        }
-    }
-
-    fun fetchWishlist(token: String) {
+    fun fetchInfluencerRecommendations(token: String, allInfluencers: List<InfluencerProfile>? = null) {
         viewModelScope.launch {
             val query = """
-                query GetWishlist {
-                  getWishlist {
-                    ... on Influencer {
-                      id
-                      email
-                      name
-                      role
-                      profileCompleted
-                      updatedAt
-                      bio
-                      location
-                      categories {
-                        category
-                        subCategories
-                      }
-                      platforms {
-                        platform
-                        profileUrl
-                        followers
-                        avgViews
-                        engagement
-                        formats
-                        connected
-                      }
-                      strengths
-                      pricing {
-                        platform
-                        deliverable
-                        price
-                        currency
-                      }
-                      availability
-                      logoUrl
-                      averageRating
-                      isVerified
-                    }
-                  }
+                query GetInfluencerRecommendations {
+                  getOverallTopInfluencers(topN: 10) { id score }
+                  getTopYoutubeInfluencers(topN: 10) { id score }
+                  getTopInstagramInfluencers(topN: 10) { id score }
                 }
             """.trimIndent()
 
             val result = GraphQLClient.query(query = query, token = token)
             result.onSuccess { jsonObject ->
-                try {
-                    val data = jsonObject.optJSONObject("data")
-                    val wishlistArray = data?.optJSONArray("getWishlist")
-                    if (wishlistArray != null) {
-                        val list = mutableListOf<InfluencerProfile>()
-                        for (i in 0 until wishlistArray.length()) {
-                            val obj = wishlistArray.optJSONObject(i)
-                            // Brands only wishlist Influencers
-                            if (obj != null && obj.has("id") && obj.has("role") && obj.optString("role") == "INFLUENCER") {
-                                list.add(parseInfluencerProfile(obj))
-                            }
-                        }
-                        _wishlistedInfluencers.postValue(list)
-                    }
-                } catch (e: Exception) {
-                    Log.e("BrandViewModel", "Wishlist parsing error", e)
+                val data = jsonObject.optJSONObject("data")
+                if (data != null) {
+                    val overallRecs = parseRecommendations(data.optJSONArray("getOverallTopInfluencers"))
+                    val youtubeRecs = parseRecommendations(data.optJSONArray("getTopYoutubeInfluencers"))
+                    val instagramRecs = parseRecommendations(data.optJSONArray("getTopInstagramInfluencers"))
+
+                    val allInf = allInfluencers ?: _influencers.value ?: emptyList()
+                    
+                    _overallTopInfluencers.postValue(sortInfluencers(allInf, overallRecs))
+                    _youtubeTopInfluencers.postValue(sortInfluencers(allInf, youtubeRecs))
+                    _instagramTopInfluencers.postValue(sortInfluencers(allInf, instagramRecs))
                 }
             }.onFailure {
-                Log.e("BrandViewModel", "Wishlist network error", it)
+                Log.e("BrandViewModel", "Failed to fetch recommendations", it)
             }
         }
+    }
+
+    private fun parseRecommendations(array: JSONArray?): List<Pair<String, Double>> {
+        val list = mutableListOf<Pair<String, Double>>()
+        if (array != null) {
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i)
+                list.add(obj.optString("id") to obj.optDouble("score"))
+            }
+        }
+        return list
+    }
+
+    private fun sortInfluencers(all: List<InfluencerProfile>, recs: List<Pair<String, Double>>): List<InfluencerProfile> {
+        val idToScore = recs.toMap()
+        return all.filter { idToScore.containsKey(it.id) }
+            .sortedByDescending { idToScore[it.id] }
     }
 
     fun fetchInfluencers(token: String) {
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
-            fetchWishlist(token) // Fetch wishlist along with influencers
+            fetchWishlist(token)
             val query = """
                 query GetInfluencers {
                   getInfluencers {
@@ -305,25 +162,12 @@ class BrandViewModel : ViewModel() {
                         if (influencersArray != null) {
                             val list = parseInfluencers(influencersArray)
                             _influencers.postValue(list)
-                        } else {
-                            _influencers.postValue(emptyList())
-                        }
-                    } else {
-                        val errors = jsonObject.optJSONArray("errors")
-                        if (errors != null && errors.length() > 0) {
-                            val message = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
-                            _error.postValue(message)
-                        } else {
-                            _error.postValue("No data returned")
+                            fetchInfluencerRecommendations(token, list)
                         }
                     }
                 } catch (e: Exception) {
                     Log.e("BrandViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
-            }.onFailure {
-                Log.e("BrandViewModel", "Network error", it)
-                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -627,181 +471,6 @@ class BrandViewModel : ViewModel() {
         )
     }
 
-    fun updateBrandProfile(
-        token: String,
-        name: String,
-        brandCategory: String,
-        subCategory: String,
-        about: String,
-        preferredPlatforms: List<String>,
-        ageMin: Int?,
-        ageMax: Int?,
-        gender: String,
-        profileUrl: String?,
-        logoUrl: String,
-        onComplete: (Boolean) -> Unit
-    ) {
-        _loading.value = true
-        _error.value = null
-        viewModelScope.launch {
-            val success = BrandRepository.setupBrandProfile(
-                token = token,
-                name = name,
-                brandCategory = brandCategory,
-                subCategory = subCategory,
-                about = about,
-                preferredPlatforms = preferredPlatforms,
-                ageMin = ageMin,
-                ageMax = ageMax,
-                gender = gender,
-                profileUrl = profileUrl,
-                logoUrl = logoUrl
-            )
-            if (success) {
-                fetchBrandDetails(token)
-            } else {
-                _error.postValue("Failed to update profile")
-            }
-            onComplete(success)
-            _loading.postValue(false)
-        }
-    }
-
-    fun fetchMyCampaigns(token: String) {
-        _loading.value = true
-        _error.value = null
-        viewModelScope.launch {
-            val query = """
-                query GetMyCampaigns {
-                  getMyCampaigns {
-                    id
-                    brandId
-                    title
-                    description
-                    budgetMin
-                    budgetMax
-                    startDate
-                    endDate
-                    status
-                    createdAt
-                    updatedAt
-                    platforms {
-                      platform
-                      formats
-                    }
-                  }
-                }
-            """.trimIndent()
-
-            val result = GraphQLClient.query(query = query, token = token)
-            result.onSuccess { jsonObject ->
-                try {
-                    val data = jsonObject.optJSONObject("data")
-                    val campaignsArray = data?.optJSONArray("getMyCampaigns")
-                    if (campaignsArray != null) {
-                        val list = mutableListOf<Campaign>()
-                        for (i in 0 until campaignsArray.length()) {
-                            val obj = campaignsArray.getJSONObject(i)
-                            
-                            val platformsArray = obj.optJSONArray("platforms")
-                            val platforms = mutableListOf<Platform>()
-                            if (platformsArray != null) {
-                                for (j in 0 until platformsArray.length()) {
-                                    val pObj = platformsArray.optJSONObject(j)
-                                    if (pObj != null) {
-                                        val formatsArray = pObj.optJSONArray("formats")
-                                        val formatsList = mutableListOf<String>()
-                                        if (formatsArray != null) {
-                                            for (k in 0 until formatsArray.length()) {
-                                                formatsList.add(formatsArray.getString(k))
-                                            }
-                                        }
-                                        platforms.add(
-                                            Platform(
-                                                platform = pObj.optString("platform"),
-                                                profileUrl = "",
-                                                followers = null,
-                                                avgViews = null,
-                                                engagement = null,
-                                                formats = formatsList,
-                                                connected = null
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-
-                            list.add(
-                                Campaign(
-                                    id = obj.optString("id"),
-                                    brandId = obj.optString("brandId"),
-                                    title = obj.optString("title"),
-                                    description = obj.optString("description"),
-                                    budgetMin = if (obj.isNull("budgetMin")) null else obj.optInt("budgetMin"),
-                                    budgetMax = if (obj.isNull("budgetMax")) null else obj.optInt("budgetMax"),
-                                    startDate = obj.optString("startDate"),
-                                    endDate = obj.optString("endDate"),
-                                    status = obj.optString("status"),
-                                    createdAt = obj.optString("createdAt"),
-                                    updatedAt = obj.optString("updatedAt"),
-                                    platforms = platforms
-                                )
-                            )
-                        }
-                        _myCampaigns.postValue(list)
-                    } else {
-                        _myCampaigns.postValue(emptyList())
-                    }
-                } catch (e: Exception) {
-                    _error.postValue("Parsing error: ${'$'}{e.message}")
-                }
-            }.onFailure {
-                _error.postValue("Network error: ${'$'}{it.message}")
-            }
-            _loading.postValue(false)
-        }
-    }
-
-    fun inviteInfluencer(token: String, influencerId: String, campaignId: String, message: String, pricing: List<Map<String, Any>>, onComplete: (Boolean) -> Unit) {
-        _loading.value = true
-        _error.value = null
-        viewModelScope.launch {
-            val mutation = """
-                mutation InviteInfluencer(${"$"}input: InviteInfluencerInput!) {
-                  inviteInfluencer(input: ${"$"}input) {
-                    id
-                  }
-                }
-            """.trimIndent()
-
-            val variables = mapOf(
-                "input" to mapOf(
-                    "influencerId" to influencerId,
-                    "campaignId" to campaignId,
-                    "message" to message,
-                    "pricing" to pricing
-                )
-            )
-
-            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
-            result.onSuccess { jsonObject ->
-                val data = jsonObject.optJSONObject("data")
-                if (data != null && data.optJSONObject("inviteInfluencer") != null) {
-                    onComplete(true)
-                } else {
-                    val errors = jsonObject.optJSONArray("errors")
-                    val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Invitation failed"
-                    _error.postValue(errorMsg)
-                    onComplete(false)
-                }
-            }.onFailure {
-                _error.postValue("Network error: ${'$'}{it.message}")
-                onComplete(false)
-            }
-            _loading.postValue(false)
-        }
-    }
-
     fun fetchCollaborations(token: String) {
         _loading.value = true
         _error.value = null
@@ -857,48 +526,6 @@ class BrandViewModel : ViewModel() {
                     advancePaid
                     finalPaid
                     totalAmount
-                    overallAnalytics {
-                      impressions
-                      clicks
-                      likes
-                      comments
-                      shares
-                      saves
-                      views
-                      retweets
-                    }
-                    platformAnalytics {
-                      platform
-                      duration
-                      cost
-                      impressions
-                      clicks
-                      likes
-                      comments
-                      shares
-                      saves
-                      views
-                      retweets
-                    }
-                    yt {
-                      videoId
-                      title
-                      viewCount
-                      likeCount
-                      thumbnail
-                      videoUrl
-                      fetchedAt
-                      analytics {
-                        views
-                        likes
-                        comments
-                        shares
-                        watchTimeMinutes
-                        subscribersGained
-                        averageViewDurationSeconds
-                        engagementRate
-                      }
-                    }
                   }
                 }
             """.trimIndent()
@@ -906,74 +533,15 @@ class BrandViewModel : ViewModel() {
             val result = GraphQLClient.query(query = query, token = token)
             result.onSuccess { jsonObject ->
                 try {
-                     val data = jsonObject.optJSONObject("data")
-                    if (data != null) {
-                         val collaborationsArray = data.optJSONArray("getCollaborations")
-                        if (collaborationsArray != null) {
-                            val list = parseCollaborations(collaborationsArray)
-                            _collaborations.postValue(list)
-                        } else {
-                             _collaborations.postValue(emptyList())
-                        }
-                    } else {
-                         val errors = jsonObject.optJSONArray("errors")
-                         if (errors != null && errors.length() > 0) {
-                             val message = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
-                             _error.postValue(message)
-                         } else {
-                             _error.postValue("No data returned")
-                         }
+                    val data = jsonObject.optJSONObject("data")
+                    val collaborationsArray = data?.optJSONArray("getCollaborations")
+                    if (collaborationsArray != null) {
+                        val list = parseCollaborations(collaborationsArray)
+                        _collaborations.postValue(list)
                     }
-
                 } catch (e: Exception) {
                     Log.e("BrandViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
-            }.onFailure {
-                Log.e("BrandViewModel", "Network error", it)
-                _error.postValue("Network error: ${'$'}{it.message}")
-            }
-            _loading.postValue(false)
-        }
-    }
-
-    fun updateCollaborationStatus(token: String, collaborationId: String, status: String, message: String? = null, onComplete: (Boolean) -> Unit) {
-        _loading.value = true
-        _error.value = null
-        viewModelScope.launch {
-            val mutation = """
-                mutation UpdateCollaboration(${'$'}input: UpdateCollaborationInput!) {
-                  updateCollaboration(input: ${'$'}input) {
-                    id
-                    status
-                    message
-                  }
-                }
-            """.trimIndent()
-
-            val variables = mapOf(
-                "input" to mapOf(
-                    "collaborationId" to collaborationId,
-                    "status" to status,
-                    "message" to message
-                )
-            )
-
-            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
-            result.onSuccess { jsonObject ->
-                val data = jsonObject.optJSONObject("data")
-                if (data != null && data.optJSONObject("updateCollaboration") != null) {
-                    fetchCollaborations(token) // Refresh the list
-                    onComplete(true)
-                } else {
-                    val errors = jsonObject.optJSONArray("errors")
-                    val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Update failed"
-                    _error.postValue(errorMsg)
-                    onComplete(false)
-                }
-            }.onFailure {
-                Log.e("BrandViewModel", "Network error", it)
-                _error.postValue("Network error: ${'$'}{it.message}")
             }
             _loading.postValue(false)
         }
@@ -1051,83 +619,6 @@ class BrandViewModel : ViewModel() {
                 }
             }
 
-            val oaObj = obj.optJSONObject("overallAnalytics")
-            val overallAnalytics = if (oaObj != null) {
-                OverallAnalytics(
-                    impressions = if (oaObj.isNull("impressions")) null else oaObj.optInt("impressions"),
-                    clicks = if (oaObj.isNull("clicks")) null else oaObj.optInt("clicks"),
-                    likes = if (oaObj.isNull("likes")) null else oaObj.optInt("likes"),
-                    comments = if (oaObj.isNull("comments")) null else oaObj.optInt("comments"),
-                    shares = if (oaObj.isNull("shares")) null else oaObj.optInt("shares"),
-                    saves = if (oaObj.isNull("saves")) null else oaObj.optInt("saves"),
-                    views = if (oaObj.isNull("views")) null else oaObj.optInt("views"),
-                    retweets = if (oaObj.isNull("retweets")) null else oaObj.optInt("retweets"),
-                    replies = null
-                )
-            } else null
-
-            val paArray = obj.optJSONArray("platformAnalytics")
-            val platformAnalytics = if (paArray != null) {
-                val pList = mutableListOf<CollaborationAnalytics>()
-                for (j in 0 until paArray.length()) {
-                    val pObj = paArray.optJSONObject(j)
-                    if (pObj != null) {
-                        pList.add(
-                            CollaborationAnalytics(
-                                platform = pObj.optString("platform"),
-                                duration = if (pObj.isNull("duration")) null else pObj.optInt("duration"),
-                                cost = if (pObj.isNull("cost")) null else pObj.optDouble("cost").toFloat(),
-                                impressions = if (pObj.isNull("impressions")) null else pObj.optInt("impressions"),
-                                clicks = if (pObj.isNull("clicks")) null else pObj.optInt("clicks"),
-                                likes = if (pObj.isNull("likes")) null else pObj.optInt("likes"),
-                                comments = if (pObj.isNull("comments")) null else pObj.optInt("comments"),
-                                shares = if (pObj.isNull("shares")) null else pObj.optInt("shares"),
-                                saves = if (pObj.isNull("saves")) null else pObj.optInt("saves"),
-                                views = if (pObj.isNull("views")) null else pObj.optInt("views"),
-                                retweets = if (pObj.isNull("retweets")) null else pObj.optInt("retweets"),
-                                replies = null
-                            )
-                        )
-                    }
-                }
-                pList
-            } else null
-
-            val ytArray = obj.optJSONArray("yt")
-            val ytList = if (ytArray != null) {
-                val list = mutableListOf<YouTubeVideoData>()
-                for (j in 0 until ytArray.length()) {
-                    val yObj = ytArray.optJSONObject(j) ?: continue
-                    val aObj = yObj.optJSONObject("analytics")
-                    val summary = if (aObj != null) {
-                        YouTubeVideoSummary(
-                            views = if (aObj.isNull("views")) null else aObj.optInt("views"),
-                            likes = if (aObj.isNull("likes")) null else aObj.optInt("likes"),
-                            comments = if (aObj.isNull("comments")) null else aObj.optInt("comments"),
-                            shares = if (aObj.isNull("shares")) null else aObj.optInt("shares"),
-                            watchTimeMinutes = if (aObj.isNull("watchTimeMinutes")) null else aObj.optDouble("watchTimeMinutes"),
-                            subscribersGained = if (aObj.isNull("subscribersGained")) null else aObj.optInt("subscribersGained"),
-                            averageViewDurationSeconds = if (aObj.isNull("averageViewDurationSeconds")) null else aObj.optInt("averageViewDurationSeconds"),
-                            engagementRate = aObj.optString("engagementRate", null)
-                        )
-                    } else null
-
-                    list.add(
-                        YouTubeVideoData(
-                            videoId = yObj.optString("videoId"),
-                            title = yObj.optString("title"),
-                            viewCount = yObj.optString("viewCount", null),
-                            likeCount = yObj.optString("likeCount", null),
-                            thumbnail = yObj.optString("thumbnail", null),
-                            analytics = summary,
-                            videoUrl = yObj.optString("videoUrl", null),
-                            fetchedAt = yObj.optString("fetchedAt", null)
-                        )
-                    )
-                }
-                list
-            } else null
-
             list.add(
                 Collaboration(
                     id = obj.optString("id"),
@@ -1147,13 +638,325 @@ class BrandViewModel : ViewModel() {
                     razorpayOrderId = obj.optString("razorpayOrderId"),
                     advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),
                     finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
-                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount"),
-                    overallAnalytics = overallAnalytics,
-                    platformAnalytics = platformAnalytics,
-                    yt = ytList
+                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount")
                 )
             )
         }
         return list
+    }
+
+    fun fetchWishlist(token: String) {
+        viewModelScope.launch {
+            val query = """
+                query GetWishlist {
+                  getWishlist {
+                    ... on Influencer {
+                      id
+                      email
+                      name
+                      role
+                      profileCompleted
+                      updatedAt
+                      bio
+                      location
+                      categories {
+                        category
+                        subCategories
+                      }
+                      platforms {
+                        platform
+                        profileUrl
+                        followers
+                        avgViews
+                        engagement
+                        formats
+                        connected
+                      }
+                      strengths
+                      pricing {
+                        platform
+                        deliverable
+                        price
+                        currency
+                      }
+                      availability
+                      logoUrl
+                      averageRating
+                      isVerified
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    val wishlistArray = data?.optJSONArray("getWishlist")
+                    if (wishlistArray != null) {
+                        val list = mutableListOf<InfluencerProfile>()
+                        for (i in 0 until wishlistArray.length()) {
+                            val obj = wishlistArray.optJSONObject(i)
+                            if (obj != null && obj.has("id") && obj.optString("role") == "INFLUENCER") {
+                                list.add(parseInfluencerProfile(obj))
+                            }
+                        }
+                        _wishlistedInfluencers.postValue(list)
+                    }
+                } catch (e: Exception) {
+                    Log.e("BrandViewModel", "Wishlist parsing error", e)
+                }
+            }
+        }
+    }
+
+    fun updateCollaborationStatus(token: String, collaborationId: String, status: String, message: String? = null, onComplete: (Boolean) -> Unit) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val mutation = """
+                mutation UpdateCollaboration(${'$'}input: UpdateCollaborationInput!) {
+                  updateCollaboration(input: ${'$'}input) {
+                    id
+                    status
+                    message
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "input" to mapOf(
+                    "collaborationId" to collaborationId,
+                    "status" to status,
+                    "message" to message
+                )
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("updateCollaboration") != null) {
+                    fetchCollaborations(token)
+                    onComplete(true)
+                } else {
+                    onComplete(false)
+                }
+            }.onFailure {
+                onComplete(false)
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun fetchMyCampaigns(token: String) {
+        _loading.value = true
+        viewModelScope.launch {
+            val query = """
+                query GetMyCampaigns {
+                  getMyCampaigns {
+                    id
+                    title
+                    description
+                    budgetMin
+                    budgetMax
+                    startDate
+                    endDate
+                    status
+                    createdAt
+                    updatedAt
+                    platforms {
+                      platform
+                      formats
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val data = jsonObject.optJSONObject("data")
+                    val campaignsArray = data?.optJSONArray("getMyCampaigns")
+                    if (campaignsArray != null) {
+                        val list = mutableListOf<Campaign>()
+                        for (i in 0 until campaignsArray.length()) {
+                            val obj = campaignsArray.getJSONObject(i)
+                            val platformsArray = obj.optJSONArray("platforms")
+                            val platforms = mutableListOf<Platform>()
+                            if (platformsArray != null) {
+                                for (j in 0 until platformsArray.length()) {
+                                    val pObj = platformsArray.optJSONObject(j)
+                                    if (pObj != null) {
+                                        val formatsArray = pObj.optJSONArray("formats")
+                                        val formatsList = mutableListOf<String>()
+                                        if (formatsArray != null) {
+                                            for (k in 0 until formatsArray.length()) {
+                                                formatsList.add(formatsArray.getString(k))
+                                            }
+                                        }
+                                        platforms.add(
+                                            Platform(
+                                                platform = pObj.optString("platform"),
+                                                profileUrl = "",
+                                                followers = null,
+                                                avgViews = null,
+                                                engagement = null,
+                                                formats = formatsList,
+                                                connected = null
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            list.add(
+                                Campaign(
+                                    id = obj.optString("id"),
+                                    brandId = null,
+                                    title = obj.optString("title"),
+                                    description = obj.optString("description"),
+                                    budgetMin = if (obj.isNull("budgetMin")) null else obj.optInt("budgetMin"),
+                                    budgetMax = if (obj.isNull("budgetMax")) null else obj.optInt("budgetMax"),
+                                    startDate = obj.optString("startDate"),
+                                    endDate = obj.optString("endDate"),
+                                    status = obj.optString("status"),
+                                    createdAt = obj.optString("createdAt"),
+                                    updatedAt = obj.optString("updatedAt"),
+                                    platforms = platforms
+                                )
+                            )
+                        }
+                        _myCampaigns.postValue(list)
+                    }
+                } catch (e: Exception) {
+                    Log.e("BrandViewModel", "Error fetching campaigns", e)
+                }
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun inviteInfluencer(token: String, influencerId: String, campaignId: String, message: String, pricing: List<Map<String, Any>>, onComplete: (Boolean) -> Unit) {
+        _loading.value = true
+        viewModelScope.launch {
+            val mutation = """
+                mutation InviteInfluencer(${"$"}input: InviteInfluencerInput!) {
+                  inviteInfluencer(input: ${"$"}input) {
+                    id
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "input" to mapOf(
+                    "influencerId" to influencerId,
+                    "campaignId" to campaignId,
+                    "message" to message,
+                    "pricing" to pricing
+                )
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("inviteInfluencer") != null) {
+                    onComplete(true)
+                } else {
+                    onComplete(false)
+                }
+            }.onFailure {
+                onComplete(false)
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun toggleWishlist(influencer: InfluencerProfile, token: String) {
+        viewModelScope.launch {
+            val mutation = """
+                mutation ToggleWishlist(${'$'}targetId: ID!) {
+                  toggleWishlist(targetId: ${'$'}targetId)
+                }
+            """.trimIndent()
+
+            val variables = mapOf("targetId" to influencer.id)
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null) {
+                    val isWishlistedResult = data.optBoolean("toggleWishlist")
+                    
+                    val currentList = _wishlistedInfluencers.value?.toMutableList() ?: mutableListOf()
+                    if (isWishlistedResult) {
+                        if (!currentList.any { it.id == influencer.id }) {
+                            currentList.add(influencer)
+                        }
+                    } else {
+                        currentList.removeAll { it.id == influencer.id }
+                    }
+                    _wishlistedInfluencers.postValue(currentList)
+                }
+            }.onFailure {
+                Log.e("BrandViewModel", "Error toggling wishlist", it)
+            }
+        }
+    }
+
+    fun updateBrandProfile(
+        token: String,
+        name: String,
+        brandCategory: String,
+        subCategory: String,
+        about: String,
+        preferredPlatforms: List<String>,
+        ageMin: Int?,
+        ageMax: Int?,
+        gender: String,
+        profileUrl: String?,
+        logoUrl: String,
+        onComplete: (Boolean) -> Unit
+    ) {
+        _loading.value = true
+        viewModelScope.launch {
+            val mutation = """
+                mutation SetupBrandProfile(${"$"}input: BrandProfileInput!) {
+                  setupBrandProfile(input: ${"$"}input) {
+                    id
+                    name
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "input" to mapOf(
+                    "name" to name,
+                    "brandCategory" to mapOf("category" to brandCategory, "subCategory" to subCategory),
+                    "about" to about,
+                    "preferredPlatforms" to preferredPlatforms.map { mapOf("platform" to it) },
+                    "targetAudience" to mapOf(
+                        "ageMin" to ageMin,
+                        "ageMax" to ageMax,
+                        "gender" to gender,
+                        "locations" to emptyList<String>()
+                    ),
+                    "profileUrl" to profileUrl,
+                    "logoUrl" to logoUrl
+                )
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("setupBrandProfile") != null) {
+                    onComplete(true)
+                } else {
+                    onComplete(false)
+                }
+            }.onFailure {
+                onComplete(false)
+            }
+            _loading.postValue(false)
+        }
     }
 }
