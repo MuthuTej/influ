@@ -449,7 +449,7 @@ class BrandViewModel : ViewModel() {
             TargetAudience(
                 ageMin = if (targetAudienceObj.isNull("ageMin")) null else targetAudienceObj.optInt("ageMin"),
                 ageMax = if (targetAudienceObj.isNull("ageMax")) null else targetAudienceObj.optInt("ageMax"),
-                gender = if (targetAudienceObj.isNull("gender")) "" else targetAudienceObj.optString("gender"),
+                gender = if (targetAudienceObj.isNull("gender")) null else targetAudienceObj.optString("gender"),
                 locations = locations
             )
         } else null
@@ -460,11 +460,11 @@ class BrandViewModel : ViewModel() {
             name = obj.optString("name", ""),
             role = obj.optString("role", ""),
             profileCompleted = if (obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
-            updatedAt = if (obj.isNull("updatedAt")) "" else obj.optString("updatedAt"),
+            updatedAt = if (obj.isNull("updatedAt")) null else obj.optString("updatedAt"),
             brandCategories = brandCategories,
-            about = if (obj.isNull("about")) "" else obj.optString("about"),
-            profileUrl = if (obj.isNull("profileUrl")) "" else obj.optString("profileUrl"),
-            logoUrl = if (obj.isNull("logoUrl")) "" else obj.optString("logoUrl"),
+            about = if (obj.isNull("about")) null else obj.optString("about"),
+            profileUrl = if (obj.isNull("profileUrl")) null else obj.optString("profileUrl"),
+            logoUrl = if (obj.isNull("logoUrl")) null else obj.optString("logoUrl"),
             preferredPlatforms = preferredPlatforms,
             targetAudience = targetAudience
         )
@@ -633,9 +633,9 @@ class BrandViewModel : ViewModel() {
                     profileCompleted = null,
                     updatedAt = null,
                     brandCategories = null,
-                    about = if (brandObj.isNull("about")) "" else brandObj.optString("about"),
-                    profileUrl = if (brandObj.isNull("profileUrl")) "" else brandObj.optString("profileUrl"),
-                    logoUrl = if (brandObj.isNull("logoUrl")) "" else brandObj.optString("logoUrl"),
+                    about = if (brandObj.isNull("about")) null else brandObj.optString("about"),
+                    profileUrl = if (brandObj.isNull("profileUrl")) null else brandObj.optString("profileUrl"),
+                    logoUrl = if (brandObj.isNull("logoUrl")) null else brandObj.optString("logoUrl"),
                     preferredPlatforms = null,
                     targetAudience = null
                 )
@@ -734,7 +734,7 @@ class BrandViewModel : ViewModel() {
                 }
             }
 
-            // Parse Instagram Data (Keep parsing logic but handle cases where it might be missing from JSON)
+            // Parse Instagram Data (Attempt to parse if present in JSON, even if removed from query)
             val igList = mutableListOf<InstagramPostData>()
             val igArray = obj.optJSONArray("ig")
             if (igArray != null) {

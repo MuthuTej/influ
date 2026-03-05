@@ -499,6 +499,21 @@ class InfluencerViewModel : ViewModel() {
                             val obj = collaborationsArray.optJSONObject(i) ?: continue
                             val brandObj = obj.optJSONObject("brand")
                             val campaignObj = obj.optJSONObject("campaign")
+                            
+                            val pricingArray = obj.optJSONArray("pricing")
+                            val pricingList = mutableListOf<Pricing>()
+                            if (pricingArray != null) {
+                                for (j in 0 until pricingArray.length()) {
+                                    val pObj = pricingArray.optJSONObject(j) ?: continue
+                                    pricingList.add(Pricing(
+                                        platform = pObj.optString("platform"),
+                                        deliverable = pObj.optString("deliverable"),
+                                        price = pObj.optInt("price"),
+                                        currency = pObj.optString("currency")
+                                    ))
+                                }
+                            }
+
                             list.add(Collaboration(
                                 id = obj.optString("id"),
                                 campaignId = obj.optString("campaignId"),
@@ -506,7 +521,7 @@ class InfluencerViewModel : ViewModel() {
                                 influencerId = obj.optString("influencerId"),
                                 status = obj.optString("status"),
                                 message = obj.optString("message"),
-                                pricing = emptyList(),
+                                pricing = pricingList,
                                 initiatedBy = "",
                                 createdAt = "",
                                 updatedAt = obj.optString("updatedAt"),
