@@ -226,7 +226,8 @@ fun MyAppNavigation(
             InfluencerSearchPage(
                 modifier = modifier,
                 navController = navController,
-                campaignViewModel = campaignViewModel
+                campaignViewModel = campaignViewModel,
+                notificationViewModel = notificationViewModel
             )
         }
         composable("proposals") {

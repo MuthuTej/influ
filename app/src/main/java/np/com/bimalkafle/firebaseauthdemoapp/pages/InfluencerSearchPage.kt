@@ -31,27 +31,31 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.components.FilterDropdown
 import np.com.bimalkafle.firebaseauthdemoapp.components.IconBubbleSearch
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InfluencerSearchPage(
     modifier: Modifier = Modifier,
     navController: NavController,
-    campaignViewModel: CampaignViewModel
+    campaignViewModel: CampaignViewModel,
+    notificationViewModel: NotificationViewModel
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val campaigns by campaignViewModel.campaigns.observeAsState(initial = emptyList())
     val isLoading by campaignViewModel.loading.observeAsState(initial = false)
     val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
+    val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
 
     LaunchedEffect(Unit) {
-        FirebaseAuth.getInstance().currentUser
-            ?.getIdToken(true)
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        currentUser?.getIdToken(true)
             ?.addOnSuccessListener { result ->
                 firebaseToken = result.token
                 if (firebaseToken != null) {
                     campaignViewModel.fetchCampaigns(firebaseToken!!)
+                    notificationViewModel.fetchUnreadCount(currentUser.uid, firebaseToken!!)
                 }
             }
     }
@@ -176,7 +180,22 @@ fun InfluencerSearchPage(
                                     onClick = { navController.navigate("wishlist") }
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
-                                IconBubbleSearch(Icons.Default.Notifications, Color.Black)
+                                Box {
+                                    IconBubbleSearch(
+                                        icon = Icons.Default.Notifications,
+                                        tint = Color.Black,
+                                        onClick = { navController.navigate("notifications") }
+                                    )
+                                    if (unreadCount > 0) {
+                                        Badge(
+                                            modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
+                                            containerColor = Color.Red,
+                                            contentColor = Color.White
+                                        ) {
+                                            Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
+                                        }
+                                    }
+                                }
                             }
                         }
 
