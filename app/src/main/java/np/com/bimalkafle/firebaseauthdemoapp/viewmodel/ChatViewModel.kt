@@ -196,6 +196,12 @@ class ChatViewModel : ViewModel() {
     }
     
     fun updateMessageStatus(messageId: String, status: String) {
+        val currentList = _messages.value.toMutableList()
+        val index = currentList.indexOfFirst { it.id == messageId }
+        if (index != -1) {
+            currentList[index] = currentList[index].copy(status = status)
+            _messages.value = currentList
+        }
         repository.updateMessageStatus(messageId, status)
     }
 
