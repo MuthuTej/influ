@@ -73,8 +73,21 @@ fun InfluencerHomePage(
     val authState = authViewModel.authState.observeAsState()
     val collaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
     val campaigns by campaignViewModel.campaigns.observeAsState(initial = emptyList())
-    val isLoading by influencerViewModel.loading.observeAsState(initial = false)
-    val error by influencerViewModel.error.observeAsState()
+    
+    // Recommended Campaign streams
+    val overallRecommendedCampaigns by campaignViewModel.overallRecommendedCampaigns.observeAsState(initial = emptyList())
+    val youtubeRecommendedCampaigns by campaignViewModel.youtubeRecommendedCampaigns.observeAsState(initial = emptyList())
+    val instagramRecommendedCampaigns by campaignViewModel.instagramRecommendedCampaigns.observeAsState(initial = emptyList())
+    
+    // Combine loading states
+    val isInfluencerLoading by influencerViewModel.loading.observeAsState(initial = false)
+    val isCampaignLoading by campaignViewModel.loading.observeAsState(initial = false)
+    val isLoading = isInfluencerLoading || isCampaignLoading
+    
+    // Combine error states
+    val influencerError by influencerViewModel.error.observeAsState()
+    val campaignError by campaignViewModel.error.observeAsState()
+    
     val influencerProfile by influencerViewModel.influencerProfile.observeAsState()
     val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
@@ -103,15 +116,22 @@ fun InfluencerHomePage(
     }
 
     var selectedBottomNavItem by remember { mutableStateOf("Home") }
-    var selectedPlatform by remember { mutableStateOf("YouTube") }
-    val platforms = listOf("YouTube", "Instagram", "Facebook")
+    var selectedPlatform by remember { mutableStateOf("All") }
+    val platforms = listOf("All", "YouTube", "Instagram", "Facebook")
 
-    val filteredCampaigns = remember(selectedPlatform, campaigns) {
-        campaigns.filter { campaign ->
-            val matchesInCampaign = campaign.platforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
-            val matchesInBrand = campaign.brand?.preferredPlatforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
-            matchesInCampaign || matchesInBrand
-        }.take(10)
+    val filteredCampaigns = remember(selectedPlatform, campaigns, overallRecommendedCampaigns, youtubeRecommendedCampaigns, instagramRecommendedCampaigns) {
+        val list = when (selectedPlatform) {
+            "All" -> overallRecommendedCampaigns.ifEmpty { campaigns }
+            "YouTube" -> youtubeRecommendedCampaigns.ifEmpty {
+                campaigns.filter { it.platforms?.any { p -> p.platform.equals("YouTube", true) } == true }
+            }
+            "Instagram" -> instagramRecommendedCampaigns.ifEmpty {
+                campaigns.filter { it.platforms?.any { p -> p.platform.equals("Instagram", true) } == true }
+            }
+            "Facebook" -> campaigns.filter { it.platforms?.any { p -> p.platform.equals("Facebook", true) } == true }
+            else -> campaigns
+        }
+        list.take(10)
     }
 
     Scaffold(
@@ -132,7 +152,7 @@ fun InfluencerHomePage(
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
 
-        if (isLoading) {
+        if (isLoading && campaigns.isEmpty() && collaborations.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = brandThemeColor)
             }
@@ -146,14 +166,16 @@ fun InfluencerHomePage(
 
                 item { InfluencerHeaderAndReachSection(influencerProfile, navController, unreadCount) }
 
-                // Checklist item for debugging (only shows if error or empty collab)
+                // Checklist item for debugging
                 item {
-                    if (error != null || collaborations.isEmpty()) {
+                    if (influencerError != null || campaignError != null || collaborations.isEmpty() || campaigns.isEmpty()) {
                         FetchStatusChecklist(
                             influencerId = influencerProfile?.id,
                             tokenPresent = firebaseToken != null,
                             collabCount = collaborations.size,
-                            error = error
+                            campaignCount = campaigns.size,
+                            influencerError = influencerError,
+                            campaignError = campaignError
                         )
                     }
                 }
@@ -195,6 +217,7 @@ fun InfluencerHomePage(
                                         "YouTube" -> youtubeColor
                                         "Instagram" -> instagramColor
                                         "Facebook" -> facebookColor
+                                        "All" -> brandThemeColor
                                         else -> brandThemeColor
                                     }
                                     TabRowDefaults.SecondaryIndicator(
@@ -204,28 +227,37 @@ fun InfluencerHomePage(
                                 }
                             ) {
                                 platforms.forEach { platform ->
-                                    val iconRes = when (platform) {
-                                        "YouTube" -> R.drawable.ic_youtube
-                                        "Instagram" -> R.drawable.ic_instagram
-                                        "Facebook" -> R.drawable.ic_facebook
-                                        else -> R.drawable.ic_youtube
-                                    }
-                                    val iconColor = when (platform) {
-                                        "YouTube" -> youtubeColor
-                                        "Instagram" -> instagramColor
-                                        "Facebook" -> facebookColor
-                                        else -> Color.Gray
-                                    }
                                     Tab(
                                         selected = selectedPlatform == platform,
                                         onClick = { selectedPlatform = platform },
                                         icon = {
-                                            Icon(
-                                                painter = painterResource(id = iconRes),
-                                                contentDescription = platform,
-                                                modifier = Modifier.size(24.dp),
-                                                tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f)
-                                            )
+                                            if (platform == "All") {
+                                                Icon(
+                                                    imageVector = Icons.Default.Campaign,
+                                                    contentDescription = "All",
+                                                    modifier = Modifier.size(24.dp),
+                                                    tint = if (selectedPlatform == platform) brandThemeColor else Color.Gray
+                                                )
+                                            } else {
+                                                val iconRes = when (platform) {
+                                                    "YouTube" -> R.drawable.ic_youtube
+                                                    "Instagram" -> R.drawable.ic_instagram
+                                                    "Facebook" -> R.drawable.ic_facebook
+                                                    else -> R.drawable.ic_youtube
+                                                }
+                                                val iconColor = when (platform) {
+                                                    "YouTube" -> youtubeColor
+                                                    "Instagram" -> instagramColor
+                                                    "Facebook" -> facebookColor
+                                                    else -> Color.Gray
+                                                }
+                                                Icon(
+                                                    painter = painterResource(id = iconRes),
+                                                    contentDescription = platform,
+                                                    modifier = Modifier.size(24.dp),
+                                                    tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f)
+                                                )
+                                            }
                                         }
                                     )
                                 }
@@ -241,7 +273,8 @@ fun InfluencerHomePage(
                             modifier = Modifier.fillMaxWidth().height(200.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No campaigns found for $selectedPlatform", color = Color.Gray)
+                            val emptyMessage = if (campaigns.isEmpty()) "No campaigns available." else "No campaigns found for $selectedPlatform"
+                            Text(emptyMessage, color = Color.Gray)
                         }
                     }
                 } else {
@@ -286,7 +319,9 @@ fun FetchStatusChecklist(
     influencerId: String?,
     tokenPresent: Boolean,
     collabCount: Int,
-    error: String?
+    campaignCount: Int,
+    influencerError: String?,
+    campaignError: String?
 ) {
     Card(
         modifier = Modifier
@@ -301,9 +336,15 @@ fun FetchStatusChecklist(
             StatusItem("Influencer ID Detected", influencerId != null)
             StatusItem("Auth Token Present", tokenPresent)
             StatusItem("Collaborations Count", collabCount > 0, suffix = ": $collabCount")
-            if (error != null) {
+            StatusItem("Campaigns Count", campaignCount > 0, suffix = ": $campaignCount")
+            
+            if (influencerError != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Error: $error", color = Color.Red, fontSize = 12.sp)
+                Text("Influencer Error: $influencerError", color = Color.Red, fontSize = 12.sp)
+            }
+            if (campaignError != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Campaign Error: $campaignError", color = Color.Red, fontSize = 12.sp)
             }
         }
     }

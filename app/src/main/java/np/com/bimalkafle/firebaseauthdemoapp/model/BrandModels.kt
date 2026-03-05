@@ -30,6 +30,17 @@ data class YouTubeVideoData(
     val fetchedAt: String?
 )
 
+data class InstagramPostData(
+    val postId: String?,
+    val caption: String?,
+    val likeCount: Int?,
+    val commentCount: Int?,
+    val viewCount: Int?,
+    val mediaUrl: String?,
+    val timestamp: String?,
+    val fetchedAt: String?
+)
+
 data class CollaborationAnalytics(
     val platform: String?,
     val duration: Int?,
@@ -41,8 +52,8 @@ data class CollaborationAnalytics(
     val shares: Int?,
     val saves: Int?,
     val views: Int?,
-    val retweets: Int?,
-    val replies: Int?
+    val retweets: Int? = null,
+    val replies: Int? = null
 )
 
 data class OverallAnalytics(
@@ -53,8 +64,8 @@ data class OverallAnalytics(
     val shares: Int?,
     val saves: Int?,
     val views: Int?,
-    val retweets: Int?,
-    val replies: Int?
+    val retweets: Int? = null,
+    val replies: Int? = null
 )
 
 data class Collaboration(
@@ -70,15 +81,16 @@ data class Collaboration(
     val updatedAt: String,
     val campaign: Campaign,
     val influencer: Influencer,
-    val paymentStatus: String?,
-    val razorpayOrderId: String?,
-    val advancePaid: Boolean?,
-    val finalPaid: Boolean?,
-    val totalAmount: Double?,
+    val paymentStatus: String? = null,
+    val razorpayOrderId: String? = null,
+    val advancePaid: Boolean? = null,
+    val finalPaid: Boolean? = null,
+    val totalAmount: Double? = null,
     val brand: Brand? = null,
     val overallAnalytics: OverallAnalytics? = null,
     val platformAnalytics: List<CollaborationAnalytics>? = null,
     val yt: List<YouTubeVideoData>? = null,
+    val ig: List<InstagramPostData>? = null,
     val youtubeVideoId: String? = null
 )
 
@@ -100,6 +112,7 @@ data class Campaign(
 data class Pricing(
     val platform: String,
     val deliverable: String,
+    val count: Int? = null,
     val price: Int,
     val currency: String,
     val status: String? = null,

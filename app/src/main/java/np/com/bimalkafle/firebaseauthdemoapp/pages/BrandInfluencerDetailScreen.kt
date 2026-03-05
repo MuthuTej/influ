@@ -165,28 +165,13 @@ fun BrandInfluencerDetailContent(
                         Spacer(modifier = Modifier.height(32.dp))
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        influencer.platforms?.let { platforms ->
-                            ViewersDonutCard(
-                                platforms = platforms,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-
-                        influencer.audienceInsights?.let { insights ->
-                            InfluencerTopLocationsCard(
-                                insights = insights,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
+                    influencer.instagramMetrics?.let { instaMetrics ->
+                        InstagramInsightsSection(instaMetrics)
+                        Spacer(modifier = Modifier.height(32.dp))
                     }
 
-                    Spacer(modifier = Modifier.height(32.dp))
 
-                    PlatformsCard(influencer)
+//                    PlatformsCard(influencer)
 
                     Spacer(modifier = Modifier.height(32.dp))
 
@@ -207,11 +192,6 @@ fun BrandInfluencerDetailContent(
                         Spacer(modifier = Modifier.height(32.dp))
                     }
 
-                    influencer.audienceInsights?.let { insights ->
-                        InfluencerGenderSplitCard(insights)
-                    }
-
-                    Spacer(modifier = Modifier.height(32.dp))
 
                     PricingTable(influencer)
 
@@ -349,53 +329,6 @@ private fun NewEnhancedProfileHeader(
     }
 }
 
-@Composable
-private fun ViewersDonutCard(
-    platforms: List<np.com.bimalkafle.firebaseauthdemoapp.model.Platform>,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Viewers", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(16.dp))
-
-            val totalViews = platforms.sumOf { it.followers ?: 0 }.toFloat()
-            val values = platforms.map { (it.followers ?: 0).toFloat() }
-            val colors = platforms.map { platformsColors[it.platform.uppercase()] ?: Color.Gray }
-
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
-                InfluencerDonutChart(
-                    values = values,
-                    colors = colors,
-                    modifier = Modifier.fillMaxSize(),
-                    strokeWidth = 12.dp
-                )
-                Text(
-                    text = formatInfluencerCount(totalViews.toInt()),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                platforms.take(3).forEach { platform ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(6.dp).background(platformsColors[platform.platform.uppercase()] ?: Color.Gray, CircleShape))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(platform.platform, fontSize = 10.sp, color = detailDarkerGray)
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun PlatformsCard(influencer: InfluencerProfile) {
@@ -475,73 +408,7 @@ private fun PriorityTag(label: String) {
     }
 }
 
-@Composable
-private fun InfluencerTopLocationsCard(
-    insights: np.com.bimalkafle.firebaseauthdemoapp.model.AudienceInsights,
-    modifier: Modifier = Modifier
-) {
-    val locations = insights.topLocations?.take(4) ?: emptyList()
-    val values = locations.map { it.percentage }
-    val colors = listOf(Color(0xFF1E63E9), Color(0xFFF7943D), Color(0xFF3CC18E), Color(0xFFF4B73B)).take(values.size)
-    val total = values.sum()
 
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Locations", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
-                InfluencerDonutChart(values = values, colors = colors, modifier = Modifier.fillMaxSize(), strokeWidth = 12.dp)
-                Text(text = formatInfluencerCount(total.toInt()), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                locations.take(3).forEachIndexed { index, loc ->
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(6.dp).background(colors[index], CircleShape))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = loc.city ?: loc.country ?: "Unknown", fontSize = 10.sp, color = detailDarkerGray, fontWeight = FontWeight.Medium)
-                        }
-                        Text(text = "${String.format("%.0f", loc.percentage)}%", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color.Black)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InfluencerGenderSplitCard(insights: np.com.bimalkafle.firebaseauthdemoapp.model.AudienceInsights) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            Text("Gender", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(modifier = Modifier.fillMaxWidth().height(120.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
-                GenderBar(insights.genderSplit?.male ?: 0f, Color(0xFF64B5F6), "Male")
-                GenderBar(insights.genderSplit?.female ?: 0f, Color(0xFF81C784), "Female")
-            }
-        }
-    }
-}
-
-@Composable
-private fun GenderBar(percentage: Float, color: Color, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(modifier = Modifier.width(80.dp).fillMaxHeight(percentage / 100f).background(color, RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)))
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(label, fontSize = 12.sp, color = detailDarkerGray)
-    }
-}
 
 @Composable
 private fun PricingTable(influencer: InfluencerProfile) {
@@ -715,6 +582,102 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun InstagramInsightsSection(metrics: np.com.bimalkafle.firebaseauthdemoapp.model.InstagramMetrics) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("Instagram Insights", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Text("Detailed Platform Analytics", color = detailDarkerGray, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            InstagramStatCard(
+                label = "Avg Likes",
+                value = formatInfluencerCount(metrics.avgLikes?.toInt() ?: 0),
+                icon = Icons.Default.Favorite,
+                modifier = Modifier.weight(1f)
+            )
+            InstagramStatCard(
+                label = "Avg Comments",
+                value = formatInfluencerCount(metrics.avgComments?.toInt() ?: 0),
+                icon = Icons.Default.Comment,
+                modifier = Modifier.weight(1f)
+            )
+            InstagramStatCard(
+                label = "Avg Views",
+                value = formatInfluencerCount(metrics.avgViews?.toInt() ?: 0),
+                icon = Icons.Default.Visibility,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Posting Frequency", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Average days between posts", color = detailDarkerGray, fontSize = 12.sp)
+                    }
+                    Text(
+                        text = "${metrics.postingFrequencyDays ?: "N/A"} Days",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 20.sp,
+                        color = platformsColors["INSTAGRAM"] ?: Color.Red
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = detailSoftGray, thickness = 1.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Posts Analyzed", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Sample size for metrics", color = detailDarkerGray, fontSize = 12.sp)
+                    }
+                    Text(
+                        text = (metrics.totalPostsAnalyzed ?: 0).toString(),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 20.sp,
+                        color = Color.Black
+                    )
+                }
+            }
+        }
+
+        if (!metrics.updatedAt.isNullOrEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("Last Updated: ${metrics.updatedAt}", color = detailDarkerGray, fontSize = 12.sp, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun InstagramStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, contentDescription = null, tint = platformsColors["INSTAGRAM"] ?: Color.Yellow, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(label, fontSize = 11.sp, color = detailDarkerGray)
         }
     }
 }

@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
+import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -60,7 +61,61 @@ class CampaignViewModel : ViewModel() {
     private val _wishlistedCampaigns = MutableLiveData<List<CampaignDetail>>(emptyList())
     val wishlistedCampaigns: LiveData<List<CampaignDetail>> = _wishlistedCampaigns
 
+    // Recommendation Streams
+    private val _overallRecommendedCampaigns = MutableLiveData<List<CampaignDetail>>()
+    val overallRecommendedCampaigns: LiveData<List<CampaignDetail>> = _overallRecommendedCampaigns
+
+    private val _youtubeRecommendedCampaigns = MutableLiveData<List<CampaignDetail>>()
+    val youtubeRecommendedCampaigns: LiveData<List<CampaignDetail>> = _youtubeRecommendedCampaigns
+
+    private val _instagramRecommendedCampaigns = MutableLiveData<List<CampaignDetail>>()
+    val instagramRecommendedCampaigns: LiveData<List<CampaignDetail>> = _instagramRecommendedCampaigns
+
     private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    fun fetchRecommendedCampaigns(token: String, allCampaigns: List<CampaignDetail>? = null) {
+        viewModelScope.launch {
+            val query = """
+                query GetCampaignRecommendations {
+                  getRecommendedCampaigns(topN: 30) { id score }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null) {
+                    val recs = parseRecs(data.optJSONArray("getRecommendedCampaigns"))
+                    val availableCampaigns = allCampaigns ?: _campaigns.value ?: emptyList()
+
+                    val sortedList = sortCampaigns(availableCampaigns, recs)
+
+                    _overallRecommendedCampaigns.postValue(sortedList)
+                    _youtubeRecommendedCampaigns.postValue(sortedList.filter { it.platforms?.any { p -> p.platform.equals("YouTube", true) } == true })
+                    _instagramRecommendedCampaigns.postValue(sortedList.filter { it.platforms?.any { p -> p.platform.equals("Instagram", true) } == true })
+                }
+            }.onFailure {
+                Log.e("CampaignViewModel", "Failed to fetch recommendations", it)
+            }
+        }
+    }
+
+    private fun parseRecs(array: JSONArray?): List<Pair<String, Double>> {
+        val list = mutableListOf<Pair<String, Double>>()
+        if (array != null) {
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i)
+                list.add(obj.optString("id") to obj.optDouble("score"))
+            }
+        }
+        return list
+    }
+
+    private fun sortCampaigns(all: List<CampaignDetail>, recs: List<Pair<String, Double>>): List<CampaignDetail> {
+        val idToScore = recs.toMap()
+        return all.filter { idToScore.containsKey(it.id) }
+            .sortedByDescending { idToScore[it.id] }
+    }
 
     fun toggleWishlist(campaign: CampaignDetail, token: String) {
         viewModelScope.launch {
@@ -220,6 +275,10 @@ class CampaignViewModel : ViewModel() {
                     brand {
                       id
                       name
+                      email
+                      role
+                      profileCompleted
+                      updatedAt
                       about
                       profileUrl
                       logoUrl
@@ -242,6 +301,15 @@ class CampaignViewModel : ViewModel() {
 
             val result = GraphQLClient.query(query = query, token = token)
             result.onSuccess { jsonObject ->
+                val errors = jsonObject.optJSONArray("errors")
+                if (errors != null && errors.length() > 0) {
+                    val errorMsg = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
+                    Log.e("CampaignViewModel", "GraphQL Error: ${'$'}errorMsg")
+                    _error.postValue(errorMsg)
+                    _loading.postValue(false)
+                    return@onSuccess
+                }
+
                 try {
                     val data = jsonObject.optJSONObject("data")
                     val campaignsArray = data?.optJSONArray("getCampaigns")
@@ -254,6 +322,7 @@ class CampaignViewModel : ViewModel() {
                             }
                         }
                         _campaigns.postValue(list)
+                        fetchRecommendedCampaigns(token, list)
                     } else {
                         _campaigns.postValue(emptyList())
                     }
@@ -261,11 +330,12 @@ class CampaignViewModel : ViewModel() {
                     Log.e("CampaignViewModel", "Parsing error", e)
                     _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
+                _loading.postValue(false)
             }.onFailure {
                 Log.e("CampaignViewModel", "Network error", it)
                 _error.postValue("Network error: ${'$'}{it.message}")
+                _loading.postValue(false)
             }
-            _loading.postValue(false)
         }
     }
 
@@ -302,6 +372,10 @@ class CampaignViewModel : ViewModel() {
                     brand {
                       id
                       name
+                      email
+                      role
+                      profileCompleted
+                      updatedAt
                       about
                       profileUrl
                       logoUrl
@@ -325,6 +399,14 @@ class CampaignViewModel : ViewModel() {
             val variables = mapOf("id" to id)
             val result = GraphQLClient.query(query = query, variables = variables, token = token)
             result.onSuccess { jsonObject ->
+                val errors = jsonObject.optJSONArray("errors")
+                if (errors != null && errors.length() > 0) {
+                    val errorMsg = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
+                    _error.postValue(errorMsg)
+                    _loading.postValue(false)
+                    return@onSuccess
+                }
+
                 try {
                     val data = jsonObject.optJSONObject("data")
                     val campaignObj = data?.optJSONObject("getCampaignById")
@@ -337,11 +419,12 @@ class CampaignViewModel : ViewModel() {
                     Log.e("CampaignViewModel", "Parsing error", e)
                     _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
+                _loading.postValue(false)
             }.onFailure {
                 Log.e("CampaignViewModel", "Network error", it)
                 _error.postValue("Network error: ${'$'}{it.message}")
+                _loading.postValue(false)
             }
-            _loading.postValue(false)
         }
     }
 
@@ -381,6 +464,10 @@ class CampaignViewModel : ViewModel() {
                     brand {
                       id
                       name
+                      email
+                      role
+                      profileCompleted
+                      updatedAt
                       about
                       profileUrl
                       logoUrl
@@ -451,11 +538,12 @@ class CampaignViewModel : ViewModel() {
                     val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Failed to create campaign"
                     _error.postValue(errorMsg)
                 }
+                _loading.postValue(false)
             }.onFailure {
                 Log.e("CampaignViewModel", "Error creating campaign", it)
                 _error.postValue(it.message ?: "Network error")
+                _loading.postValue(false)
             }
-            _loading.postValue(false)
         }
     }
 
@@ -494,7 +582,7 @@ class CampaignViewModel : ViewModel() {
                 TargetAudience(
                     ageMin = if (targetAudienceObj.isNull("ageMin")) null else targetAudienceObj.optInt("ageMin"),
                     ageMax = if (targetAudienceObj.isNull("ageMax")) null else targetAudienceObj.optInt("ageMax"),
-                    gender = targetAudienceObj.optString("gender", null),
+                    gender = targetAudienceObj.optString("gender", null as String?),
                     locations = locations
                 )
             } else null
@@ -504,16 +592,16 @@ class CampaignViewModel : ViewModel() {
                 email = it.optString("email"),
                 name = it.optString("name"),
                 role = it.optString("role"),
-                profileCompleted = it.optBoolean("profileCompleted"),
-                updatedAt = it.optString("updatedAt"),
+                profileCompleted = if (it.has("profileCompleted")) it.optBoolean("profileCompleted") else null,
+                updatedAt = it.optString("updatedAt", null as String?),
                 brandCategories = brandCategories,
                 about = it.optString("about"),
                 profileUrl = it.optString("profileUrl"),
                 logoUrl = it.optString("logoUrl"),
                 govtId = it.optString("govtId"),
-                isVerified = it.optBoolean("isVerified"),
+                isVerified = if (it.has("isVerified")) it.optBoolean("isVerified") else null,
                 reviews = null,
-                averageRating = it.optDouble("averageRating").takeIf { it != 0.0 },
+                averageRating = if (it.has("averageRating")) it.optDouble("averageRating").takeIf { it != 0.0 } else null,
                 fcmToken = it.optString("fcmToken"),
                 preferredPlatforms = null, // Use campaign level platforms
                 targetAudience = brandTargetAudience
