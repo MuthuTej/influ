@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,7 +46,7 @@ fun BrandProfilePage(
     authViewModel: AuthViewModel,
     brandViewModel: BrandViewModel
 ) {
-    val brandProfile by brandViewModel.brandProfile.observeAsState()
+    val brandProfile by brandViewModel.brandProfile.observeAsState(initial = null)
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
 
     LaunchedEffect(Unit) {
@@ -70,7 +69,7 @@ fun BrandProfilePage(
             }
         },
         onNavigateToCreateCampaign = { navController.navigate("create_campaign") },
-        onUpdateProfile = { updatedBrand ->
+        onUpdateProfile = { updatedBrand: Brand ->
             FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                 val firebaseToken = result.token
                 if (firebaseToken != null) {
