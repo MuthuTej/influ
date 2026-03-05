@@ -121,7 +121,7 @@ class CampaignViewModel : ViewModel() {
                       endDate
                       categories {
                         category
-                        subCategory
+                        subCategories
                       }
                       platforms {
                         platform
@@ -141,9 +141,9 @@ class CampaignViewModel : ViewModel() {
                         logoUrl
                         isVerified
                         averageRating
-                        brandCategory {
+                        brandCategories {
                           category
-                          subCategory
+                          subCategories
                         }
                         targetAudience {
                           ageMin
@@ -205,7 +205,7 @@ class CampaignViewModel : ViewModel() {
                     endDate
                     categories {
                       category
-                      subCategory
+                      subCategories
                     }
                     platforms {
                       platform
@@ -225,9 +225,9 @@ class CampaignViewModel : ViewModel() {
                       logoUrl
                       isVerified
                       averageRating
-                      brandCategory {
+                      brandCategories {
                         category
-                        subCategory
+                        subCategories
                       }
                       targetAudience {
                         ageMin
@@ -287,7 +287,7 @@ class CampaignViewModel : ViewModel() {
                     endDate
                     categories {
                       category
-                      subCategory
+                      subCategories
                     }
                     platforms {
                       platform
@@ -307,9 +307,9 @@ class CampaignViewModel : ViewModel() {
                       logoUrl
                       isVerified
                       averageRating
-                      brandCategory {
+                      brandCategories {
                         category
-                        subCategory
+                        subCategories
                       }
                       targetAudience {
                         ageMin
@@ -366,7 +366,7 @@ class CampaignViewModel : ViewModel() {
                     endDate
                     categories {
                       category
-                      subCategory
+                      subCategories
                     }
                     platforms {
                       platform
@@ -386,9 +386,9 @@ class CampaignViewModel : ViewModel() {
                       logoUrl
                       isVerified
                       averageRating
-                      brandCategory {
+                      brandCategories {
                         category
-                        subCategory
+                        subCategories
                       }
                       targetAudience {
                         ageMin
@@ -414,13 +414,12 @@ class CampaignViewModel : ViewModel() {
                 "locations" to selectedLocations.toList()
             )
 
-            val categoriesJson = selectedCategories.flatMap { cat ->
+            val categoriesJson = selectedCategories.map { cat ->
                 val subCats = selectedSubCategories[cat] ?: emptySet()
-                if (subCats.isEmpty()) {
-                    listOf(mapOf("category" to cat, "subCategory" to "General"))
-                } else {
-                    subCats.map { subCat -> mapOf("category" to cat, "subCategory" to subCat) }
-                }
+                mapOf(
+                    "category" to cat,
+                    "subCategories" to if (subCats.isEmpty()) listOf("General") else subCats.toList()
+                )
             }
 
             val input = mutableMapOf<String, Any>(
@@ -463,9 +462,22 @@ class CampaignViewModel : ViewModel() {
     private fun parseCampaignDetail(json: JSONObject): CampaignDetail {
         val brandJson = json.optJSONObject("brand")
         val brand = brandJson?.let {
-            val categoryJson = it.optJSONObject("brandCategory")
-            val category = categoryJson?.let { cat ->
-                BrandCategory(cat.optString("category"), cat.optString("subCategory"))
+            val categoriesArray = it.optJSONArray("brandCategories")
+            val brandCategories = mutableListOf<BrandCategory>()
+            if (categoriesArray != null) {
+                for (i in 0 until categoriesArray.length()) {
+                    val catObj = categoriesArray.optJSONObject(i)
+                    if (catObj != null) {
+                        val subCatsArray = catObj.optJSONArray("subCategories")
+                        val subCats = mutableListOf<String>()
+                        if (subCatsArray != null) {
+                            for (j in 0 until subCatsArray.length()) {
+                                subCats.add(subCatsArray.getString(j))
+                            }
+                        }
+                        brandCategories.add(BrandCategory(catObj.optString("category"), subCats))
+                    }
+                }
             }
 
             val targetAudienceObj = it.optJSONObject("targetAudience")
@@ -488,23 +500,23 @@ class CampaignViewModel : ViewModel() {
             } else null
             
             Brand(
-                it.optString("id"),
-                it.optString("email"),
-                it.optString("name"),
-                it.optString("role"),
-                it.optBoolean("profileCompleted"),
-                it.optString("updatedAt"),
-                category,
-                it.optString("about"),
-                it.optString("profileUrl"),
-                it.optString("logoUrl"),
-                it.optString("govtId"),
-                it.optBoolean("isVerified"),
-                null,
-                it.optDouble("averageRating").takeIf { it != 0.0 },
-                it.optString("fcmToken"),
-                null, // Use campaign level platforms
-                brandTargetAudience
+                id = it.optString("id"),
+                email = it.optString("email"),
+                name = it.optString("name"),
+                role = it.optString("role"),
+                profileCompleted = it.optBoolean("profileCompleted"),
+                updatedAt = it.optString("updatedAt"),
+                brandCategories = brandCategories,
+                about = it.optString("about"),
+                profileUrl = it.optString("profileUrl"),
+                logoUrl = it.optString("logoUrl"),
+                govtId = it.optString("govtId"),
+                isVerified = it.optBoolean("isVerified"),
+                reviews = null,
+                averageRating = it.optDouble("averageRating").takeIf { it != 0.0 },
+                fcmToken = it.optString("fcmToken"),
+                preferredPlatforms = null, // Use campaign level platforms
+                targetAudience = brandTargetAudience
             )
         }
 
@@ -560,7 +572,14 @@ class CampaignViewModel : ViewModel() {
         if (categoriesArray != null) {
             for (i in 0 until categoriesArray.length()) {
                 val cat = categoriesArray.getJSONObject(i)
-                categories.add(BrandCategory(cat.optString("category"), cat.optString("subCategory")))
+                val subCatsArray = cat.optJSONArray("subCategories")
+                val subCats = mutableListOf<String>()
+                if (subCatsArray != null) {
+                    for (j in 0 until subCatsArray.length()) {
+                        subCats.add(subCatsArray.getString(j))
+                    }
+                }
+                categories.add(BrandCategory(cat.optString("category"), subCats))
             }
         }
 

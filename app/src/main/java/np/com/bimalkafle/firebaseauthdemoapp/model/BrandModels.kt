@@ -117,7 +117,7 @@ data class Influencer(
 
 data class BrandCategory(
     val category: String,
-    val subCategory: String
+    val subCategories: List<String>
 )
 
 data class PreferredPlatform(
@@ -172,7 +172,7 @@ data class Brand(
     val role: String,
     val profileCompleted: Boolean?,
     val updatedAt: String?,
-    val brandCategory: BrandCategory?,
+    val brandCategories: List<BrandCategory>?,
     val about: String?,
     val profileUrl: String?,
     val logoUrl: String?,

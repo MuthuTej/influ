@@ -364,8 +364,8 @@ fun CampaignRequirementsSection(campaign: CampaignDetail) {
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            val categoryText = campaign.categories?.joinToString(", ") { "${it.category} (${it.subCategory})" }
-                ?: campaign.brand?.brandCategory?.let { "${it.category} (${it.subCategory})" }
+            val categoryText = campaign.categories?.joinToString(", ") { "${it.category} (${it.subCategories.firstOrNull() ?: ""})" }
+                ?: campaign.brand?.brandCategories?.firstOrNull()?.let { "${it.category} (${it.subCategories.firstOrNull() ?: ""})" }
                 ?: "N/A"
                 
             RequirementRow(
@@ -432,7 +432,7 @@ fun BrandInfoSection(brand: Brand?) {
                 Icon(Icons.Default.Category, contentDescription = null, tint = darkerGray, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = brand?.brandCategory?.let { "${it.category} - ${it.subCategory}" } ?: "Not specified",
+                    text = brand?.brandCategories?.firstOrNull()?.let { "${it.category} - ${it.subCategories.firstOrNull() ?: ""}" } ?: "Not specified",
                     fontSize = 13.sp,
                     color = darkerGray
                 )
@@ -454,12 +454,12 @@ fun BrandInfoSection(brand: Brand?) {
                 )
             }
 
-            if (brand?.profileUrl != null && brand.profileUrl!!.isNotEmpty()) {
+            if (brand?.profileUrl != null && brand.profileUrl.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Language, contentDescription = null, tint = darkerGray, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = brand.profileUrl!!, fontSize = 13.sp, color = darkerGray)
+                    Text(text = brand.profileUrl, fontSize = 13.sp, color = darkerGray)
                 }
             }
         }

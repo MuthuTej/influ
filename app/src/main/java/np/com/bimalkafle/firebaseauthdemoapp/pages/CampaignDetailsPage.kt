@@ -153,7 +153,9 @@ fun CampaignDetailsPage(
             ) {
                 CampaignDetailRow("Brand Name", createdCampaign?.brand?.name ?: "N/A")
                 Divider(color = Color.LightGray)
-                CampaignDetailRow("Category", createdCampaign?.brand?.brandCategory?.category ?: "N/A")
+                
+                val brandCategory = createdCampaign?.brand?.brandCategories?.firstOrNull()?.category ?: "N/A"
+                CampaignDetailRow("Category", brandCategory)
                 Divider(color = Color.LightGray)
                 
                 val budgetRange = if (createdCampaign?.budgetMin != null && createdCampaign?.budgetMax != null) {

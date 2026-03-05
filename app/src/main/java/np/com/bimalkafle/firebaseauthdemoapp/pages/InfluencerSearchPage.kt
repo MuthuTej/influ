@@ -74,7 +74,7 @@ fun InfluencerSearchPage(
                 campaign.brand?.preferredPlatforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
 
         val matchesCategory = selectedCategory == "All" ||
-                campaign.brand?.brandCategory?.category.equals(selectedCategory, ignoreCase = true)
+                campaign.brand?.brandCategories?.any { it.category.equals(selectedCategory, ignoreCase = true) } == true
 
         val matchesBudget = when (selectedBudgetRange) {
             "All" -> true
@@ -256,7 +256,7 @@ fun InfluencerSearchPage(
                         val count = if (category == "All") {
                             campaigns.size
                         } else {
-                            campaigns.count { it.brand?.brandCategory?.category.equals(category, ignoreCase = true) }
+                            campaigns.count { it.brand?.brandCategories?.any { it.category.equals(category, ignoreCase = true) } == true }
                         }
                         category to count
                     }
