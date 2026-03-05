@@ -543,7 +543,7 @@ fun InfluencerProfileContent(
                                     selectedPricing.forEach { (platform, serviceMap) ->
                                         serviceMap.forEach { (service, price) ->
                                             if (price.isNotEmpty()) {
-                                                updatedPricing.add(PricingInfo(platform, service, price.toIntOrNull() ?: 0, "INR"))
+                                                updatedPricing.add(PricingInfo(platform, service, null, price.toIntOrNull() ?: 0, "INR"))
                                             }
                                         }
                                     }

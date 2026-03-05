@@ -85,6 +85,7 @@ data class Platform(
 data class PricingInfo(
     val platform: String,
     val deliverable: String,
+    val count: Int? = null,
     val price: Int,
     val currency: String
 )
@@ -119,6 +120,7 @@ data class PlatformInput(
 data class PricingInput(
     val platform: String,
     val deliverable: String,
+    val count: Int? = null,
     val price: Int,
     val currency: String
 )
