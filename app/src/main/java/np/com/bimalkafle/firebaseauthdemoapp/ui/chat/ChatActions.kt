@@ -32,7 +32,7 @@ fun RestrictedActionPanel(
     collaborationId: String?,
     isBrand: Boolean,
     onSend: (String, String, Map<String, Any>) -> Unit,
-    onSendUpload: (String) -> Unit = {},
+    onSendUpload: (String, String) -> Unit = { _, _ -> },
     onStatusUpdate: (String) -> Unit = {},
     collaboration: Collaboration? = null
 ) {
@@ -150,7 +150,7 @@ fun RestrictedActionPanel(
             collaboration = collaboration,
             onSend = { amount, platform, deliverables ->
                 val delStr = deliverables.entries.joinToString { "${it.key} (x${it.value})" }
-                onSend("Negotiated Proposal: ₹$amount on $platform - $delStr", "NEGOTIATION", mapOf("amount" to amount, "platform" to platform, "items" to deliverables))
+                onSend("Negotiated Proposal: \u20B9$amount on $platform - $delStr", "NEGOTIATION", mapOf("amount" to amount, "platform" to platform, "items" to deliverables))
                 onStatusUpdate("NEGOTIATION")
                 showNegotiation = false
             }
@@ -211,17 +211,107 @@ fun RestrictedActionPanel(
     }
 
     if (showUpload) {
-        TextInputDialog(
-            title = "Mark as Completed",
-            label = "Final Content Link",
+        ContentUploadDialog(
             onDismiss = { showUpload = false },
-            onSend = { link ->
-                onSendUpload(link)
+            onSend = { link, platform ->
+                onSendUpload(link, platform)
                 onStatusUpdate("WAITING_FOR_PAYMENT")
                 showUpload = false
             }
         )
     }
+}
+
+@Composable
+fun ContentUploadDialog(
+    onDismiss: () -> Unit,
+    onSend: (String, String) -> Unit
+) {
+    var link by remember { mutableStateOf("") }
+    var selectedPlatform by remember { mutableStateOf("YouTube") }
+    var showPlatformDropdown by remember { mutableStateOf(false) }
+    val platforms = listOf("YouTube", "Instagram")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Complete Work") },
+        text = {
+            Column {
+                Text("Select Platform", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { showPlatformDropdown = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(selectedPlatform, color = Color.Black)
+                            Icon(Icons.Default.ArrowDropDown, null, tint = Color.Gray)
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = showPlatformDropdown,
+                        onDismissRequest = { showPlatformDropdown = false },
+                        modifier = Modifier.fillMaxWidth(0.6f)
+                    ) {
+                        platforms.forEach { platform ->
+                            DropdownMenuItem(
+                                text = { Text(platform) },
+                                onClick = {
+                                    selectedPlatform = platform
+                                    showPlatformDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                TextField(
+                    value = link,
+                    onValueChange = { link = it },
+                    label = { Text("Final Content Link") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = Color(0xFFFF8383),
+                        cursorColor = Color(0xFFFF8383)
+                    )
+                )
+                
+                if (selectedPlatform == "Instagram") {
+                    Text(
+                        "Note: Entering an Instagram link will trigger an automated verification of post statistics.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    if (link.isNotBlank()) onSend(link, selectedPlatform) 
+                },
+                enabled = link.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+            ) {
+                Text("Upload")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -335,7 +425,7 @@ fun NegotiationDialog(
                 Spacer(Modifier.height(16.dp))
 
                 // Price Field
-                Text("Proposed Budget (₹)", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Text("Proposed Budget (\u20B9)", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 OutlinedTextField(
                     value = budget,
                     onValueChange = { budget = it },

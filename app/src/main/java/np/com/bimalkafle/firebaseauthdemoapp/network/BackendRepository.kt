@@ -587,4 +587,116 @@ object BackendRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun scrapeInstagramProfile(
+        profileUrl: String,
+        influencerId: String,
+        token: String
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                mutation ScrapeInstagramProfile(${'$'}profileUrl: String!, ${'$'}influencerId: String!) {
+                    scrapeInstagramProfile(profileUrl: ${'$'}profileUrl, influencerId: ${'$'}influencerId)
+                }
+            """.trimIndent()
+
+            val variables = JSONObject().apply {
+                put("profileUrl", profileUrl)
+                put("influencerId", influencerId)
+            }
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+                put("variables", variables)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    val data = jsonResponse.optJSONObject("data")
+                    val result = data?.optBoolean("scrapeInstagramProfile", false) ?: false
+                    Result.success(result)
+                }
+            } else {
+                val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Log.e("BackendRepository", "scrapeInstagramProfile Error Response: $errorResponse")
+                Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
+            }
+        } catch (e: Exception) {
+            Log.e("BackendRepository", "scrapeInstagramProfile Exception: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun scrapeInstagramPost(
+        postUrl: String,
+        collaborationId: String,
+        token: String
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                mutation ScrapeInstagramPost(${'$'}postUrl: String!, ${'$'}collaborationId: String!) {
+                    scrapeInstagramPost(postUrl: ${'$'}postUrl, collaborationId: ${'$'}collaborationId)
+                }
+            """.trimIndent()
+
+            val variables = JSONObject().apply {
+                put("postUrl", postUrl)
+                put("collaborationId", collaborationId)
+            }
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+                put("variables", variables)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    val data = jsonResponse.optJSONObject("data")
+                    val result = data?.optBoolean("scrapeInstagramPost", false) ?: false
+                    Result.success(result)
+                }
+            } else {
+                val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Log.e("BackendRepository", "scrapeInstagramPost Error Response: $errorResponse")
+                Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
+            }
+        } catch (e: Exception) {
+            Log.e("BackendRepository", "scrapeInstagramPost Exception: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }
