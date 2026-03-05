@@ -74,11 +74,12 @@ fun BrandProfilePage(
             FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                 val firebaseToken = result.token
                 if (firebaseToken != null) {
+                    val firstCategory = updatedBrand.brandCategories?.firstOrNull()
                     brandViewModel.updateBrandProfile(
                         token = firebaseToken,
                         name = updatedBrand.name,
-                        brandCategory = updatedBrand.brandCategory?.category ?: "",
-                        subCategory = updatedBrand.brandCategory?.subCategory ?: "",
+                        brandCategory = firstCategory?.category ?: "",
+                        subCategory = firstCategory?.subCategories?.firstOrNull() ?: "",
                         about = updatedBrand.about ?: "",
                         preferredPlatforms = updatedBrand.preferredPlatforms?.map { it.platform } ?: emptyList(),
                         ageMin = updatedBrand.targetAudience?.ageMin,
@@ -123,8 +124,8 @@ fun BrandProfileContent(
     var email by remember(brandProfile) { mutableStateOf(brandProfile?.email ?: "") }
     var role by remember(brandProfile) { mutableStateOf(brandProfile?.role ?: "") }
     var about by remember(brandProfile) { mutableStateOf(brandProfile?.about ?: "") }
-    var category by remember(brandProfile) { mutableStateOf(brandProfile?.brandCategory?.category ?: "") }
-    var subCategory by remember(brandProfile) { mutableStateOf(brandProfile?.brandCategory?.subCategory ?: "") }
+    var category by remember(brandProfile) { mutableStateOf(brandProfile?.brandCategories?.firstOrNull()?.category ?: "") }
+    var subCategory by remember(brandProfile) { mutableStateOf(brandProfile?.brandCategories?.firstOrNull()?.subCategories?.firstOrNull() ?: "") }
     var profileUrl by remember(brandProfile) { mutableStateOf(brandProfile?.profileUrl ?: "") }
     var logoUrl by remember(brandProfile) { mutableStateOf(brandProfile?.logoUrl ?: "") }
     var ageMin by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.ageMin?.toString() ?: "") }
@@ -413,7 +414,7 @@ fun BrandProfileContent(
                                         email = email,
                                         role = role,
                                         about = about,
-                                        brandCategory = BrandCategory(category, subCategory),
+                                        brandCategories = listOf(BrandCategory(category, listOf(subCategory))),
                                         profileUrl = profileUrl,
                                         logoUrl = logoUrl,
                                         targetAudience = TargetAudience(

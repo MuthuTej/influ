@@ -46,7 +46,7 @@ class InfluencerViewModel : ViewModel() {
                       location
                       categories {
                         category
-                        subCategory
+                        subCategories
                       }
                       platforms {
                         platform
@@ -135,7 +135,7 @@ class InfluencerViewModel : ViewModel() {
                     "bio" to bio,
                     "location" to location,
                     "logoUrl" to logoUrl,
-                    "categories" to categories.map { mapOf("category" to it.category, "subCategory" to it.subCategory) },
+                    "categories" to categories.map { mapOf("category" to it.category, "subCategories" to it.subCategories) },
                     "platforms" to platforms.map { 
                         mapOf(
                             "platform" to it.platform,
@@ -196,7 +196,7 @@ class InfluencerViewModel : ViewModel() {
                     location
                     categories {
                       category
-                      subCategory
+                      subCategories
                     }
                     platforms {
                       platform
@@ -298,10 +298,17 @@ class InfluencerViewModel : ViewModel() {
             for (i in 0 until categoriesArray.length()) {
                 val catObj = categoriesArray.optJSONObject(i)
                 if (catObj != null) {
+                    val subCatsArray = catObj.optJSONArray("subCategories")
+                    val subCats = mutableListOf<String>()
+                    if (subCatsArray != null) {
+                        for (j in 0 until subCatsArray.length()) {
+                            subCats.add(subCatsArray.getString(j))
+                        }
+                    }
                     categoriesList.add(
                         Category(
                             category = catObj.optString("category", ""),
-                            subCategory = catObj.optString("subCategory", "")
+                            subCategories = subCats
                         )
                     )
                 }
@@ -713,7 +720,7 @@ class InfluencerViewModel : ViewModel() {
                     role = brandObj.optString("role"),
                     profileCompleted = if(brandObj.has("profileCompleted")) brandObj.optBoolean("profileCompleted") else null,
                     updatedAt = brandObj.optString("updatedAt"),
-                    brandCategory = null,
+                    brandCategories = null,
                     about = brandObj.optString("about"),
                     profileUrl = brandObj.optString("profileUrl"),
                     logoUrl = brandObj.optString("logoUrl"),
@@ -867,9 +874,9 @@ class InfluencerViewModel : ViewModel() {
                     role
                     profileCompleted
                     updatedAt
-                    brandCategory {
+                    brandCategories {
                       category
-                      subCategory
+                      subCategories
                     }
                     about
                     preferredPlatforms {
@@ -971,13 +978,28 @@ class InfluencerViewModel : ViewModel() {
         for (i in 0 until jsonArray.length()) {
             val obj = jsonArray.optJSONObject(i) ?: continue
 
-            val categoryObj = obj.optJSONObject("brandCategory")
-            val brandCategory = if (categoryObj != null) {
-                BrandCategory(
-                    category = categoryObj.optString("category", ""),
-                    subCategory = categoryObj.optString("subCategory", "")
-                )
-            } else null
+            val categoriesArray = obj.optJSONArray("brandCategories")
+            val brandCategories = mutableListOf<BrandCategory>()
+            if (categoriesArray != null) {
+                for (j in 0 until categoriesArray.length()) {
+                    val categoryObj = categoriesArray.optJSONObject(j)
+                    if (categoryObj != null) {
+                        val subCatsArray = categoryObj.optJSONArray("subCategories")
+                        val subCats = mutableListOf<String>()
+                        if (subCatsArray != null) {
+                            for (k in 0 until subCatsArray.length()) {
+                                subCats.add(subCatsArray.getString(k))
+                            }
+                        }
+                        brandCategories.add(
+                            BrandCategory(
+                                category = categoryObj.optString("category", ""),
+                                subCategories = subCats
+                            )
+                        )
+                    }
+                }
+            }
 
             // preferredPlatforms
             val prefPlatforms = mutableListOf<PreferredPlatform>()
@@ -1095,7 +1117,7 @@ class InfluencerViewModel : ViewModel() {
                     role = obj.optString("role"),
                     profileCompleted = if(obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
                     updatedAt = obj.optString("updatedAt"),
-                    brandCategory = brandCategory,
+                    brandCategories = brandCategories,
                     about = obj.optString("about"),
                     profileUrl = obj.optString("profileUrl"),
                     logoUrl = obj.optString("logoUrl"),

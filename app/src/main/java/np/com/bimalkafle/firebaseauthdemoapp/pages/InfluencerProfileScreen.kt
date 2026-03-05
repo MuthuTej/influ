@@ -374,8 +374,8 @@ fun InfluencerProfileContent(
                                             shape = RoundedCornerShape(8.dp)
                                         )
                                         OutlinedTextField(
-                                            value = cat.subCategory,
-                                            onValueChange = { newVal -> editableCategories[index] = cat.copy(subCategory = newVal) },
+                                            value = cat.subCategories.firstOrNull() ?: "",
+                                            onValueChange = { newVal -> editableCategories[index] = cat.copy(subCategories = listOf(newVal)) },
                                             modifier = Modifier.weight(1f),
                                             label = { Text("Sub-category") },
                                             shape = RoundedCornerShape(8.dp)
@@ -386,7 +386,7 @@ fun InfluencerProfileContent(
                                     }
                                 }
                                 Button(
-                                    onClick = { editableCategories.add(Category("", "")) },
+                                    onClick = { editableCategories.add(Category("", emptyList())) },
                                     modifier = Modifier.align(Alignment.Start),
                                     colors = ButtonDefaults.buttonColors(containerColor = themeColor.copy(alpha = 0.1f), contentColor = themeColor)
                                 ) {
@@ -417,7 +417,7 @@ fun InfluencerProfileContent(
                                                     fontWeight = FontWeight.Bold
                                                 )
                                                 Text(
-                                                    text = category.subCategory,
+                                                    text = category.subCategories.joinToString(", "),
                                                     color = themeColor.copy(alpha = 0.7f),
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Medium

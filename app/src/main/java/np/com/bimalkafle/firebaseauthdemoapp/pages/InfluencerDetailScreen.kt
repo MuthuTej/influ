@@ -261,7 +261,7 @@ fun InfluencerDetailScreenPreview() {
         updatedAt = "2023-10-27T10:00:00Z",
         bio = "Fashion and lifestyle influencer.",
         location = "New York, USA",
-        categories = listOf(Category("Fashion", "Lifestyle")),
+        categories = listOf(Category("Fashion", listOf("Lifestyle"))),
         platforms = listOf(Platform("Instagram", "http://instagram.com/janedoe", 100000, 5000, 5.0f, listOf("Reels", "Stories"), true)),
         audienceInsights = null,
         strengths = listOf("Creative", "Engaging"),

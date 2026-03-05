@@ -50,9 +50,11 @@ object BrandRepository {
             "profileUrl" to (profileUrl ?: ""),
             "logoUrl" to logoUrl,
             "about" to about,
-            "brandCategory" to mapOf(
-                "category" to brandCategory,
-                "subCategory" to subCategory
+            "brandCategories" to listOf(
+                mapOf(
+                    "category" to brandCategory,
+                    "subCategories" to listOf(subCategory)
+                )
             ),
             "preferredPlatforms" to parsePlatformsToMapList(platformsArray),
             "targetAudience" to mutableMapOf<String, Any>(

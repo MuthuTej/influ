@@ -183,7 +183,7 @@ class BrandViewModel : ViewModel() {
                       location
                       categories {
                         category
-                        subCategory
+                        subCategories
                       }
                       platforms {
                         platform
@@ -253,7 +253,7 @@ class BrandViewModel : ViewModel() {
                     location
                     categories {
                       category
-                      subCategory
+                      subCategories
                     }
                     platforms {
                       platform
@@ -347,7 +347,14 @@ class BrandViewModel : ViewModel() {
             for (i in 0 until categoriesArray.length()) {
                 val cObj = categoriesArray.optJSONObject(i)
                 if (cObj != null) {
-                    categories.add(Category(cObj.optString("category"), cObj.optString("subCategory")))
+                    val subCatsArray = cObj.optJSONArray("subCategories")
+                    val subCats = mutableListOf<String>()
+                    if (subCatsArray != null) {
+                        for (j in 0 until subCatsArray.length()) {
+                            subCats.add(subCatsArray.getString(j))
+                        }
+                    }
+                    categories.add(Category(cObj.optString("category"), subCats))
                 }
             }
         }
@@ -472,9 +479,9 @@ class BrandViewModel : ViewModel() {
                       role
                       profileCompleted
                       updatedAt
-                      brandCategory {
+                      brandCategories {
                         category
-                        subCategory
+                        subCategories
                       }
                       about
                       profileUrl
@@ -530,13 +537,28 @@ class BrandViewModel : ViewModel() {
     }
 
     private fun parseBrand(obj: JSONObject): Brand {
-        val categoryObj = obj.optJSONObject("brandCategory")
-        val brandCategory = if (categoryObj != null) {
-            BrandCategory(
-                category = categoryObj.optString("category", ""),
-                subCategory = categoryObj.optString("subCategory", "")
-            )
-        } else null
+        val categoriesArray = obj.optJSONArray("brandCategories")
+        val brandCategories = mutableListOf<BrandCategory>()
+        if (categoriesArray != null) {
+            for (i in 0 until categoriesArray.length()) {
+                val categoryObj = categoriesArray.optJSONObject(i)
+                if (categoryObj != null) {
+                    val subCatsArray = categoryObj.optJSONArray("subCategories")
+                    val subCats = mutableListOf<String>()
+                    if (subCatsArray != null) {
+                        for (j in 0 until subCatsArray.length()) {
+                            subCats.add(subCatsArray.getString(j))
+                        }
+                    }
+                    brandCategories.add(
+                        BrandCategory(
+                            category = categoryObj.optString("category", ""),
+                            subCategories = subCats
+                        )
+                    )
+                }
+            }
+        }
 
         val preferredPlatformsArray = obj.optJSONArray("preferredPlatforms")
         val preferredPlatforms = if (preferredPlatformsArray != null) {
@@ -596,7 +618,7 @@ class BrandViewModel : ViewModel() {
             role = obj.optString("role", ""),
             profileCompleted = if (obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
             updatedAt = obj.optString("updatedAt", null),
-            brandCategory = brandCategory,
+            brandCategories = brandCategories,
             about = obj.optString("about", null),
             profileUrl = obj.optString("profileUrl", null),
             logoUrl = obj.optString("logoUrl", null),
@@ -1002,7 +1024,7 @@ class BrandViewModel : ViewModel() {
                     role = brandObj.optString("role", ""),
                     profileCompleted = null,
                     updatedAt = null,
-                    brandCategory = null,
+                    brandCategories = null,
                     about = brandObj.optString("about", null),
                     profileUrl = brandObj.optString("profileUrl", null),
                     logoUrl = brandObj.optString("logoUrl", null),

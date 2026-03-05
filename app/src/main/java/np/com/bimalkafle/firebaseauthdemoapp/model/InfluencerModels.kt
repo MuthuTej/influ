@@ -67,7 +67,7 @@ data class AgeGroupInsight(
 
 data class Category(
     val category: String,
-    val subCategory: String
+    val subCategories: List<String>
 )
 
 data class Platform(
@@ -104,7 +104,7 @@ data class InfluencerProfileInput(
 
 data class CategoryInput(
     val category: String,
-    val subCategory: String
+    val subCategories: List<String>
 )
 
 data class PlatformInput(
