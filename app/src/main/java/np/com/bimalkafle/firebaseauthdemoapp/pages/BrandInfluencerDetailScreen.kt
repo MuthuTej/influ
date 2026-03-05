@@ -32,10 +32,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 
 private val influencerDetailThemeColor = Color(0xFFFF8383)
@@ -57,9 +57,9 @@ fun BrandInfluencerDetailScreen(
     onConnect: (String, String) -> Unit,
     influencerViewModel: InfluencerViewModel
 ) {
-    val influencer by influencerViewModel.influencerProfile.observeAsState()
-    val isLoading by influencerViewModel.loading.observeAsState(false)
-    val error by influencerViewModel.error.observeAsState()
+    val influencer by influencerViewModel.influencerProfile.observeAsState(initial = null)
+    val isLoading by influencerViewModel.loading.observeAsState(initial = false)
+    val error by influencerViewModel.error.observeAsState(initial = null)
 
     LaunchedEffect(influencerId) {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
@@ -83,7 +83,7 @@ fun BrandInfluencerDetailScreen(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BrandInfluencerDetailContent(
-    influencer: np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile?,
+    influencer: InfluencerProfile?,
     isLoading: Boolean,
     error: String?,
     onBack: () -> Unit,
@@ -199,7 +199,7 @@ fun BrandInfluencerDetailContent(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                influencer.strengths!!.forEach { strength ->
+                                influencer.strengths?.forEach { strength ->
                                     PriorityTag(strength)
                                 }
                             }
@@ -224,7 +224,7 @@ fun BrandInfluencerDetailContent(
 
 @Composable
 private fun NewEnhancedProfileHeader(
-    influencer: np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile,
+    influencer: InfluencerProfile,
     onCreateProposal: () -> Unit,
     onConnect: (String, String) -> Unit
 ) {
@@ -350,15 +350,6 @@ private fun NewEnhancedProfileHeader(
 }
 
 @Composable
-private fun MetricItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = detailDarkerGray, modifier = Modifier.size(18.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(label, color = detailDarkerGray, fontSize = 14.sp)
-    }
-}
-
-@Composable
 private fun ViewersDonutCard(
     platforms: List<np.com.bimalkafle.firebaseauthdemoapp.model.Platform>,
     modifier: Modifier = Modifier
@@ -407,7 +398,7 @@ private fun ViewersDonutCard(
 }
 
 @Composable
-private fun PlatformsCard(influencer: np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile) {
+private fun PlatformsCard(influencer: InfluencerProfile) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Platforms", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(modifier = Modifier.height(16.dp))
@@ -553,7 +544,7 @@ private fun GenderBar(percentage: Float, color: Color, label: String) {
 }
 
 @Composable
-private fun PricingTable(influencer: np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile) {
+private fun PricingTable(influencer: InfluencerProfile) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(text = "Payments & Deliverables", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
         Spacer(modifier = Modifier.height(16.dp))
