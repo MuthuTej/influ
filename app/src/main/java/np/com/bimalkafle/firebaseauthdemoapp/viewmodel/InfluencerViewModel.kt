@@ -498,6 +498,43 @@ class InfluencerViewModel : ViewModel() {
                     val collaborationsArray = data?.optJSONArray("getCollaborations")
                     if (collaborationsArray != null) {
                         _collaborations.postValue(parseCollaborations(collaborationsArray))
+                        val list = mutableListOf<Collaboration>()
+                        for (i in 0 until collaborationsArray.length()) {
+                            val obj = collaborationsArray.optJSONObject(i) ?: continue
+                            val brandObj = obj.optJSONObject("brand")
+                            val campaignObj = obj.optJSONObject("campaign")
+                            
+                            val pricingArray = obj.optJSONArray("pricing")
+                            val pricingList = mutableListOf<Pricing>()
+                            if (pricingArray != null) {
+                                for (j in 0 until pricingArray.length()) {
+                                    val pObj = pricingArray.optJSONObject(j) ?: continue
+                                    pricingList.add(Pricing(
+                                        platform = pObj.optString("platform"),
+                                        deliverable = pObj.optString("deliverable"),
+                                        price = pObj.optInt("price"),
+                                        currency = pObj.optString("currency")
+                                    ))
+                                }
+                            }
+
+                            list.add(Collaboration(
+                                id = obj.optString("id"),
+                                campaignId = obj.optString("campaignId"),
+                                brandId = obj.optString("brandId"),
+                                influencerId = obj.optString("influencerId"),
+                                status = obj.optString("status"),
+                                message = obj.optString("message"),
+                                pricing = pricingList,
+                                initiatedBy = "",
+                                createdAt = "",
+                                updatedAt = obj.optString("updatedAt"),
+                                brand = Brand(brandObj.optString("id"), "", brandObj.optString("name"), "", null, null, null, null, null, brandObj.optString("logoUrl"), null),
+                                campaign = Campaign(campaignObj.optString("id"), null, campaignObj.optString("title"), "", campaignObj.optInt("budgetMin"), campaignObj.optInt("budgetMax"), null, null, null, null, null),
+                                influencer = Influencer("Me", null, null, null)
+                            ))
+                        }
+                        _collaborations.postValue(list)
                     }
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Collab parsing error", e)

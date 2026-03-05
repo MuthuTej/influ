@@ -9,7 +9,6 @@ import kotlinx.coroutines.launch
 
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
-import np.com.bimalkafle.firebaseauthdemoapp.network.BrandRepository
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -450,7 +449,7 @@ class BrandViewModel : ViewModel() {
             TargetAudience(
                 ageMin = if (targetAudienceObj.isNull("ageMin")) null else targetAudienceObj.optInt("ageMin"),
                 ageMax = if (targetAudienceObj.isNull("ageMax")) null else targetAudienceObj.optInt("ageMax"),
-                gender = targetAudienceObj.optString("gender", null),
+                gender = if (targetAudienceObj.isNull("gender")) null else targetAudienceObj.optString("gender"),
                 locations = locations
             )
         } else null
@@ -461,11 +460,11 @@ class BrandViewModel : ViewModel() {
             name = obj.optString("name", ""),
             role = obj.optString("role", ""),
             profileCompleted = if (obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
-            updatedAt = obj.optString("updatedAt", null),
+            updatedAt = if (obj.isNull("updatedAt")) null else obj.optString("updatedAt"),
             brandCategories = brandCategories,
-            about = obj.optString("about", null),
-            profileUrl = obj.optString("profileUrl", null),
-            logoUrl = obj.optString("logoUrl", null),
+            about = if (obj.isNull("about")) null else obj.optString("about"),
+            profileUrl = if (obj.isNull("profileUrl")) null else obj.optString("profileUrl"),
+            logoUrl = if (obj.isNull("logoUrl")) null else obj.optString("logoUrl"),
             preferredPlatforms = preferredPlatforms,
             targetAudience = targetAudience
         )
@@ -526,6 +525,47 @@ class BrandViewModel : ViewModel() {
                     advancePaid
                     finalPaid
                     totalAmount
+                    overallAnalytics {
+                      impressions
+                      clicks
+                      likes
+                      comments
+                      shares
+                      saves
+                      views
+                      retweets
+                    }
+                    platformAnalytics {
+                      platform
+                      duration
+                      cost
+                      impressions
+                      clicks
+                      likes
+                      comments
+                      shares
+                      saves
+                      views
+                      retweets
+                    }
+                    yt {
+                      videoId
+                      title
+                      viewCount
+                      likeCount
+                      thumbnail
+                      videoUrl
+                      fetchedAt
+                      analytics {
+                        views
+                        likes
+                        comments
+                        shares
+                        watchTimeMinutes
+                        subscribersGained
+                        engagementRate
+                      }
+                    }
                   }
                 }
             """.trimIndent()
@@ -575,9 +615,9 @@ class BrandViewModel : ViewModel() {
             val influencer = if (influencerObj != null) {
                  Influencer(
                     name = influencerObj.optString("name", "Unknown"),
-                    bio = influencerObj.optString("bio"),
-                    logoUrl = influencerObj.optString("logoUrl"),
-                    updatedAt = influencerObj.optString("updatedAt")
+                    bio = if (influencerObj.isNull("bio")) null else influencerObj.optString("bio"),
+                    logoUrl = if (influencerObj.isNull("logoUrl")) null else influencerObj.optString("logoUrl"),
+                    updatedAt = if (influencerObj.isNull("updatedAt")) null else influencerObj.optString("updatedAt")
                 )
             } else {
                  Influencer("Unknown", null, null, null)
@@ -593,9 +633,9 @@ class BrandViewModel : ViewModel() {
                     profileCompleted = null,
                     updatedAt = null,
                     brandCategories = null,
-                    about = brandObj.optString("about", null),
-                    profileUrl = brandObj.optString("profileUrl", null),
-                    logoUrl = brandObj.optString("logoUrl", null),
+                    about = if (brandObj.isNull("about")) null else brandObj.optString("about"),
+                    profileUrl = if (brandObj.isNull("profileUrl")) null else brandObj.optString("profileUrl"),
+                    logoUrl = if (brandObj.isNull("logoUrl")) null else brandObj.optString("logoUrl"),
                     preferredPlatforms = null,
                     targetAudience = null
                 )
@@ -619,6 +659,102 @@ class BrandViewModel : ViewModel() {
                 }
             }
 
+            // Parse Analytics
+            val overallObj = obj.optJSONObject("overallAnalytics")
+            val overallAnalytics = if (overallObj != null) {
+                OverallAnalytics(
+                    impressions = if (overallObj.isNull("impressions")) null else overallObj.optInt("impressions"),
+                    clicks = if (overallObj.isNull("clicks")) null else overallObj.optInt("clicks"),
+                    likes = if (overallObj.isNull("likes")) null else overallObj.optInt("likes"),
+                    comments = if (overallObj.isNull("comments")) null else overallObj.optInt("comments"),
+                    shares = if (overallObj.isNull("shares")) null else overallObj.optInt("shares"),
+                    saves = if (overallObj.isNull("saves")) null else overallObj.optInt("saves"),
+                    views = if (overallObj.isNull("views")) null else overallObj.optInt("views"),
+                    retweets = if (overallObj.isNull("retweets")) null else overallObj.optInt("retweets"),
+                    replies = null
+                )
+            } else null
+
+            val platformAnalyticsList = mutableListOf<CollaborationAnalytics>()
+            val platformAnalyticsArray = obj.optJSONArray("platformAnalytics")
+            if (platformAnalyticsArray != null) {
+                for (j in 0 until platformAnalyticsArray.length()) {
+                    val paObj = platformAnalyticsArray.optJSONObject(j) ?: continue
+                    platformAnalyticsList.add(
+                        CollaborationAnalytics(
+                            platform = paObj.optString("platform"),
+                            duration = if (paObj.isNull("duration")) null else paObj.optInt("duration"),
+                            cost = if (paObj.isNull("cost")) null else paObj.optDouble("cost").toFloat(),
+                            impressions = if (paObj.isNull("impressions")) null else paObj.optInt("impressions"),
+                            clicks = if (paObj.isNull("clicks")) null else paObj.optInt("clicks"),
+                            likes = if (paObj.isNull("likes")) null else paObj.optInt("likes"),
+                            comments = if (paObj.isNull("comments")) null else paObj.optInt("comments"),
+                            shares = if (paObj.isNull("shares")) null else paObj.optInt("shares"),
+                            saves = if (paObj.isNull("saves")) null else paObj.optInt("saves"),
+                            views = if (paObj.isNull("views")) null else paObj.optInt("views"),
+                            retweets = if (paObj.isNull("retweets")) null else paObj.optInt("retweets"),
+                            replies = null
+                        )
+                    )
+                }
+            }
+
+            // Parse YouTube Data
+            val ytList = mutableListOf<YouTubeVideoData>()
+            val ytArray = obj.optJSONArray("yt")
+            if (ytArray != null) {
+                for (j in 0 until ytArray.length()) {
+                    val ytObj = ytArray.optJSONObject(j) ?: continue
+                    val analyticsObj = ytObj.optJSONObject("analytics")
+                    val ytAnalytics = if (analyticsObj != null) {
+                        YouTubeVideoSummary(
+                            views = if (analyticsObj.isNull("views")) null else analyticsObj.optInt("views"),
+                            likes = if (analyticsObj.isNull("likes")) null else analyticsObj.optInt("likes"),
+                            comments = if (analyticsObj.isNull("comments")) null else analyticsObj.optInt("comments"),
+                            shares = if (analyticsObj.isNull("shares")) null else analyticsObj.optInt("shares"),
+                            watchTimeMinutes = if (analyticsObj.isNull("watchTimeMinutes")) null else analyticsObj.optDouble("watchTimeMinutes"),
+                            subscribersGained = if (analyticsObj.isNull("subscribersGained")) null else analyticsObj.optInt("subscribersGained"),
+                            averageViewDurationSeconds = null,
+                            engagementRate = if (analyticsObj.isNull("engagementRate")) null else analyticsObj.optString("engagementRate")
+                        )
+                    } else null
+
+                    ytList.add(
+                        YouTubeVideoData(
+                            videoId = ytObj.optString("videoId"),
+                            title = ytObj.optString("title"),
+                            viewCount = if (ytObj.isNull("viewCount")) null else ytObj.optString("viewCount"),
+                            likeCount = if (ytObj.isNull("likeCount")) null else ytObj.optString("likeCount"),
+                            thumbnail = if (ytObj.isNull("thumbnail")) null else ytObj.optString("thumbnail"),
+                            analytics = ytAnalytics,
+                            videoUrl = if (ytObj.isNull("videoUrl")) null else ytObj.optString("videoUrl"),
+                            fetchedAt = if (ytObj.isNull("fetchedAt")) null else ytObj.optString("fetchedAt")
+                        )
+                    )
+                }
+            }
+
+            // Parse Instagram Data (Attempt to parse if present in JSON, even if removed from query)
+            val igList = mutableListOf<InstagramPostData>()
+            val igArray = obj.optJSONArray("ig")
+            if (igArray != null) {
+                for (j in 0 until igArray.length()) {
+                    val igObj = igArray.optJSONObject(j) ?: continue
+                    igList.add(
+                        InstagramPostData(
+                            postId = if (igObj.isNull("postId")) null else igObj.optString("postId"),
+                            caption = if (igObj.isNull("caption")) null else igObj.optString("caption"),
+                            likeCount = if (igObj.isNull("likeCount")) null else igObj.optInt("likeCount"),
+                            commentCount = if (igObj.isNull("commentCount")) null else igObj.optInt("commentCount"),
+                            viewCount = if (igObj.isNull("viewCount")) null else igObj.optInt("viewCount"),
+                            mediaUrl = if (igObj.isNull("mediaUrl")) null else igObj.optString("mediaUrl"),
+                            timestamp = if (igObj.isNull("timestamp")) null else igObj.optString("timestamp"),
+                            fetchedAt = if (igObj.isNull("fetchedAt")) null else igObj.optString("fetchedAt")
+                        )
+                    )
+                }
+            }
+
             list.add(
                 Collaboration(
                     id = obj.optString("id"),
@@ -626,7 +762,7 @@ class BrandViewModel : ViewModel() {
                     brandId = obj.optString("brandId"),
                     influencerId = obj.optString("influencerId"),
                     status = obj.optString("status"),
-                    message = obj.optString("message"),
+                    message = if (obj.isNull("message")) null else obj.optString("message"),
                     pricing = pricingList,
                     initiatedBy = obj.optString("initiatedBy"),
                     createdAt = obj.optString("createdAt"),
@@ -634,11 +770,15 @@ class BrandViewModel : ViewModel() {
                     campaign = campaign,
                     influencer = influencer,
                     brand = brand,
-                    paymentStatus = obj.optString("paymentStatus"),
-                    razorpayOrderId = obj.optString("razorpayOrderId"),
+                    paymentStatus = if (obj.isNull("paymentStatus")) null else obj.optString("paymentStatus"),
+                    razorpayOrderId = if (obj.isNull("razorpayOrderId")) null else obj.optString("razorpayOrderId"),
                     advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),
                     finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
-                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount")
+                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount"),
+                    overallAnalytics = overallAnalytics,
+                    platformAnalytics = if (platformAnalyticsList.isEmpty()) null else platformAnalyticsList,
+                    yt = if (ytList.isEmpty()) null else ytList,
+                    ig = if (igList.isEmpty()) null else igList
                 )
             )
         }
@@ -814,14 +954,14 @@ class BrandViewModel : ViewModel() {
                                     id = obj.optString("id"),
                                     brandId = null,
                                     title = obj.optString("title"),
-                                    description = obj.optString("description"),
+                                    description = if (obj.isNull("description")) null else obj.optString("description"),
                                     budgetMin = if (obj.isNull("budgetMin")) null else obj.optInt("budgetMin"),
                                     budgetMax = if (obj.isNull("budgetMax")) null else obj.optInt("budgetMax"),
-                                    startDate = obj.optString("startDate"),
-                                    endDate = obj.optString("endDate"),
-                                    status = obj.optString("status"),
-                                    createdAt = obj.optString("createdAt"),
-                                    updatedAt = obj.optString("updatedAt"),
+                                    startDate = if (obj.isNull("startDate")) null else obj.optString("startDate"),
+                                    endDate = if (obj.isNull("endDate")) null else obj.optString("endDate"),
+                                    status = if (obj.isNull("status")) null else obj.optString("status"),
+                                    createdAt = if (obj.isNull("createdAt")) null else obj.optString("createdAt"),
+                                    updatedAt = if (obj.isNull("updatedAt")) null else obj.optString("updatedAt"),
                                     platforms = platforms
                                 )
                             )

@@ -26,6 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -34,6 +35,7 @@ import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.CollaborationAnalytics
+import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramPostData
 import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeVideoData
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
@@ -140,6 +142,20 @@ fun CollaborationAnalyticsPage(
                         }
                     }
 
+                    // Instagram Post Analytics Section
+                    if (collaboration.ig != null && collaboration.ig.isNotEmpty()) {
+                        item {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                SectionTitle("INSTAGRAM PERFORMANCE")
+                                Spacer(modifier = Modifier.height(8.dp))
+                                collaboration.ig.forEach { post ->
+                                    InstagramPostCard(post)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                            }
+                        }
+                    }
+
                     item {
                         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                             SectionTitle("PLATFORM BREAKDOWN")
@@ -160,6 +176,61 @@ fun CollaborationAnalyticsPage(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun InstagramPostCard(post: InstagramPostData) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                // Post Media/Thumbnail
+                AsyncImage(
+                    model = post.mediaUrl,
+                    contentDescription = "Instagram Post",
+                    modifier = Modifier
+                        .size(width = 100.dp, height = 100.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(id = R.drawable.ic_instagram)
+                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Column {
+                    Text(
+                        text = post.caption ?: "No caption",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        color = Color.Black
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Posted on: ${post.timestamp?.split("T")?.get(0) ?: "N/A"}",
+                        fontSize = 12.sp,
+                        color = textGray
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = softGray)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Metrics
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                VideoStatItem("Likes", post.likeCount?.toString() ?: "0")
+                VideoStatItem("Comments", post.commentCount?.toString() ?: "0")
+                VideoStatItem("Views", post.viewCount?.toString() ?: "0")
             }
         }
     }

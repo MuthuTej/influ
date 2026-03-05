@@ -5,13 +5,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CurrencyRupee
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -23,10 +24,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -61,123 +62,162 @@ fun AllCampaignPage(
         }
     }
 
-    val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
-    val headerHeight = screenHeight * 0.3f
-    val formPaddingTop = headerHeight - 80.dp
-
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF8F9FA))) {
-        // Header
-        Box(
+    Box(modifier = Modifier.fillMaxSize().background(brandThemeColor)) {
+        // Background Decorative Image
+        Image(
+            painter = painterResource(id = R.drawable.vector),
+            contentDescription = null,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(headerHeight)
-                .background(brandThemeColor)
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.vector),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(0.2f),
-                contentScale = ContentScale.Crop
-            )
-            IconButton(onClick = { navController.popBackStack() }, modifier = Modifier.padding(16.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-            }
+                .height(260.dp)
+                .alpha(0.2f),
+            contentScale = ContentScale.Crop
+        )
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Header Section
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 60.dp),
+                    .statusBarsPadding()
+                    .padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                ) {
+                    IconButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier.align(Alignment.TopStart)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                }
+
                 Surface(
                     shape = CircleShape,
                     color = Color.White,
                     modifier = Modifier
-                        .size(80.dp)
-                        .shadow(8.dp, CircleShape)
+                        .size(85.dp)
+                        .shadow(12.dp, CircleShape)
                 ) {
                     if (!brandProfile?.logoUrl.isNullOrEmpty()) {
                         AsyncImage(
                             model = brandProfile?.logoUrl,
                             contentDescription = "Brand Profile",
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().padding(4.dp).clip(CircleShape)
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(4.dp)
+                                .clip(CircleShape)
                         )
                     } else {
                         Image(
                             painter = painterResource(id = R.drawable.brand_profile),
                             contentDescription = "Brand Profile",
-                            modifier = Modifier.fillMaxSize().padding(12.dp).clip(CircleShape)
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(12.dp)
+                                .clip(CircleShape)
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 Text(
                     text = brandProfile?.name ?: "My Brand",
                     color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 22.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 24.dp)
                 )
             }
-        }
 
-        // Content
-        Column(
-            modifier = Modifier
-                .padding(top = formPaddingTop)
-                .fillMaxSize()
-                .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                .background(Color.White)
-                .padding(horizontal = 24.dp)
-        ) {
-            Text(
-                "MY CAMPAIGNS",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp),
-                color = brandThemeColor
-            )
-
-            if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = brandThemeColor)
-                }
-            } else if (error != null) {
+            // Campaigns List Card
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+                shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+                color = Color.White,
+                tonalElevation = 2.dp
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp)
                 ) {
-                    Text(text = error ?: "Unknown error", color = Color.Red, textAlign = TextAlign.Center)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = {
-                        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-                            result.token?.let { brandViewModel.fetchMyCampaigns(it) }
-                        }
-                    }, colors = ButtonDefaults.buttonColors(containerColor = brandThemeColor)) {
-                        Text("Retry")
-                    }
-                }
-            } else if (myCampaigns.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "No campaigns created yet.",
-                        fontSize = 18.sp,
-                        color = Color.Gray,
-                        fontWeight = FontWeight.Medium
+                        "MY CAMPAIGNS",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 28.dp, bottom = 16.dp),
+                        color = brandThemeColor,
+                        textAlign = TextAlign.Center
                     )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 32.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(myCampaigns) { campaign ->
-                        CampaignDetailCard(campaign)
+
+                    if (isLoading) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = brandThemeColor)
+                        }
+                    } else if (error != null) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = Color.Red, modifier = Modifier.size(48.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(text = error ?: "Unknown error", color = Color.Gray, textAlign = TextAlign.Center)
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Button(
+                                onClick = {
+                                    FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                        result.token?.let { brandViewModel.fetchMyCampaigns(it) }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = brandThemeColor),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Retry", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else if (myCampaigns.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "No campaigns created yet.",
+                                    fontSize = 16.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(myCampaigns) { campaign ->
+                                CampaignDetailCard(campaign)
+                            }
+                        }
                     }
                 }
             }
@@ -190,49 +230,47 @@ fun AllCampaignPage(
 fun CampaignDetailCard(campaign: Campaign) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Text(
                     text = campaign.title,
-                    fontSize = 18.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
                     modifier = Modifier.weight(1f)
                 )
-                
+                Spacer(modifier = Modifier.width(8.dp))
                 campaign.status?.let { status ->
                     StatusBadge(status)
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
                 text = campaign.description ?: "No description provided",
-                fontSize = 14.sp,
-                color = Color.DarkGray,
-                lineHeight = 20.sp,
+                fontSize = 13.sp,
+                color = Color.Gray,
+                lineHeight = 18.sp,
                 maxLines = 3,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Platforms & Formats
+            // Platforms Section
             if (!campaign.platforms.isNullOrEmpty()) {
-                Text("PLATFORMS", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = brandThemeColor)
-                Spacer(modifier = Modifier.height(8.dp))
                 campaign.platforms.forEach { platform ->
-                    Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                    Column(modifier = Modifier.padding(bottom = 12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             val iconRes = when (platform.platform.uppercase()) {
                                 "INSTAGRAM" -> R.drawable.ic_instagram
@@ -245,83 +283,82 @@ fun CampaignDetailCard(campaign: Campaign) {
                                 painter = painterResource(id = iconRes),
                                 contentDescription = null,
                                 tint = brandThemeColor,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(platform.platform, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(platform.platform, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = brandThemeColor)
                         }
                         FlowRow(
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             platform.formats?.forEach { format ->
                                 Surface(
-                                    color = Color(0xFFF5F5F5),
-                                    shape = RoundedCornerShape(6.dp)
+                                    color = Color(0xFFF8F9FA),
+                                    shape = RoundedCornerShape(6.dp),
+                                    border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFFEEEEEE))
                                 ) {
                                     Text(
                                         text = format,
                                         fontSize = 10.sp,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        fontWeight = FontWeight.Medium
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.DarkGray
                                     )
                                 }
                             }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+            HorizontalDivider(color = Color(0xFFF5F5F5), thickness = 1.dp)
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Budget Section
-            CampaignInfoRow(
-                icon = Icons.Default.CurrencyRupee,
-                label = "Budget",
-                value = if (campaign.budgetMin != null && campaign.budgetMax != null) {
-                    "₹${campaign.budgetMin}K - ₹${campaign.budgetMax}K"
-                } else if (campaign.budgetMin != null) {
-                    "From ₹${campaign.budgetMin}K"
-                } else if (campaign.budgetMax != null) {
-                    "Up to ₹${campaign.budgetMax}K"
-                } else "Not specified"
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Dates Section
-            Row(modifier = Modifier.fillMaxWidth()) {
+            // Info Grid
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(modifier = Modifier.weight(1f)) {
                     CampaignInfoRow(
-                        icon = Icons.Default.CalendarToday,
-                        label = "Starts",
-                        value = formatDate(campaign.startDate)
+                        icon = Icons.Default.CurrencyRupee,
+                        label = "Budget",
+                        value = if (campaign.budgetMin != null && campaign.budgetMax != null) {
+                            "₹${campaign.budgetMin} - ₹${campaign.budgetMax}"
+                        } else if (campaign.budgetMin != null) {
+                            "₹${campaign.budgetMin}+"
+                        } else if (campaign.budgetMax != null) {
+                            "Up to ₹${campaign.budgetMax}"
+                        } else "TBD"
                     )
                 }
                 Box(modifier = Modifier.weight(1f)) {
+                    val timeline = if (!campaign.startDate.isNullOrEmpty() && !campaign.endDate.isNullOrEmpty()) {
+                        "${formatDate(campaign.startDate)} - ${formatDate(campaign.endDate)}"
+                    } else if (!campaign.startDate.isNullOrEmpty()) {
+                        formatDate(campaign.startDate)
+                    } else {
+                        "N/A"
+                    }
                     CampaignInfoRow(
                         icon = Icons.Default.CalendarToday,
-                        label = "Ends",
-                        value = formatDate(campaign.endDate)
+                        label = "Timeline",
+                        value = timeline
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Footer with Created Date
+            // Footer
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.End
             ) {
                 Text(
-                    text = "Posted on ${formatDate(campaign.createdAt)}",
-                    fontSize = 11.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium
+                    text = "Created ${formatDate(campaign.createdAt)}",
+                    fontSize = 10.sp,
+                    color = Color.LightGray,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -348,10 +385,10 @@ fun StatusBadge(status: String) {
         shape = RoundedCornerShape(8.dp)
     ) {
         Text(
-            text = status,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
+            text = status.uppercase(),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black,
             color = textColor
         )
     }
@@ -362,22 +399,22 @@ fun CampaignInfoRow(icon: ImageVector, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(28.dp)
                 .clip(CircleShape)
-                .background(brandThemeColor.copy(alpha = 0.1f)),
+                .background(brandThemeColor.copy(alpha = 0.08f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = brandThemeColor,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(14.dp)
             )
         }
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
         Column {
-            Text(text = label, fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
-            Text(text = value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            Text(text = label, fontSize = 9.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+            Text(text = value, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
         }
     }
 }

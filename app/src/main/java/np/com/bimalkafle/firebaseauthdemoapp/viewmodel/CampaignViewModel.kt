@@ -77,9 +77,7 @@ class CampaignViewModel : ViewModel() {
         viewModelScope.launch {
             val query = """
                 query GetCampaignRecommendations {
-                  getOverallRecommendedCampaigns(topN: 10) { id score }
-                  getTopYoutubeRecommendedCampaigns(topN: 10) { id score }
-                  getTopInstagramRecommendedCampaigns(topN: 10) { id score }
+                  getRecommendedCampaigns(topN: 30) { id score }
                 }
             """.trimIndent()
 
@@ -87,15 +85,14 @@ class CampaignViewModel : ViewModel() {
             result.onSuccess { jsonObject ->
                 val data = jsonObject.optJSONObject("data")
                 if (data != null) {
-                    val overallRecs = parseRecs(data.optJSONArray("getOverallRecommendedCampaigns"))
-                    val youtubeRecs = parseRecs(data.optJSONArray("getTopYoutubeRecommendedCampaigns"))
-                    val instagramRecs = parseRecs(data.optJSONArray("getTopInstagramRecommendedCampaigns"))
-
+                    val recs = parseRecs(data.optJSONArray("getRecommendedCampaigns"))
                     val availableCampaigns = allCampaigns ?: _campaigns.value ?: emptyList()
 
-                    _overallRecommendedCampaigns.postValue(sortCampaigns(availableCampaigns, overallRecs))
-                    _youtubeRecommendedCampaigns.postValue(sortCampaigns(availableCampaigns, youtubeRecs))
-                    _instagramRecommendedCampaigns.postValue(sortCampaigns(availableCampaigns, instagramRecs))
+                    val sortedList = sortCampaigns(availableCampaigns, recs)
+
+                    _overallRecommendedCampaigns.postValue(sortedList)
+                    _youtubeRecommendedCampaigns.postValue(sortedList.filter { it.platforms?.any { p -> p.platform.equals("YouTube", true) } == true })
+                    _instagramRecommendedCampaigns.postValue(sortedList.filter { it.platforms?.any { p -> p.platform.equals("Instagram", true) } == true })
                 }
             }.onFailure {
                 Log.e("CampaignViewModel", "Failed to fetch recommendations", it)
