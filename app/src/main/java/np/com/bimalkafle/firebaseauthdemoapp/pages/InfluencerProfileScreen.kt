@@ -40,10 +40,18 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
-import np.com.bimalkafle.firebaseauthdemoapp.model.Category
+import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramMetrics
+import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeInsights
 import np.com.bimalkafle.firebaseauthdemoapp.model.Platform
-import np.com.bimalkafle.firebaseauthdemoapp.model.PricingInfo
+import np.com.bimalkafle.firebaseauthdemoapp.model.YoutubeDemographics
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import np.com.bimalkafle.firebaseauthdemoapp.model.Category
+import np.com.bimalkafle.firebaseauthdemoapp.model.PricingInfo
 
 @Composable
 fun InfluencerProfileScreen(
@@ -139,7 +147,7 @@ fun InfluencerProfileContent(
     
     // Structured Categories State
     val editableCategories = remember(influencerProfile) { 
-        mutableStateListOf<Category>().apply { 
+        mutableStateListOf<Category>().apply {
             addAll(influencerProfile?.categories ?: emptyList()) 
         } 
     }
@@ -168,6 +176,14 @@ fun InfluencerProfileContent(
     }
 
     val themeColor = Color(0xFFFF8383)
+    val detailSoftGray = Color(0xFFF8F9FA)
+    val detailDarkerGray = Color(0xFF6C757D)
+    val platformsColors = mapOf(
+        "INSTAGRAM" to Color(0xFFF8CA43),
+        "YOUTUBE" to Color(0xFFFA4A4A),
+        "X" to Color(0xFF000000),
+        "TWITTER" to Color(0xFF1DA1F2)
+    )
 
     Scaffold(
         bottomBar = bottomBar
@@ -398,7 +414,7 @@ fun InfluencerProfileContent(
                             if (editableCategories.isEmpty()) {
                                 Text("No categories specified", color = Color.Gray, fontSize = 15.sp)
                             } else {
-                                FlowRow(
+                                androidx.compose.foundation.layout.FlowRow(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -430,49 +446,14 @@ fun InfluencerProfileContent(
                         }
                     }
 
-                    InfluencerDetailSection(icon = Icons.Default.Public, title = "Platforms") {
-                        if (platforms.isEmpty()) {
-                            Text("No platforms added", color = Color.Gray, fontSize = 15.sp)
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                platforms.forEach { platform ->
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(16.dp),
-                                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
-                                        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
-                                    ) {
-                                        Column(modifier = Modifier.padding(16.dp)) {
-                                            Text(
-                                                text = platform.platform.uppercase(), 
-                                                fontWeight = FontWeight.ExtraBold, 
-                                                color = themeColor,
-                                                fontSize = 14.sp,
-                                                letterSpacing = 1.sp
-                                            )
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Column {
-                                                    Text("Followers", fontSize = 11.sp, color = Color.Gray)
-                                                    Text(text = formatCount(platform.followers ?: 0), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
-                                                }
-                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text("Avg Views", fontSize = 11.sp, color = Color.Gray)
-                                                    Text(text = formatCount(platform.avgViews ?: 0), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
-                                                }
-                                                Column(horizontalAlignment = Alignment.End) {
-                                                    Text("Engagement", fontSize = 11.sp, color = Color.Gray)
-                                                    Text(text = "${platform.engagement ?: 0}%", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    influencerProfile?.youtubeInsights?.let { ytInsights ->
+                        YouTubeInsightsSection(ytInsights, platformsColors, detailDarkerGray)
+                        Spacer(modifier = Modifier.height(20.dp))
+                    }
+
+                    influencerProfile?.instagramMetrics?.let { instaMetrics ->
+                        InstagramInsightsSection(instaMetrics, platformsColors, detailDarkerGray, detailSoftGray)
+                        Spacer(modifier = Modifier.height(20.dp))
                     }
 
                     InfluencerDetailSection(icon = Icons.Default.Payments, title = "Services & Pricing") {
@@ -637,6 +618,216 @@ private fun formatCount(count: Int): String {
         count >= 1000000 -> "${String.format("%.1f", count / 1000000.0)}M"
         count >= 1000 -> "${count / 1000}K"
         else -> count.toString()
+    }
+}
+
+@Composable
+private fun YouTubeInsightsSection(insights: np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeInsights, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("YouTube Insights", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Text("Channel: ${insights.title ?: "N/A"}", color = detailDarkerGray, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            YouTubeStatCard(label = "Subscribers", value = formatCount(insights.subscribers ?: 0), icon = Icons.Default.People, modifier = Modifier.weight(1f), platformsColors = platformsColors, detailDarkerGray = detailDarkerGray)
+            YouTubeStatCard(label = "Total Views", value = formatCount(insights.totalViews?.toInt() ?: 0), icon = Icons.Default.Visibility, modifier = Modifier.weight(1f), platformsColors = platformsColors, detailDarkerGray = detailDarkerGray)
+            YouTubeStatCard(label = "Videos", value = (insights.totalVideos ?: 0).toString(), icon = Icons.Default.VideoLibrary, modifier = Modifier.weight(1f), platformsColors = platformsColors, detailDarkerGray = detailDarkerGray)
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        if (!insights.demographics.isNullOrEmpty()) { YouTubeDemographicsCard(insights.demographics!!, detailDarkerGray) }
+        if (!insights.lastSynced.isNullOrEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("Last Synced: ${insights.lastSynced}", color = detailDarkerGray, fontSize = 12.sp, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun YouTubeStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
+    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, contentDescription = null, tint = platformsColors["YOUTUBE"] ?: Color.Red, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(label, fontSize = 11.sp, color = detailDarkerGray)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebaseauthdemoapp.model.YoutubeDemographics>, detailDarkerGray: Color) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("YouTube Audience Demographics", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Age Groups", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val ageData = demographics.groupBy { d -> d.ageGroup ?: "Other" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
+                    val values = ageData.values.toList()
+                    val labels = ageData.keys.toList()
+                    val colors = listOf(Color(0xFF6C63FF), Color(0xFFFF8383), Color(0xFF4CAF50), Color(0xFFFFC107), Color(0xFF2196F3), Color(0xFF9C27B0)).take(values.size)
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
+                        InfluencerDonutChart(values, colors, modifier = Modifier.fillMaxSize(), strokeWidth = 10.dp)
+                        Text("${values.sum().toInt()}%", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    androidx.compose.foundation.layout.FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        labels.forEachIndexed { index, label ->
+                            Row(modifier = Modifier.fillMaxWidth(0.45f).padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(8.dp).background(colors[index], CircleShape))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(label.removePrefix("age"), fontSize = 10.sp, color = detailDarkerGray)
+                            }
+                        }
+                    }
+                }
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Gender", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val genderData = demographics.groupBy { d -> d.gender ?: "Other" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
+                    val values = genderData.values.toList()
+                    val labels = genderData.keys.toList()
+                    val colors = listOf(Color(0xFF64B5F6), Color(0xFFF06292), Color(0xFF9E9E9E)).take(values.size)
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
+                        InfluencerDonutChart(values, colors, modifier = Modifier.fillMaxSize(), strokeWidth = 10.dp)
+                        Text("${values.sum().toInt()}%", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        labels.forEachIndexed { index, label ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(8.dp).background(colors[index], CircleShape))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(label.replaceFirstChar { it.uppercase() }, fontSize = 10.sp, color = detailDarkerGray)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InstagramInsightsSection(metrics: np.com.bimalkafle.firebaseauthdemoapp.model.InstagramMetrics, platformsColors: Map<String, Color>, detailDarkerGray: Color, detailSoftGray: Color) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("Instagram Insights", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Text("Detailed Platform Analytics", color = detailDarkerGray, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            InstagramStatCard(
+                label = "Avg Likes",
+                value = formatCount(metrics.avgLikes?.toInt() ?: 0),
+                icon = Icons.Default.Favorite,
+                modifier = Modifier.weight(1f),
+                platformsColors = platformsColors,
+                detailDarkerGray = detailDarkerGray
+            )
+            InstagramStatCard(
+                label = "Avg Comments",
+                value = formatCount(metrics.avgComments?.toInt() ?: 0),
+                icon = Icons.Default.Comment,
+                modifier = Modifier.weight(1f),
+                platformsColors = platformsColors,
+                detailDarkerGray = detailDarkerGray
+            )
+            InstagramStatCard(
+                label = "Avg Views",
+                value = formatCount(metrics.avgViews?.toInt() ?: 0),
+                icon = Icons.Default.Visibility,
+                modifier = Modifier.weight(1f),
+                platformsColors = platformsColors,
+                detailDarkerGray = detailDarkerGray
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Posting Frequency", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Average days between posts", color = detailDarkerGray, fontSize = 12.sp)
+                    }
+                    Text(
+                        text = "${metrics.postingFrequencyDays ?: "N/A"} Days",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 20.sp,
+                        color = platformsColors["INSTAGRAM"] ?: Color.Red
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = detailSoftGray, thickness = 1.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Posts Analyzed", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Sample size for metrics", color = detailDarkerGray, fontSize = 12.sp)
+                    }
+                    Text(
+                        text = (metrics.totalPostsAnalyzed ?: 0).toString(),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 20.sp,
+                        color = Color.Black
+                    )
+                }
+            }
+        }
+
+        if (!metrics.updatedAt.isNullOrEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("Last Updated: ${metrics.updatedAt}", color = detailDarkerGray, fontSize = 12.sp, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun InstagramStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
+    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, contentDescription = null, tint = platformsColors["INSTAGRAM"] ?: Color.Yellow, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(label, fontSize = 11.sp, color = detailDarkerGray)
+        }
+    }
+}
+
+@Composable
+private fun InfluencerDonutChart(
+    values: List<Float>,
+    colors: List<Color>,
+    modifier: Modifier = Modifier,
+    strokeWidth: Dp = 20.dp
+) {
+    val total = values.sum()
+    if (total == 0f) return
+    var startAngle = -90f
+    Canvas(modifier = modifier) {
+        values.forEachIndexed { index, value ->
+            val sweepAngle = (value / total) * 360f
+            drawArc(color = colors[index], startAngle = startAngle, sweepAngle = sweepAngle, useCenter = false, style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round))
+            startAngle += sweepAngle
+        }
     }
 }
 
