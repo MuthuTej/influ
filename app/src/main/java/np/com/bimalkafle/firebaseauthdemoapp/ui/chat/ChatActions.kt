@@ -208,8 +208,10 @@ fun RestrictedActionPanel(
     if (showUpload) {
         ContentUploadDialog(
             onDismiss = { showUpload = false },
-            onSend = { link ->
-                onSendUpload(link)
+            onSend = { links, platform ->
+                links.forEach { link ->
+                    onSendUpload(link, platform)
+                }
                 onStatusUpdate("COMPLETED")
                 showUpload = false
             }

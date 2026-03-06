@@ -566,6 +566,16 @@ class BrandViewModel : ViewModel() {
                         engagementRate
                       }
                     }
+                    ig {
+                      postId
+                      caption
+                      likeCount
+                      commentCount
+                      viewCount
+                      mediaUrl
+                      timestamp
+                      fetchedAt
+                    }
                   }
                 }
             """.trimIndent()

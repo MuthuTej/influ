@@ -112,38 +112,41 @@ fun CollaborationAnalyticsPage(
                     }
                     item { StatusPlaceholder(statusMessage, statusIcon) }
                 } else {
-                    item {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            SectionTitle("OVERALL PERFORMANCE")
-                        }
-                    }
-
-                    item {
-                        val duration = collaboration.platformAnalytics?.firstOrNull()?.duration ?: 0
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            TotalImpressionsCard(
-                                impressions = String.format("%,d", collaboration.overallAnalytics?.impressions ?: 0),
-                                subtext = "Reached across $duration days"
-                            )
-                        }
-                    }
-
-                    item {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            OverallStatsGrid(collaboration)
-                        }
-                    }
-
-                    item {
-                        collaboration.overallAnalytics?.let { stats ->
+                    // Overall Performance Header
+                    if (collaboration.overallAnalytics != null) {
+                        item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                EngagementBreakdownCard(
-                                    likes = stats.likes ?: 0,
-                                    comments = stats.comments ?: 0,
-                                    shares = stats.shares ?: 0,
-                                    saves = stats.saves ?: 0,
-                                    title = "Engagement Breakdown"
+                                SectionTitle("OVERALL PERFORMANCE")
+                            }
+                        }
+
+                        item {
+                            val duration = collaboration.platformAnalytics?.firstOrNull()?.duration ?: 0
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                TotalImpressionsCard(
+                                    impressions = String.format("%,d", collaboration.overallAnalytics.impressions ?: 0),
+                                    subtext = "Reached across $duration days"
                                 )
+                            }
+                        }
+
+                        item {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                OverallStatsGrid(collaboration)
+                            }
+                        }
+
+                        item {
+                            collaboration.overallAnalytics.let { stats ->
+                                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                    EngagementBreakdownCard(
+                                        likes = stats.likes ?: 0,
+                                        comments = stats.comments ?: 0,
+                                        shares = stats.shares ?: 0,
+                                        saves = stats.saves ?: 0,
+                                        title = "Engagement Breakdown"
+                                    )
+                                }
                             }
                         }
                     }
@@ -176,23 +179,25 @@ fun CollaborationAnalyticsPage(
                         }
                     }
 
-                    item {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            SectionTitle("PLATFORM BREAKDOWN")
+                    // Platform Breakdown Section
+                    if (collaboration.platformAnalytics != null && collaboration.platformAnalytics.isNotEmpty()) {
+                        item {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                SectionTitle("PLATFORM BREAKDOWN")
+                            }
                         }
-                    }
 
-                    val platformAnalytics = collaboration.platformAnalytics ?: emptyList()
-                    items(platformAnalytics) { analytics ->
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            PlatformMetricCard(analytics, expandedDefault = platformAnalytics.size == 1)
+                        items(collaboration.platformAnalytics) { analytics ->
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                PlatformMetricCard(analytics, expandedDefault = collaboration.platformAnalytics.size == 1)
+                            }
                         }
-                    }
 
-                    item {
-                        val durationValue = collaboration.platformAnalytics?.firstOrNull()?.duration ?: 0
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            CampaignDurationCard(durationValue.toString())
+                        item {
+                            val durationValue = collaboration.platformAnalytics.firstOrNull()?.duration ?: 0
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                CampaignDurationCard(durationValue.toString())
+                            }
                         }
                     }
                 }
@@ -248,9 +253,9 @@ fun InstagramPostCard(post: InstagramPostData) {
             
             // Metrics
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                VideoStatItem("Likes", post.likeCount?.toString() ?: "0")
-                VideoStatItem("Comments", post.commentCount?.toString() ?: "0")
-                VideoStatItem("Views", post.viewCount?.toString() ?: "0")
+                VideoStatItem("Likes", String.format("%,d", post.likeCount ?: 0))
+                VideoStatItem("Comments", String.format("%,d", post.commentCount ?: 0))
+                VideoStatItem("Views", String.format("%,d", post.viewCount ?: 0))
             }
         }
     }
@@ -314,8 +319,6 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                     VideoStatItem("Subs Gained", analytics.subscribersGained?.toString() ?: "0")
                     VideoStatItem("Engagement", analytics.engagementRate ?: "0%")
                 }
-            } else {
-                Text("Detailed analytics pending sync...", color = textGray, fontSize = 12.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
             }
         }
     }
@@ -541,6 +544,11 @@ fun OverallStatsGrid(collaboration: Collaboration) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             StatCard(Icons.Default.PlayArrow, Color(0xFF4285F4), String.format("%,d", stats.views ?: 0), "Views", Color(0xFF4285F4), Modifier.weight(1f))
             StatCard(Icons.Default.AdsClick, Color(0xFF9E9E9E), String.format("%,d", stats.clicks ?: 0), "Clicks", Color(0xFF9E9E9E), Modifier.weight(1f))
+        }
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            StatCard(Icons.Default.Favorite, Color(0xFFFF5252), String.format("%,d", stats.likes ?: 0), "Likes", Color(0xFFFF5252), Modifier.weight(1f))
+            StatCard(Icons.Default.ChatBubble, Color(0xFFFFD740), String.format("%,d", stats.comments ?: 0), "Comments", Color(0xFFFFD740), Modifier.weight(1f))
         }
     }
 }
