@@ -51,7 +51,7 @@ android {
 }
 
 dependencies {
-
+    implementation("com.razorpay:checkout:1.6.40")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
