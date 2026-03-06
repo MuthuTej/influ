@@ -91,6 +91,25 @@ fun ChatScreen(
         }
     }
 
+    DisposableEffect(authState.value) {
+        if (authState.value is AuthState.Authenticated) {
+            val role = (authState.value as AuthState.Authenticated).role
+            val isBrandUser = role.equals("BRAND", ignoreCase = true)
+            
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                result.token?.let { token ->
+                    if (isBrandUser) brandViewModel.startPollingCollaborations(token)
+                    else influencerViewModel.startPollingCollaborations(token)
+                }
+            }
+        }
+        
+        onDispose {
+            brandViewModel.stopPollingCollaborations()
+            influencerViewModel.stopPollingCollaborations()
+        }
+    }
+
     LaunchedEffect(chatId, collaborationId) {
         chatId?.let { 
             viewModel.initChat(it, chatNameParam ?: "Chat", collaborationId) 
@@ -112,9 +131,11 @@ fun ChatScreen(
     if (modificationMessage != null) {
         val msg = modificationMessage!!
         when (msg.type) {
-            "NEGOTIATION" -> {
-                val currentAmount = msg.metadata["amount"]?.toString()?.toIntOrNull() ?: 0
-                val currentPlatform = msg.metadata["platform"]?.toString() ?: "Instagram"
+            "NEGOTIATION", "DELIVERABLES" -> {
+                val currentAmount = msg.metadata["amount"]?.toString()?.toIntOrNull() ?: 
+                                   currentCollaboration?.pricing?.firstOrNull()?.price ?: 0
+                val currentPlatform = msg.metadata["platform"]?.toString() ?: 
+                                     currentCollaboration?.pricing?.firstOrNull()?.platform ?: "Instagram"
                 @Suppress("UNCHECKED_CAST")
                 val currentItems = msg.metadata["items"] as? Map<String, Int> ?: emptyMap()
 
@@ -134,25 +155,6 @@ fun ChatScreen(
                                 "platform" to platform,
                                 "items" to deliverables
                             )
-                        )
-                        viewModel.updateMessageStatus(msg.id, "MODIFIED")
-                        modificationMessage = null
-                    }
-                )
-            }
-            "DELIVERABLES" -> {
-                @Suppress("UNCHECKED_CAST")
-                val currentItems = msg.metadata["items"] as? Map<String, Int> ?: emptyMap()
-                DeliverablesDialog(
-                    initialDeliverables = currentItems,
-                    collaboration = currentCollaboration,
-                    onDismiss = { modificationMessage = null },
-                    onSend = { deliverables ->
-                        val text = "Deliverables: ${deliverables.entries.joinToString { "${it.key} (x${it.value})" }}"
-                        viewModel.sendMessage(
-                            text = text, 
-                            type = "DELIVERABLES", 
-                            metadata = mapOf("items" to deliverables)
                         )
                         viewModel.updateMessageStatus(msg.id, "MODIFIED")
                         modificationMessage = null
@@ -466,7 +468,8 @@ fun ChatScreen(
                                     }
                                 }
                             },
-                            collaboration = currentCollaboration
+                            collaboration = currentCollaboration,
+                            brandViewModel = brandViewModel
                         )
                     }
                 }
@@ -724,3 +727,4 @@ private fun calculateReadableDate(timestamp: Long): String {
         else -> SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(msgTime.time)
     }
 }
+

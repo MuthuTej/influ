@@ -26,18 +26,24 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SplashViewModelFactory
+import com.razorpay.PaymentResultWithDataListener
+import com.razorpay.PaymentData
+import com.razorpay.Checkout
+import android.widget.Toast
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
+    private val authViewModel : AuthViewModel by viewModels()
+    private val brandViewModel: BrandViewModel by viewModels()
+    private val influencerViewModel: InfluencerViewModel by viewModels()
+    private val campaignViewModel: CampaignViewModel by viewModels()
+    private val notificationViewModel: NotificationViewModel by viewModels()
+    private val splashViewModel: SplashViewModel by viewModels { SplashViewModelFactory(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val authViewModel : AuthViewModel by viewModels()
-        val splashViewModel: SplashViewModel by viewModels { SplashViewModelFactory(this) }
-        val brandViewModel: BrandViewModel by viewModels()
-        val influencerViewModel: InfluencerViewModel by viewModels()
-        val campaignViewModel: CampaignViewModel by viewModels()
-        val notificationViewModel: NotificationViewModel by viewModels()
-        
+        Checkout.preload(applicationContext)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -98,5 +104,42 @@ class MainActivity : ComponentActivity() {
                 }
             }
         })
+    }
+
+    override fun onPaymentSuccess(razorpayPaymentId: String?, data: PaymentData?) {
+        val paymentId = razorpayPaymentId ?: data?.paymentId
+        val signature = data?.signature
+        val orderId = data?.orderId
+        
+        Log.d("Razorpay", "Payment Success: $paymentId, Order: $orderId")
+        
+        if (paymentId != null && signature != null) {
+            // We need collaborationId and paymentType. 
+            // These should be passed to Razorpay in notes or stored locally.
+            // RazorpayService.kt should include these in notes.
+            val notes = data?.data?.optJSONObject("notes")
+            val collaborationId = notes?.optString("collaborationId")
+            val paymentType = notes?.optString("paymentType", "FULL")
+            
+            if (collaborationId != null && paymentType != null) {
+                FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                    val token = result.token
+                    if (token != null) {
+                        brandViewModel.verifyPayment(token, collaborationId, paymentId, signature, paymentType) { success ->
+                            if (success) {
+                                Toast.makeText(this, "Payment Verified Successfully", Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(this, "Payment Verification Failed", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onPaymentError(code: Int, description: String?, data: PaymentData?) {
+        Log.e("Razorpay", "Payment Error $code: $description")
+        Toast.makeText(this, "Payment Failed: $description", Toast.LENGTH_LONG).show()
     }
 }

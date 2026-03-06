@@ -564,6 +564,10 @@ fun NegotiationBubble(
     onModify: () -> Unit
 ) {
     val amount = message.metadata?.get("amount")?.toString() ?: "0"
+    val platform = message.metadata?.get("platform")?.toString() ?: ""
+    val itemsMap = message.metadata?.get("items") as? Map<String, Any> ?: emptyMap()
+    
+    val displayItems = itemsMap.entries.map { "${it.key} (x${it.value})" }
     
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -585,17 +589,32 @@ fun NegotiationBubble(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "Proposal",
+                        text = if (platform.isNotEmpty()) "Proposal on $platform" else "Proposal",
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = if (isMe) Color.White else Color.Black
                     )
                     Text(
-                        text = "$$amount",
+                        text = "₹$amount",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 20.sp,
                         color = if (isMe) Color.White else BrandThemeColor
                     )
+                }
+            }
+            
+            if (displayItems.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                displayItems.forEach { item ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                        Box(modifier = Modifier.size(6.dp).background(if(isMe) Color.White.copy(alpha=0.7f) else Color.Gray, CircleShape))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = item,
+                            color = if (isMe) Color.White.copy(alpha = 0.9f) else Color.DarkGray,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
             
@@ -623,7 +642,7 @@ fun DeliverablesBubble(
     val itemsMap = message.metadata?.get("items") as? Map<String, Any> ?: emptyMap()
     
     val displayItems = if (itemsMap.isNotEmpty()) {
-        itemsMap.entries.map { "${it.key} k(x${it.value})" }
+        itemsMap.entries.map { "${it.key} (x${it.value})" }
     } else {
         message.metadata?.get("items") as? List<String> ?: emptyList()
     }

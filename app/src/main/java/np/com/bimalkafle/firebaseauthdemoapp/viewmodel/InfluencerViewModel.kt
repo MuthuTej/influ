@@ -181,8 +181,8 @@ class InfluencerViewModel : ViewModel() {
         _error.value = null
         viewModelScope.launch {
             val query = """
-                query GetInfluencer(${'$'}id: ID!) {
-                  getInfluencer(id: ${'$'}id) {
+                query GetInfluencerById(${'$'}id: ID!) {
+                  getInfluencerById(id: ${'$'}id) {
                     id
                     email
                     name
@@ -247,7 +247,7 @@ class InfluencerViewModel : ViewModel() {
                 try {
                     val data = jsonObject.optJSONObject("data")
                     if (data != null) {
-                        val influencerObj = data.optJSONObject("getInfluencer")
+                        val influencerObj = data.optJSONObject("getInfluencerById")
                         if (influencerObj != null) {
                             val influencer = parseInfluencer(influencerObj)
                             _influencerProfile.postValue(influencer)
@@ -481,9 +481,12 @@ class InfluencerViewModel : ViewModel() {
                     status
                     message
                     pricing { platform deliverable price currency }
-                    brand { id name logoUrl }
-                    campaign { id title budgetMin budgetMax }
+                    initiatedBy
+                    createdAt
                     updatedAt
+                    brand { id email name role about profileUrl logoUrl }
+                    campaign { id brandId title description budgetMin budgetMax startDate endDate status createdAt updatedAt }
+                    influencer { name bio logoUrl updatedAt }
                   }
                 }
             """.trimIndent()
@@ -494,6 +497,7 @@ class InfluencerViewModel : ViewModel() {
                     val data = jsonObject.optJSONObject("data")
                     val collaborationsArray = data?.optJSONArray("getCollaborations")
                     if (collaborationsArray != null) {
+                        _collaborations.postValue(parseCollaborations(collaborationsArray))
                         val list = mutableListOf<Collaboration>()
                         for (i in 0 until collaborationsArray.length()) {
                             val obj = collaborationsArray.optJSONObject(i) ?: continue
@@ -538,6 +542,104 @@ class InfluencerViewModel : ViewModel() {
             }
             _loading.postValue(false)
         }
+    }
+
+    private fun parseCollaborations(jsonArray: JSONArray): List<Collaboration> {
+        val list = mutableListOf<Collaboration>()
+        for (i in 0 until jsonArray.length()) {
+            val obj = jsonArray.optJSONObject(i) ?: continue
+
+            val campaignObj = obj.optJSONObject("campaign")
+            val campaign = if (campaignObj != null) {
+                Campaign(
+                    id = campaignObj.optString("id"),
+                    brandId = campaignObj.optString("brandId"),
+                    title = campaignObj.optString("title"),
+                    description = campaignObj.optString("description"),
+                    budgetMin = if (campaignObj.isNull("budgetMin")) null else campaignObj.optInt("budgetMin"),
+                    budgetMax = if (campaignObj.isNull("budgetMax")) null else campaignObj.optInt("budgetMax"),
+                    startDate = campaignObj.optString("startDate"),
+                    endDate = campaignObj.optString("endDate"),
+                    status = campaignObj.optString("status"),
+                    createdAt = campaignObj.optString("createdAt"),
+                    updatedAt = campaignObj.optString("updatedAt")
+                )
+            } else {
+                Campaign("unknown", null, "Unknown Campaign", null, null, null, null, null, null, null, null)
+            }
+
+            val influencerObj = obj.optJSONObject("influencer")
+            val influencer = if (influencerObj != null) {
+                 Influencer(
+                    name = influencerObj.optString("name", "Unknown"),
+                    bio = influencerObj.optString("bio"),
+                    logoUrl = influencerObj.optString("logoUrl"),
+                    updatedAt = influencerObj.optString("updatedAt")
+                )
+            } else {
+                 Influencer("Unknown", null, null, null)
+            }
+
+            val brandObj = obj.optJSONObject("brand")
+            val brand = if (brandObj != null) {
+                Brand(
+                    id = brandObj.optString("id", ""),
+                    email = brandObj.optString("email", ""),
+                    name = brandObj.optString("name", "Unknown Brand"),
+                    role = brandObj.optString("role", ""),
+                    profileCompleted = null,
+                    updatedAt = null,
+                    brandCategories = null,
+                    about = brandObj.optString("about", null),
+                    profileUrl = brandObj.optString("profileUrl", null),
+                    logoUrl = brandObj.optString("logoUrl", null),
+                    preferredPlatforms = null,
+                    targetAudience = null
+                )
+            } else null
+
+            val pricingList = mutableListOf<Pricing>()
+            val pricingArray = obj.optJSONArray("pricing")
+            if (pricingArray != null) {
+                for (j in 0 until pricingArray.length()) {
+                    val pObj = pricingArray.optJSONObject(j)
+                    if (pObj != null) {
+                        pricingList.add(
+                            Pricing(
+                                platform = pObj.optString("platform"),
+                                deliverable = pObj.optString("deliverable"),
+                                price = pObj.optInt("price"),
+                                currency = pObj.optString("currency")
+                            )
+                        )
+                    }
+                }
+            }
+
+            list.add(
+                Collaboration(
+                    id = obj.optString("id"),
+                    campaignId = obj.optString("campaignId"),
+                    brandId = obj.optString("brandId"),
+                    influencerId = obj.optString("influencerId"),
+                    status = obj.optString("status"),
+                    message = obj.optString("message"),
+                    pricing = pricingList,
+                    initiatedBy = obj.optString("initiatedBy"),
+                    createdAt = obj.optString("createdAt"),
+                    updatedAt = obj.optString("updatedAt"),
+                    campaign = campaign,
+                    influencer = influencer,
+                    brand = brand,
+                    paymentStatus = obj.optString("paymentStatus"),
+                    razorpayOrderId = obj.optString("razorpayOrderId"),
+                    advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),
+                    finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
+                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount")
+                )
+            )
+        }
+        return list
     }
 
     fun applyToCampaign(
@@ -651,21 +753,30 @@ class InfluencerViewModel : ViewModel() {
         token: String,
         collaborationId: String,
         status: String,
+        message: String? = null,
         onComplete: (Boolean) -> Unit
     ) {
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
             val mutation = """
-                mutation UpdateCollaborationStatus(${'$'}id: ID!, ${'$'}status: String!) {
-                  updateCollaborationStatus(id: ${'$'}id, status: ${'$'}status) {
+                mutation UpdateCollaborationStatus(${'$'}input: UpdateCollaborationInput!) {
+                  updateCollaboration(input: ${'$'}input) {
                     id
                     status
+                    message
                   }
                 }
             """.trimIndent()
 
-            val variables = mapOf("id" to collaborationId, "status" to status)
+            val variables = mapOf(
+                "input" to mapOf(
+                    "collaborationId" to collaborationId,
+                    "status" to status,
+                    "message" to message
+                )
+            )
+
             val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
             result.onSuccess { 
                 fetchCollaborations(token)
@@ -676,5 +787,27 @@ class InfluencerViewModel : ViewModel() {
             }
             _loading.postValue(false)
         }
+    }
+    private var pollingJob: kotlinx.coroutines.Job? = null
+
+    fun startPollingCollaborations(token: String) {
+        if (pollingJob?.isActive == true) return
+        
+        pollingJob = viewModelScope.launch {
+            while (true) {
+                fetchCollaborations(token)
+                kotlinx.coroutines.delay(5000)
+            }
+        }
+    }
+
+    fun stopPollingCollaborations() {
+        pollingJob?.cancel()
+        pollingJob = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopPollingCollaborations()
     }
 }

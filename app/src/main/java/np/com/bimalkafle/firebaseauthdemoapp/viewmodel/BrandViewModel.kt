@@ -1099,4 +1099,114 @@ class BrandViewModel : ViewModel() {
             _loading.postValue(false)
         }
     }
+
+    fun createCollaborationPaymentOrder(token: String, collaborationId: String, paymentType: String, onComplete: (JSONObject?) -> Unit) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val mutation = """
+                mutation CreateCollaborationPaymentOrder(${'$'}collaborationId: ID!, ${'$'}paymentType: PaymentType!) {
+                    createCollaborationPaymentOrder(collaborationId: ${'$'}collaborationId, paymentType: ${'$'}paymentType) {
+                        success
+                        collaborationId
+                        razorpayOrderId
+                        totalAmount
+                    }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "collaborationId" to collaborationId,
+                "paymentType" to paymentType
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")?.optJSONObject("createCollaborationPaymentOrder")
+                if (data != null && data.optBoolean("success")) {
+                    onComplete(data)
+                } else {
+                    val errorMsg = jsonObject.optJSONArray("errors")?.optJSONObject(0)?.optString("message") ?: "Failed to create order"
+                    _error.postValue(errorMsg)
+                    onComplete(null)
+                }
+            }.onFailure {
+                _error.postValue(it.message ?: "Network error")
+                onComplete(null)
+            }
+            _loading.postValue(false)
+        }
+    }
+
+    fun verifyPayment(token: String, collaborationId: String, razorpayPaymentId: String, razorpaySignature: String, paymentType: String, onComplete: (Boolean) -> Unit) {
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val mutation = """
+                mutation VerifyPayment(
+                    ${'$'}collaborationId: ID!, 
+                    ${'$'}razorpayPaymentId: String!, 
+                    ${'$'}razorpaySignature: String!, 
+                    ${'$'}paymentType: PaymentType!
+                ) {
+                    verifyPayment(
+                        collaborationId: ${'$'}collaborationId, 
+                        razorpayPaymentId: ${'$'}razorpayPaymentId, 
+                        razorpaySignature: ${'$'}razorpaySignature, 
+                        paymentType: ${'$'}paymentType
+                    ) {
+                        id
+                        status
+                        paymentStatus
+                    }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "collaborationId" to collaborationId,
+                "razorpayPaymentId" to razorpayPaymentId,
+                "razorpaySignature" to razorpaySignature,
+                "paymentType" to paymentType
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")?.optJSONObject("verifyPayment")
+                if (data != null) {
+                    fetchCollaborations(token)
+                    onComplete(true)
+                } else {
+                    val errorMsg = jsonObject.optJSONArray("errors")?.optJSONObject(0)?.optString("message") ?: "Verification failed"
+                    _error.postValue(errorMsg)
+                    onComplete(false)
+                }
+            }.onFailure {
+                _error.postValue(it.message ?: "Network error")
+                onComplete(false)
+            }
+            _loading.postValue(false)
+        }
+    }
+    private var pollingJob: kotlinx.coroutines.Job? = null
+
+    fun startPollingCollaborations(token: String) {
+        if (pollingJob?.isActive == true) return
+        
+        pollingJob = viewModelScope.launch {
+            while (true) {
+                fetchCollaborations(token)
+                kotlinx.coroutines.delay(5000)
+            }
+        }
+    }
+
+    fun stopPollingCollaborations() {
+        pollingJob?.cancel()
+        pollingJob = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopPollingCollaborations()
+    }
 }
