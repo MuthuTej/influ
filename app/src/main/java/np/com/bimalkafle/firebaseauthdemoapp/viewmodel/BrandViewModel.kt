@@ -1187,4 +1187,26 @@ class BrandViewModel : ViewModel() {
             _loading.postValue(false)
         }
     }
+    private var pollingJob: kotlinx.coroutines.Job? = null
+
+    fun startPollingCollaborations(token: String) {
+        if (pollingJob?.isActive == true) return
+        
+        pollingJob = viewModelScope.launch {
+            while (true) {
+                fetchCollaborations(token)
+                kotlinx.coroutines.delay(5000)
+            }
+        }
+    }
+
+    fun stopPollingCollaborations() {
+        pollingJob?.cancel()
+        pollingJob = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopPollingCollaborations()
+    }
 }

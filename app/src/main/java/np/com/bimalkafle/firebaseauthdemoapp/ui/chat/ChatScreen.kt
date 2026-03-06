@@ -91,6 +91,25 @@ fun ChatScreen(
         }
     }
 
+    DisposableEffect(authState.value) {
+        if (authState.value is AuthState.Authenticated) {
+            val role = (authState.value as AuthState.Authenticated).role
+            val isBrandUser = role.equals("BRAND", ignoreCase = true)
+            
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                result.token?.let { token ->
+                    if (isBrandUser) brandViewModel.startPollingCollaborations(token)
+                    else influencerViewModel.startPollingCollaborations(token)
+                }
+            }
+        }
+        
+        onDispose {
+            brandViewModel.stopPollingCollaborations()
+            influencerViewModel.stopPollingCollaborations()
+        }
+    }
+
     LaunchedEffect(chatId, collaborationId) {
         chatId?.let { 
             viewModel.initChat(it, chatNameParam ?: "Chat", collaborationId) 

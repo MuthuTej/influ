@@ -181,8 +181,8 @@ class InfluencerViewModel : ViewModel() {
         _error.value = null
         viewModelScope.launch {
             val query = """
-                query GetInfluencer(${'$'}id: ID!) {
-                  getInfluencer(id: ${'$'}id) {
+                query GetInfluencerById(${'$'}id: ID!) {
+                  getInfluencerById(id: ${'$'}id) {
                     id
                     email
                     name
@@ -247,7 +247,7 @@ class InfluencerViewModel : ViewModel() {
                 try {
                     val data = jsonObject.optJSONObject("data")
                     if (data != null) {
-                        val influencerObj = data.optJSONObject("getInfluencer")
+                        val influencerObj = data.optJSONObject("getInfluencerById")
                         if (influencerObj != null) {
                             val influencer = parseInfluencer(influencerObj)
                             _influencerProfile.postValue(influencer)
@@ -787,5 +787,27 @@ class InfluencerViewModel : ViewModel() {
             }
             _loading.postValue(false)
         }
+    }
+    private var pollingJob: kotlinx.coroutines.Job? = null
+
+    fun startPollingCollaborations(token: String) {
+        if (pollingJob?.isActive == true) return
+        
+        pollingJob = viewModelScope.launch {
+            while (true) {
+                fetchCollaborations(token)
+                kotlinx.coroutines.delay(5000)
+            }
+        }
+    }
+
+    fun stopPollingCollaborations() {
+        pollingJob?.cancel()
+        pollingJob = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopPollingCollaborations()
     }
 }
