@@ -2,29 +2,13 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -37,7 +21,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -46,6 +29,7 @@ import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.UnifiedDeliverableItem
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -61,32 +45,21 @@ fun InfluencerCreateProposal(
     val myCampaigns by brandViewModel.myCampaigns.observeAsState(emptyList())
     val isLoading by brandViewModel.loading.observeAsState(false)
     val error by brandViewModel.error.observeAsState()
-
     var selectedCampaignId by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
-    
+
     // Get target platforms from the selected campaign
     val selectedCampaign = remember(selectedCampaignId, myCampaigns) {
         myCampaigns.find { it.id == selectedCampaignId }
     }
     
-    val targetPlatforms = remember(selectedCampaign) {
-        selectedCampaign?.platforms?.map { it.platform } ?: emptyList()
-    }
-    
-    // Get target deliverables (formats) from the selected campaign
-    val targetDeliverables = remember(selectedCampaign) {
-        selectedCampaign?.platforms?.flatMap { it.formats ?: emptyList() }?.distinct() ?: emptyList()
-    }
-    
-    val selectedPlatforms = remember { mutableStateListOf<String>() }
-    var deliverableQuantities by remember { mutableStateOf(emptyMap<String, Int>()) }
+    // Structure: mapOf(platform to mapOf(deliverable to quantity))
+    var platformDeliverableQuantities by remember { mutableStateOf(emptyMap<String, Map<String, String>>()) }
     var pricing by remember { mutableStateOf(mapOf<String, Map<String, String>>()) }
 
-    // Synchronize selectedPlatforms and deliverables when campaign changes
+    // Synchronize states when campaign changes
     LaunchedEffect(selectedCampaignId) {
-        selectedPlatforms.clear()
-        deliverableQuantities = targetDeliverables.associateWith { 0 }
+        platformDeliverableQuantities = emptyMap()
         pricing = emptyMap()
     }
 
@@ -183,7 +156,7 @@ fun InfluencerCreateProposal(
                     .padding(bottom = 16.dp)
             )
 
-            Text("Campaign", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+            Text("Select Campaign", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
             var campaignExpanded by remember { mutableStateOf(false) }
             val selectedCampaignTitle = selectedCampaign?.title ?: "Select Campaign"
             
@@ -217,139 +190,84 @@ fun InfluencerCreateProposal(
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
             )
 
-            if (targetPlatforms.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Target Platform", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-                FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    targetPlatforms.forEach { platform ->
-                        val isSelected = selectedPlatforms.contains(platform)
-                        val icon = when (platform.lowercase()) {
-                            "instagram" -> painterResource(id = R.drawable.ic_instagram)
-                            "facebook" -> painterResource(id = R.drawable.ic_facebook)
-                            "youtube" -> painterResource(id = R.drawable.ic_youtube)
-                            else -> null
-                        }
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { if (isSelected) selectedPlatforms.remove(platform) else selectedPlatforms.add(platform) },
-                            label = { Text(platform) },
-                            leadingIcon = {
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "$platform selected",
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                } else if (icon != null) {
-                                    Image(
-                                        painter = icon,
-                                        contentDescription = "$platform logo",
-                                        modifier = Modifier.size(20.dp)
-                                    )
+            // Unified Deliverables & Pricing section
+            if (selectedCampaign != null && !selectedCampaign.platforms.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text("Deliverables & Pricing", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
+                
+                selectedCampaign.platforms?.forEach { campaignPlatform ->
+                    val platformName = campaignPlatform.platform
+                    val formats = campaignPlatform.formats ?: emptyList()
+                    
+                    if (formats.isNotEmpty()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val icon = when (platformName.lowercase()) {
+                                    "instagram" -> painterResource(id = R.drawable.ic_instagram)
+                                    "facebook" -> painterResource(id = R.drawable.ic_facebook)
+                                    "youtube" -> painterResource(id = R.drawable.ic_youtube)
+                                    else -> null
                                 }
-                            }
-                        )
-                    }
-                }
-            }
-
-            if (targetDeliverables.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Deliverables Offered", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    targetDeliverables.forEach { deliverable ->
-                        DeliverableRow(
-                            deliverable = deliverable,
-                            quantity = deliverableQuantities[deliverable] ?: 0,
-                            onQuantityChange = { quantity ->
-                                deliverableQuantities = deliverableQuantities.toMutableMap().apply {
-                                    this[deliverable] = quantity
+                                if (icon != null) {
+                                    Image(painter = icon, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
-                            }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Pricing", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-
-            val selectedDeliverablesList = deliverableQuantities.filter { it.value > 0 }.keys.toList()
-
-            if (selectedPlatforms.isNotEmpty() && selectedDeliverablesList.isNotEmpty()) {
-                selectedPlatforms.forEach { platform ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val icon = when (platform.lowercase()) {
-                                "instagram" -> painterResource(id = R.drawable.ic_instagram)
-                                "facebook" -> painterResource(id = R.drawable.ic_facebook)
-                                "youtube" -> painterResource(id = R.drawable.ic_youtube)
-                                else -> null
-                            }
-                            if (icon != null) {
-                                Image(painter = icon, contentDescription = null, modifier = Modifier.size(24.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            Text(platform, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Filter deliverables specifically allowed for this platform in the campaign
-                        val platformAllowedDeliverables = selectedCampaign?.platforms
-                            ?.find { it.platform.equals(platform, ignoreCase = true) }
-                            ?.formats ?: emptyList()
-
-                        val platformDeliverables = selectedDeliverablesList.filter { 
-                            platformAllowedDeliverables.any { allowed -> it.equals(allowed, ignoreCase = true) }
-                        }
-
-                        if (platformDeliverables.isNotEmpty()) {
-                            platformDeliverables.forEach { deliverable ->
-                                OutlinedTextField(
-                                    value = pricing[platform]?.get(deliverable) ?: "",
-                                    onValueChange = { price ->
-                                        val newPricing = pricing.toMutableMap()
-                                        val platformPricing =
-                                            newPricing[platform]?.toMutableMap() ?: mutableMapOf()
-                                        platformPricing[deliverable] = price
-                                        newPricing[platform] = platformPricing
-                                        pricing = newPricing
+                                Text(
+                                    platformName.uppercase(),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = when(platformName.lowercase()) {
+                                        "youtube" -> Color(0xFFCC0000)
+                                        "instagram" -> Color(0xFFE4405F)
+                                        else -> Color(0xFFFF8383)
                                     },
-                                    label = { Text("Price per $deliverable") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 8.dp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                                    fontSize = 14.sp
                                 )
                             }
-                        } else {
-                            Text(
-                                text = "No applicable deliverables selected for $platform in this campaign.",
-                                color = Color.Gray,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)
+                            
+                            Surface(
+                                color = Color(0xFFF0F0F5),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = "${formats.size} items",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                        
+                        formats.forEach { deliverable ->
+                            val currentCount = platformDeliverableQuantities[platformName]?.get(deliverable) ?: ""
+                            val currentPrice = pricing[platformName]?.get(deliverable) ?: ""
+                            
+                            UnifiedDeliverableItem(
+                                deliverable = deliverable,
+                                count = currentCount,
+                                onCountChange = { newCount ->
+                                    val newQuantities = platformDeliverableQuantities.toMutableMap()
+                                    val platformMap = newQuantities[platformName]?.toMutableMap() ?: mutableMapOf()
+                                    platformMap[deliverable] = newCount
+                                    newQuantities[platformName] = platformMap
+                                    platformDeliverableQuantities = newQuantities
+                                },
+                                price = currentPrice,
+                                onPriceChange = { newPrice ->
+                                    val newPricing = pricing.toMutableMap()
+                                    val platformPricing = newPricing[platformName]?.toMutableMap() ?: mutableMapOf()
+                                    platformPricing[deliverable] = newPrice
+                                    newPricing[platformName] = platformPricing
+                                    pricing = newPricing
+                                }
                             )
                         }
                     }
                 }
-            } else {
-                Text(
-                    text = "no platform or deliverables are selected",
-                    color = Color.Gray,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp)
-                )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -359,13 +277,16 @@ fun InfluencerCreateProposal(
                     val finalPricing = mutableListOf<Map<String, Any>>()
                     pricing.forEach { (platform, deliverables) ->
                         deliverables.forEach { (deliverable, price) ->
-                            if (price.isNotEmpty()) {
+                            val quantityStr = platformDeliverableQuantities[platform]?.get(deliverable) ?: "0"
+                            val quantity = quantityStr.toIntOrNull() ?: 0
+                            if (price.isNotEmpty() && quantity > 0) {
                                 finalPricing.add(
                                     mapOf(
                                         "platform" to platform.uppercase(),
                                         "deliverable" to deliverable,
                                         "price" to (price.toIntOrNull() ?: 0),
-                                        "currency" to "INR" // Default currency
+                                        "count" to quantity,
+                                        "currency" to "INR"
                                     )
                                 )
                             }
@@ -421,64 +342,11 @@ fun InfluencerCreateProposal(
                     modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
                 )
             }
+            
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DeliverableRow(deliverable: String, quantity: Int, onQuantityChange: (Int) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val quantityOptions = (0..10).toList()
-
-    val iconRes = when (deliverable.lowercase()) {
-        "post" -> R.drawable.brand2 // Replace with actual icons if available
-        "reels" -> R.drawable.brand2
-        "story" -> R.drawable.brand2
-        "videos" -> R.drawable.brand2
-        else -> R.drawable.brand2
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFF5F5F5))
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(32.dp))
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(deliverable)
-        }
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
-            OutlinedTextField(
-                value = quantity.toString(),
-                onValueChange = { },
-                readOnly = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier
-                    .width(80.dp)
-                    .menuAnchor(),
-                shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
-                )
-            )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                quantityOptions.forEach { option ->
-                    DropdownMenuItem(text = { Text(option.toString()) }, onClick = { onQuantityChange(option); expanded = false })
-                }
-            }
-        }
-    }
-}
-
 
 @Preview(showBackground = true)
 @Composable

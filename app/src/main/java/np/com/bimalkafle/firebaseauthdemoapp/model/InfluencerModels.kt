@@ -18,7 +18,17 @@ data class InfluencerProfile(
     val logoUrl: String?,
     val averageRating: Float? = null,
     val isVerified: Boolean? = false,
-    val youtubeInsights: YouTubeInsights? = null
+    val youtubeInsights: YouTubeInsights? = null,
+    val instagramMetrics: InstagramMetrics? = null
+)
+
+data class InstagramMetrics(
+    val avgComments: Float?,
+    val avgLikes: Float?,
+    val avgViews: Float?,
+    val postingFrequencyDays: Float?,
+    val totalPostsAnalyzed: Int?,
+    val updatedAt: String?
 )
 
 data class YouTubeInsights(
@@ -67,7 +77,7 @@ data class AgeGroupInsight(
 
 data class Category(
     val category: String,
-    val subCategory: String
+    val subCategories: List<String>
 )
 
 data class Platform(
@@ -85,6 +95,7 @@ data class Platform(
 data class PricingInfo(
     val platform: String,
     val deliverable: String,
+    val count: Int? = null,
     val price: Int,
     val currency: String
 )
@@ -104,7 +115,7 @@ data class InfluencerProfileInput(
 
 data class CategoryInput(
     val category: String,
-    val subCategory: String
+    val subCategories: List<String>
 )
 
 data class PlatformInput(
@@ -119,6 +130,7 @@ data class PlatformInput(
 data class PricingInput(
     val platform: String,
     val deliverable: String,
+    val count: Int? = null,
     val price: Int,
     val currency: String
 )

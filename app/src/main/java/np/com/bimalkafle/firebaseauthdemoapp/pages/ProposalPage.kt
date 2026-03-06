@@ -39,6 +39,9 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.utils.RazorpayService
+import android.app.Activity
+import androidx.compose.ui.platform.LocalContext
 
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 
@@ -270,6 +273,7 @@ fun ProposalPage(
                                 PremiumProposalCard(
                                     proposal = proposal,
                                     isBrand = isBrand,
+                                    brandViewModel = brandViewModel,
                                     onClick = {
                                         navController.navigate("collaboration_analytics/${proposal.id}")
                                     },
@@ -366,10 +370,14 @@ fun StatusFilterRow(selectedStatus: ProposalStatus?, onStatusSelected: (Proposal
 fun PremiumProposalCard(
     proposal: Proposal, 
     isBrand: Boolean,
+    brandViewModel: BrandViewModel,
     onClick: () -> Unit,
     onChat: () -> Unit,
     onAction: (String) -> Unit
 ) {
+    val context = LocalContext.current
+    val activity = context as? Activity
+    
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -466,6 +474,33 @@ fun PremiumProposalCard(
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Text("Revoke", fontWeight = FontWeight.Bold)
+                    }
+                } else if (isBrand && (proposal.status == ProposalStatus.ACCEPTED || proposal.status == ProposalStatus.WAITING_FOR_PAYMENT)) {
+                    Button(
+                        onClick = {
+                            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                val token = result.token
+                                if (token != null) {
+                                    brandViewModel.createCollaborationPaymentOrder(token, proposal.id, "FULL") { orderData ->
+                                        if (orderData != null && activity != null) {
+                                            RazorpayService.startPayment(
+                                                activity = activity,
+                                                orderData = orderData,
+                                                userEmail = FirebaseAuth.getInstance().currentUser?.email,
+                                                userContact = null
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383)),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Pay Now", fontWeight = FontWeight.Bold)
                     }
                 }
             }

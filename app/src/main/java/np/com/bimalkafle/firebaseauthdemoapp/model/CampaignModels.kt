@@ -3,6 +3,7 @@ package np.com.bimalkafle.firebaseauthdemoapp.model
 data class CampaignInput(
     val title: String,
     val description: String,
+    val categories: List<BrandCategory>,
     val platforms: List<CampaignPlatformInput>,
     val budgetMin: Int,
     val budgetMax: Int,
@@ -44,7 +45,8 @@ data class CampaignDetail(
     val endDate: String?,
     val targetAudience: CampaignAudienceResponse?,
     val platforms: List<Platform>?,
-    val brand: Brand?
+    val brand: Brand?,
+    val categories: List<BrandCategory>? = null
 )
 
 data class CampaignAudienceResponse(

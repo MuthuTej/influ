@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -33,12 +35,14 @@ import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.CollaborationAnalytics
-import np.com.bimalkafle.firebaseauthdemoapp.model.OverallAnalytics
+import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramPostData
+import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeVideoData
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
 // App theme colors
 private val themeColor_campaign = Color(0xFFFF8383)
 private val textGray = Color(0xFF8E8E93)
+private val softGray = Color(0xFFF8F9FA)
 
 @Composable
 fun CollaborationAnalyticsPage(
@@ -86,7 +90,7 @@ fun CollaborationAnalyticsPage(
                 if (collaboration.status == "PENDING") {
                     item { StatusPlaceholder("Proposal not accepted till now", Icons.Default.HourglassEmpty) }
                 } else if (collaboration.status == "ACCEPTED") {
-                    item { StatusPlaceholder("Advance payment is not completed", Icons.Default.Payment) }
+                    item { StatusPlaceholder("Payment is not completed", Icons.Default.Payment) }
                 } else {
                     item {
                         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -124,6 +128,34 @@ fun CollaborationAnalyticsPage(
                         }
                     }
 
+                    // YouTube Video Analytics Section
+                    if (collaboration.yt != null && collaboration.yt.isNotEmpty()) {
+                        item {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                SectionTitle("YOUTUBE VIDEO PERFORMANCE")
+                                Spacer(modifier = Modifier.height(8.dp))
+                                collaboration.yt.forEach { video ->
+                                    YouTubeVideoCard(video)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    // Instagram Post Analytics Section
+                    if (collaboration.ig != null && collaboration.ig.isNotEmpty()) {
+                        item {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                SectionTitle("INSTAGRAM PERFORMANCE")
+                                Spacer(modifier = Modifier.height(8.dp))
+                                collaboration.ig.forEach { post ->
+                                    InstagramPostCard(post)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                            }
+                        }
+                    }
+
                     item {
                         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                             SectionTitle("PLATFORM BREAKDOWN")
@@ -146,6 +178,134 @@ fun CollaborationAnalyticsPage(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun InstagramPostCard(post: InstagramPostData) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                // Post Media/Thumbnail
+                AsyncImage(
+                    model = post.mediaUrl,
+                    contentDescription = "Instagram Post",
+                    modifier = Modifier
+                        .size(width = 100.dp, height = 100.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(id = R.drawable.ic_instagram)
+                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Column {
+                    Text(
+                        text = post.caption ?: "No caption",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        color = Color.Black
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Posted on: ${post.timestamp?.split("T")?.get(0) ?: "N/A"}",
+                        fontSize = 12.sp,
+                        color = textGray
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = softGray)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Metrics
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                VideoStatItem("Likes", post.likeCount?.toString() ?: "0")
+                VideoStatItem("Comments", post.commentCount?.toString() ?: "0")
+                VideoStatItem("Views", post.viewCount?.toString() ?: "0")
+            }
+        }
+    }
+}
+
+@Composable
+fun YouTubeVideoCard(video: YouTubeVideoData) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                // Video Thumbnail
+                AsyncImage(
+                    model = video.thumbnail,
+                    contentDescription = video.title,
+                    modifier = Modifier
+                        .size(width = 120.dp, height = 68.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Column {
+                    Text(
+                        text = video.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        maxLines = 2,
+                        color = Color.Black
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Views: ${video.viewCount ?: video.analytics?.views ?: "0"}",
+                        fontSize = 12.sp,
+                        color = textGray
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = softGray)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Detailed Analytics
+            val analytics = video.analytics
+            if (analytics != null) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    VideoStatItem("Likes", analytics.likes?.toString() ?: video.likeCount ?: "0")
+                    VideoStatItem("Comments", analytics.comments?.toString() ?: "0")
+                    VideoStatItem("Shares", analytics.shares?.toString() ?: "0")
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    val watchTime = analytics.watchTimeMinutes ?: 0.0
+                    VideoStatItem("Watch Time", if (watchTime >= 1000) "${(watchTime / 60).toInt()}h" else "${watchTime.toInt()}m")
+                    VideoStatItem("Subs Gained", analytics.subscribersGained?.toString() ?: "0")
+                    VideoStatItem("Engagement", analytics.engagementRate ?: "0%")
+                }
+            } else {
+                Text("Detailed analytics pending sync...", color = textGray, fontSize = 12.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+            }
+        }
+    }
+}
+
+@Composable
+fun VideoStatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = value, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = Color.Black)
+        Text(text = label, fontSize = 10.sp, color = textGray)
     }
 }
 
@@ -180,7 +340,7 @@ fun AnalyticsHeader(navController: NavController, collaboration: Collaboration?)
                         .size(36.dp)
                         .background(Color.White.copy(alpha = 0.1f), CircleShape)
                 ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
@@ -242,7 +402,7 @@ fun InfluencerProfileCard(collaboration: Collaboration) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(collaboration.influencer.name, color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text("Influencer · Instagram", color = textGray, fontSize = 12.sp)
+                Text("Influencer", color = textGray, fontSize = 12.sp)
             }
             if (collaboration.status == "COMPLETED") {
                 Surface(
@@ -477,7 +637,7 @@ fun PlatformMetricCard(analytics: CollaborationAnalytics, expandedDefault: Boole
 
             AnimatedVisibility(visible = expanded) {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
-                    Divider(color = Color.LightGray.copy(alpha = 0.3f))
+                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     PlatformStatsDetails(analytics)

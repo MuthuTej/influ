@@ -1,6 +1,5 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -68,8 +67,8 @@ fun CreateCampaignScreen(
     // Validation
     val isFormValid = campaignViewModel.title.isNotBlank() &&
             campaignViewModel.description.isNotBlank() &&
-            campaignViewModel.category.isNotBlank() &&
-            campaignViewModel.subCategory.isNotBlank() &&
+            campaignViewModel.selectedCategories.isNotEmpty() &&
+            campaignViewModel.selectedSubCategories.isNotEmpty() &&
             campaignViewModel.selectedPlatforms.isNotEmpty() &&
             campaignViewModel.selectedPlatforms.all { platform -> 
                 campaignViewModel.platformFormats[platform]?.isNotEmpty() == true 
@@ -160,29 +159,66 @@ fun CreateCampaignScreen(
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Category & Subcategory Dropdowns - Vertical Layout
-            DropdownField(
-                label = "Category *",
-                selectedOption = campaignViewModel.category,
-                options = categoriesMap.keys.toList(),
-                modifier = Modifier.fillMaxWidth(),
-                onOptionSelected = { 
-                    campaignViewModel.category = it
-                    campaignViewModel.subCategory = "" // Reset subcategory when category changes
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Multiselect Category Chips
+            Text("Select Categories *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                categoriesMap.keys.forEach { category ->
+                    val isSelected = campaignViewModel.selectedCategories.contains(category)
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = {
+                            campaignViewModel.selectedCategories = if (isSelected) {
+                                campaignViewModel.selectedCategories - category
+                            } else {
+                                campaignViewModel.selectedCategories + category
+                            }
+                            // Cleanup subcategories if category unselected
+                            if (isSelected) {
+                                campaignViewModel.selectedSubCategories = campaignViewModel.selectedSubCategories - category
+                            }
+                        },
+                        label = { Text(category) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFFFF8383),
+                            selectedLabelColor = Color.White
+                        )
+                    )
                 }
-            )
+            }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            DropdownField(
-                label = "Sub-Category *",
-                selectedOption = campaignViewModel.subCategory,
-                options = categoriesMap[campaignViewModel.category] ?: emptyList(),
-                modifier = Modifier.fillMaxWidth(),
-                onOptionSelected = { campaignViewModel.subCategory = it }
-            )
+            if (campaignViewModel.selectedCategories.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Select Sub-Categories *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                campaignViewModel.selectedCategories.forEach { category ->
+                    Text(category, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        categoriesMap[category]?.forEach { subCat ->
+                            val selectedSubCats = campaignViewModel.selectedSubCategories[category] ?: emptySet()
+                            val isSelected = selectedSubCats.contains(subCat)
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    val newSubCats = if (isSelected) selectedSubCats - subCat else selectedSubCats + subCat
+                                    campaignViewModel.selectedSubCategories = campaignViewModel.selectedSubCategories + (category to newSubCats)
+                                },
+                                label = { Text(subCat, fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFFFF8383).copy(alpha = 0.7f),
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
             Text("Target Platforms & Formats *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
@@ -219,7 +255,7 @@ fun CreateCampaignScreen(
 
                     if (isPlatformSelected) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Select format for $platform:", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(start = 8.dp))
+                        Text("Select format for $platform (min 1):", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(start = 8.dp))
                         FlowRow(
                             modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -251,7 +287,6 @@ fun CreateCampaignScreen(
             Text("Campaign Timeline", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             
-            // Timeline - Vertical Layout
             DateSelector(
                 label = "Start Date *", 
                 date = campaignViewModel.startDate, 
@@ -286,17 +321,43 @@ fun CreateCampaignScreen(
         }
 
         if (showDatePicker) {
+            val today = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+            val minDate = if (dateField == "end" && campaignViewModel.startDate != null) {
+                campaignViewModel.startDate!!.time
+            } else {
+                today
+            }
+
             val datePickerState = rememberDatePickerState(
-                initialSelectedDateMillis = System.currentTimeMillis()
+                initialSelectedDateMillis = if (dateField == "start") (campaignViewModel.startDate?.time ?: today) else (campaignViewModel.endDate?.time ?: minDate),
+                selectableDates = object : SelectableDates {
+                    override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                        return utcTimeMillis >= minDate
+                    }
+                }
             )
+            
             DatePickerDialog(
                 onDismissRequest = { showDatePicker = false },
                 confirmButton = {
                     TextButton(onClick = {
                         showDatePicker = false
                         datePickerState.selectedDateMillis?.let {
-                            if (dateField == "start") campaignViewModel.startDate = Date(it)
-                            else campaignViewModel.endDate = Date(it)
+                            if (dateField == "start") {
+                                campaignViewModel.startDate = Date(it)
+                                // Reset end date if it's now before start date
+                                if (campaignViewModel.endDate != null && campaignViewModel.endDate!!.before(campaignViewModel.startDate)) {
+                                    campaignViewModel.endDate = null
+                                }
+                            } else {
+                                campaignViewModel.endDate = Date(it)
+                            }
                         }
                     }) { Text("OK") }
                 },
@@ -304,57 +365,6 @@ fun CreateCampaignScreen(
                     TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
                 }
             ) { DatePicker(state = datePickerState) }
-        }
-    }
-}
-
-@Composable
-fun DropdownField(
-    label: String,
-    selectedOption: String,
-    options: List<String>,
-    modifier: Modifier = Modifier,
-    onOptionSelected: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Column(modifier = modifier) {
-        Text(label, fontSize = 12.sp, color = Color.Gray)
-        Spacer(modifier = Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
-                .clickable { expanded = true }
-                .padding(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (selectedOption.isEmpty()) "Select" else selectedOption,
-                    fontSize = 14.sp,
-                    color = if (selectedOption.isEmpty()) Color.Gray else Color.Black
-                )
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.Gray)
-            }
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.fillMaxWidth(0.85f).background(Color.White)
-            ) {
-                options.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            onOptionSelected(option)
-                            expanded = false
-                        }
-                    )
-                }
-            }
         }
     }
 }

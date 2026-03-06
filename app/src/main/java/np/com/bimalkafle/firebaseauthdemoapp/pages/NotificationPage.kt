@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,6 +45,13 @@ fun NotificationPage(
     val notifications by notificationViewModel.notifications.observeAsState(emptyList())
     val isLoading by notificationViewModel.loading.observeAsState(false)
     val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
+
+    val sortedNotifications = remember(notifications) {
+        notifications.sortedWith(
+            compareBy<Notification> { it.isRead }
+                .thenByDescending { it.createdAt }
+        )
+    }
 
     LaunchedEffect(Unit) {
         val currentUser = FirebaseAuth.getInstance().currentUser
@@ -107,7 +116,7 @@ fun NotificationPage(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(notifications) { notification ->
+                    items(sortedNotifications) { notification ->
                         NotificationItem(
                             notification = notification,
                             onClick = {
@@ -137,8 +146,9 @@ fun NotificationItem(
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
+        border = if (!notification.isRead) BorderStroke(1.dp, themeColor) else null,
         colors = CardDefaults.cardColors(
-            containerColor = if (notification.isRead) Color.White else themeColor.copy(alpha = 0.05f)
+            containerColor = Color.White
         ),
         elevation = CardDefaults.cardElevation(if (notification.isRead) 1.dp else 4.dp)
     ) {

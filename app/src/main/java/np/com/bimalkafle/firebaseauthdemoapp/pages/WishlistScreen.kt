@@ -72,12 +72,7 @@ fun WishlistScreen(navController: NavController, campaignViewModel: CampaignView
                                 Text("Wishlist", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             }
                         },
-                        colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.Transparent),
-                        actions = {
-                            IconButton(onClick = { /*TODO: Implement notification logic*/ }) {
-                                Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
-                            }
-                        }
+                        colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.Transparent)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(

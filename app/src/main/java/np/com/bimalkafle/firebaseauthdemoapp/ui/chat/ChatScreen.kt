@@ -29,7 +29,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
@@ -92,6 +91,25 @@ fun ChatScreen(
         }
     }
 
+    DisposableEffect(authState.value) {
+        if (authState.value is AuthState.Authenticated) {
+            val role = (authState.value as AuthState.Authenticated).role
+            val isBrandUser = role.equals("BRAND", ignoreCase = true)
+            
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                result.token?.let { token ->
+                    if (isBrandUser) brandViewModel.startPollingCollaborations(token)
+                    else influencerViewModel.startPollingCollaborations(token)
+                }
+            }
+        }
+        
+        onDispose {
+            brandViewModel.stopPollingCollaborations()
+            influencerViewModel.stopPollingCollaborations()
+        }
+    }
+
     LaunchedEffect(chatId, collaborationId) {
         chatId?.let { 
             viewModel.initChat(it, chatNameParam ?: "Chat", collaborationId) 
@@ -100,7 +118,6 @@ fun ChatScreen(
 
     val messages by viewModel.messages.collectAsState()
     val chatName by viewModel.chatName.collectAsState()
-    val replyingTo by viewModel.replyingTo.collectAsState()
 
     var isProfileExpanded by remember { mutableStateOf(false) }
     var modificationMessage by remember { mutableStateOf<ChatMessage?>(null) }
@@ -114,34 +131,30 @@ fun ChatScreen(
     if (modificationMessage != null) {
         val msg = modificationMessage!!
         when (msg.type) {
-            "NEGOTIATION" -> {
-                val currentAmount = msg.metadata["amount"]?.toString()?.toIntOrNull() ?: 0
-                NegotiationDialog(
-                    initialAmount = currentAmount,
-                    onDismiss = { modificationMessage = null },
-                    onSend = { amount ->
-                        viewModel.sendMessage(
-                            text = "Proposed Budget: $$amount", 
-                            type = "NEGOTIATION", 
-                            metadata = mapOf("amount" to amount)
-                        )
-                        viewModel.updateMessageStatus(msg.id, "MODIFIED")
-                        modificationMessage = null
-                    }
-                )
-            }
-            "DELIVERABLES" -> {
+            "NEGOTIATION", "DELIVERABLES" -> {
+                val currentAmount = msg.metadata["amount"]?.toString()?.toIntOrNull() ?: 
+                                   currentCollaboration?.pricing?.firstOrNull()?.price ?: 0
+                val currentPlatform = msg.metadata["platform"]?.toString() ?: 
+                                     currentCollaboration?.pricing?.firstOrNull()?.platform ?: "Instagram"
                 @Suppress("UNCHECKED_CAST")
                 val currentItems = msg.metadata["items"] as? Map<String, Int> ?: emptyMap()
-                DeliverablesDialog(
+
+                NegotiationDialog(
+                    initialAmount = currentAmount,
+                    initialPlatform = currentPlatform,
                     initialDeliverables = currentItems,
+                    collaboration = currentCollaboration,
                     onDismiss = { modificationMessage = null },
-                    onSend = { deliverables ->
-                        val text = "Deliverables: ${deliverables.entries.joinToString { "${it.key} (x${it.value})" }}"
+                    onSend = { amount, platform, deliverables ->
+                        val delStr = deliverables.entries.joinToString { "${it.key} (x${it.value})" }
                         viewModel.sendMessage(
-                            text = text, 
-                            type = "DELIVERABLES", 
-                            metadata = mapOf("items" to deliverables)
+                            text = "Negotiated Proposal: ₹$amount on $platform - $delStr", 
+                            type = "NEGOTIATION", 
+                            metadata = mapOf(
+                                "amount" to amount,
+                                "platform" to platform,
+                                "items" to deliverables
+                            )
                         )
                         viewModel.updateMessageStatus(msg.id, "MODIFIED")
                         modificationMessage = null
@@ -153,103 +166,117 @@ fun ChatScreen(
 
     Scaffold(
         bottomBar = {
-            CmnBottomNavigationBar(
-                selectedItem = "Connect",
-                onItemSelected = { /* Handled in component */ },
-                navController = navController,
-                isBrand = isBrand
-            )
+            Surface(
+                color = Color.White,
+                modifier = Modifier.fillMaxWidth(),
+                shadowElevation = 8.dp
+            ) {
+                Box(modifier = Modifier.navigationBarsPadding()) {
+                    CmnBottomNavigationBar(
+                        selectedItem = "Connect",
+                        onItemSelected = { /* Handled in component */ },
+                        navController = navController,
+                        isBrand = isBrand
+                    )
+                }
+            }
         }
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
                 .background(Color(0xFFF2F2F7))
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .statusBarsPadding()
                     .imePadding()
             ) {
                 // Primary Project Selector Top Bar
                 Surface(
-                    shadowElevation = 4.dp,
+                    shadowElevation = 2.dp,
                     color = Color.White,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                            .statusBarsPadding()
+                            .padding(horizontal = 8.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.Black
+                            )
                         }
 
                         Column(
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                         ) {
                             Text(
                                 text = chatName,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.ExtraBold,
                                 fontSize = 18.sp,
+                                color = Color.Black,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             
-                            // Context (Collaboration) Selector
+                            // Context (Collaboration) Selector - Attractive Pill Design
                             Surface(
                                 onClick = { showCollabDropdown = true },
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (collaborationId == null) Color(0xFFFFF1F0) else Color(0xFFF5F5F5),
-                                modifier = Modifier.padding(top = 4.dp)
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (collaborationId == null) Color(0xFFFFEAEA) else Color(0xFFF5F5F5),
+                                modifier = Modifier.padding(top = 2.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.WorkOutline,
                                         contentDescription = null,
-                                        modifier = Modifier.size(14.dp),
-                                        tint = if (collaborationId == null) Color(0xFFD32F2F) else Color.Gray
+                                        modifier = Modifier.size(12.dp),
+                                        tint = if (collaborationId == null) Color(0xFFFF8383) else Color.Gray
                                     )
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(Modifier.width(6.dp))
                                     Text(
-                                        text = currentCollaboration?.campaign?.title ?: "Select a Collaboration",
-                                        fontSize = 12.sp,
+                                        text = currentCollaboration?.campaign?.title ?: "Select Project",
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (collaborationId == null) Color(0xFFD32F2F) else Color.Black,
+                                        color = if (collaborationId == null) Color(0xFFFF8383) else Color.DarkGray,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f, fill = false)
+                                        modifier = Modifier.widthIn(max = 180.dp)
                                     )
                                     Icon(
                                         imageVector = Icons.Default.ArrowDropDown,
                                         contentDescription = null,
                                         tint = Color.Gray,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                                 
                                 DropdownMenu(
                                     expanded = showCollabDropdown,
                                     onDismissRequest = { showCollabDropdown = false },
-                                    modifier = Modifier.fillMaxWidth(0.7f)
+                                    modifier = Modifier.fillMaxWidth(0.75f).background(Color.White)
                                 ) {
                                     Text(
-                                        text = "Switch Collaboration",
+                                        text = "SWITCH COLLABORATION",
                                         style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
                                         color = Color.Gray,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                                     )
                                     
                                     if (relevantCollabs.isEmpty()) {
                                         DropdownMenuItem(
-                                            text = { Text("No active collaborations found") },
+                                            text = { Text("No active collaborations", fontSize = 14.sp) },
                                             onClick = { },
                                             enabled = false
                                         )
@@ -258,8 +285,8 @@ fun ChatScreen(
                                             DropdownMenuItem(
                                                 text = { 
                                                     Column {
-                                                        Text(collab.campaign.title, fontWeight = FontWeight.SemiBold)
-                                                        Text("Status: ${collab.status}", fontSize = 10.sp, color = Color.Gray)
+                                                        Text(collab.campaign.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                        Text(collab.status, fontSize = 10.sp, color = Color(0xFFFF8383), fontWeight = FontWeight.Bold)
                                                     }
                                                 },
                                                 onClick = {
@@ -270,16 +297,16 @@ fun ChatScreen(
                                                     }
                                                 },
                                                 leadingIcon = {
-                                                    Icon(Icons.Default.WorkOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                    Icon(Icons.Default.WorkOutline, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Gray)
                                                 }
                                             )
                                         }
                                     }
                                     
-                                    Divider()
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFFF0F0F0))
                                     
                                     DropdownMenuItem(
-                                        text = { Text("General Discussion", color = Color.Gray) },
+                                        text = { Text("General Discussion", color = Color.Gray, fontSize = 14.sp) },
                                         onClick = {
                                             showCollabDropdown = false
                                             navController.navigate("chat/$chatId/$chatName") {
@@ -292,26 +319,28 @@ fun ChatScreen(
                             }
                         }
 
-                        Box(
+                        Surface(
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(44.dp)
                                 .clip(CircleShape)
-                                .background(Color.LightGray.copy(alpha = 0.2f))
                                 .clickable { isProfileExpanded = true },
-                            contentAlignment = Alignment.Center
+                            color = Color(0xFFF2F2F7),
+                            shape = CircleShape
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Profile",
-                                modifier = Modifier.fillMaxSize().padding(4.dp),
-                                tint = Color.Gray
-                            )
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Profile",
+                                    modifier = Modifier.size(24.dp),
+                                    tint = Color.Gray
+                                )
+                            }
                         }
                     }
                 }
 
                 if (collaborationId == null) {
-                    // Empty state for when no collaboration is selected
+                    // Modern Empty State
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -323,44 +352,48 @@ fun ChatScreen(
                             modifier = Modifier.padding(32.dp)
                         ) {
                             Surface(
-                                color = Color(0xFFF2F2F7),
+                                color = Color.White,
                                 shape = CircleShape,
-                                modifier = Modifier.size(80.dp)
+                                shadowElevation = 4.dp,
+                                modifier = Modifier.size(100.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         Icons.Default.WorkOutline,
                                         contentDescription = null,
-                                        modifier = Modifier.size(40.dp),
-                                        tint = Color.LightGray
+                                        modifier = Modifier.size(48.dp),
+                                        tint = Color(0xFFFF8383).copy(alpha = 0.6f)
                                     )
                                 }
                             }
-                            Spacer(Modifier.height(24.dp))
+                            Spacer(Modifier.height(32.dp))
                             Text(
-                                "No Collaboration Selected",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.Black
+                                "No project context",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Black,
+                                color = Color.Black,
+                                textAlign = TextAlign.Center
                             )
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(12.dp))
                             Text(
-                                "Conversations here are project-focused. Please select an active collaboration from the top menu to view messages and shared assets.",
+                                "Select an active collaboration from the top bar to start discussing specific deliverables and milestones.",
                                 textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.Gray
+                                color = Color.Gray,
+                                lineHeight = 22.sp
                             )
-                            Spacer(Modifier.height(32.dp))
+                            Spacer(Modifier.height(40.dp))
                             Button(
                                 onClick = { showCollabDropdown = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383)),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.height(48.dp).fillMaxWidth(0.7f)
+                                modifier = Modifier.height(54.dp).fillMaxWidth(0.8f),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                             ) {
-                                Text("Select Collaboration", fontWeight = FontWeight.Bold)
+                                Text("Select Collaboration", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
                             }
 
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(16.dp))
                             OutlinedButton(
                                 onClick = {
                                     if (isBrand) {
@@ -370,11 +403,15 @@ fun ChatScreen(
                                     }
                                 },
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.height(48.dp).fillMaxWidth(0.7f),
-                                border = BorderStroke(1.dp, Color(0xFFFF8383)),
+                                modifier = Modifier.height(54.dp).fillMaxWidth(0.8f),
+                                border = BorderStroke(1.5.dp, Color(0xFFFF8383)),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8383))
                             ) {
-                                Text(if (isBrand) "Invite to Campaign" else "Apply to Campaign", fontWeight = FontWeight.Bold)
+                                Text(
+                                    if (isBrand) "Invite to Campaign" else "Find Campaigns", 
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 16.sp
+                                )
                             }
                         }
                     }
@@ -384,8 +421,8 @@ fun ChatScreen(
                         messages = messages,
                         collaboration = currentCollaboration,
                         isBrand = isBrand,
-                        onReply = { message ->
-                            viewModel.setReplyingTo(message)
+                        onReply = { _ ->
+                            // Replying functionality placeholder
                         },
                         onUpdateStatus = { messageId, status ->
                             viewModel.updateMessageStatus(messageId, status)
@@ -407,7 +444,7 @@ fun ChatScreen(
                     )
 
                     Surface(
-                        shadowElevation = 8.dp,
+                        shadowElevation = 12.dp,
                         color = Color.White,
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -418,8 +455,8 @@ fun ChatScreen(
                             onSend = { text, type, metadata ->
                                 viewModel.sendMessage(text, type, metadata)
                             },
-                            onSendUpload = { link ->
-                                viewModel.sendUpload(link)
+                            onSendUpload = { link, platform ->
+                                viewModel.sendUpload(link, platform)
                             },
                             onStatusUpdate = { newStatus ->
                                 FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
@@ -430,7 +467,9 @@ fun ChatScreen(
                                         influencerViewModel.updateCollaborationStatus(token, collaborationId, newStatus) { }
                                     }
                                 }
-                            }
+                            },
+                            collaboration = currentCollaboration,
+                            brandViewModel = brandViewModel
                         )
                     }
                 }
@@ -444,7 +483,7 @@ fun ChatScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.7f))
+                        .background(Color.Black.copy(alpha = 0.8f))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
@@ -453,15 +492,16 @@ fun ChatScreen(
                 ) {
                     Surface(
                         modifier = Modifier
-                            .size(300.dp)
+                            .size(280.dp)
                             .clip(CircleShape),
-                        color = MaterialTheme.colorScheme.surface
+                        color = Color.White,
+                        shadowElevation = 8.dp
                     ) {
                         Icon(
                             imageVector = Icons.Default.Person,
                             contentDescription = "Profile",
-                            modifier = Modifier.fillMaxSize(),
-                            tint = Color.Gray
+                            modifier = Modifier.fillMaxSize().padding(40.dp),
+                            tint = Color.LightGray
                         )
                     }
                 }
@@ -500,7 +540,6 @@ fun MessagesList(
         }
 
         var lastDate = ""
-        val dateFormat = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
 
         messages.forEach { message ->
             val readableDate = calculateReadableDate(message.timestamp)
@@ -523,8 +562,8 @@ fun MessagesList(
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         state = listState,
-        contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(vertical = 16.dp, horizontal = 0.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         items(uiItems) { item ->
             when (item) {
@@ -539,19 +578,19 @@ fun MessagesList(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 16.dp),
+                            .padding(vertical = 20.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Surface(
-                            color = Color(0xFFE0E0E0),
+                            color = Color.LightGray.copy(alpha = 0.3f),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
                                 text = item.date,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.DarkGray,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                color = Color.Gray,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                             )
                         }
                     }
@@ -581,91 +620,92 @@ fun ProposalSummaryCard(
     val initiatedByMe = if (isBrand) collaboration.initiatedBy == "BRAND" else collaboration.initiatedBy == "INFLUENCER"
 
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     color = Color(0xFFFF8383).copy(alpha = 0.1f),
                     shape = CircleShape,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.WorkOutline, null, tint = Color(0xFFFF8383), modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.WorkOutline, null, tint = Color(0xFFFF8383), modifier = Modifier.size(22.dp))
                     }
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Initial Proposal", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text(collaboration.campaign.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("INITIAL PROPOSAL", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                    Text(collaboration.campaign.title, fontWeight = FontWeight.Black, fontSize = 17.sp, color = Color.Black)
                 }
                 
                 Surface(
-                    color = Color(0xFFF5F5F5),
+                    color = Color(0xFFF2F2F7),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = status,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.DarkGray
+                        fontWeight = FontWeight.Black,
+                        color = Color.Black
                     )
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
-            Divider(color = Color(0xFFF5F5F5))
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = Color(0xFFF5F5F5))
+            Spacer(Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
-                    Text("Deliverable", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text(pricing?.deliverable ?: "N/A", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text("DELIVERABLE", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Text(pricing?.deliverable ?: "N/A", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("Budget", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text("${pricing?.currency ?: "INR"} ${pricing?.price ?: 0}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFFFF8383))
+                    Text("BUDGET", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Text("${pricing?.currency ?: "INR"} ${pricing?.price ?: 0}", fontWeight = FontWeight.Black, fontSize = 16.sp, color = Color(0xFFFF8383))
                 }
             }
 
             // CTAs for PENDING status
             if (status == "PENDING") {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
                 if (!initiatedByMe) {
                     // I am the receiver - show Accept/Reject
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
                             onClick = { onAction("ACCEPTED") },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).height(48.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Accept", fontWeight = FontWeight.Bold)
+                            Text("Accept", fontWeight = FontWeight.ExtraBold)
                         }
                         OutlinedButton(
                             onClick = { onAction("REJECTED") },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            border = BorderStroke(1.5.dp, Color(0xFFF44336)),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF44336)),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Reject", fontWeight = FontWeight.Bold)
+                            Text("Reject", fontWeight = FontWeight.ExtraBold)
                         }
                     }
                 } else {
                     // I am the sender - show Revoke
                     Button(
                         onClick = { onAction("REVOKED") },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Withdraw Proposal", fontWeight = FontWeight.Bold)
+                        Text("Withdraw Proposal", fontWeight = FontWeight.ExtraBold)
                     }
                 }
             }
@@ -687,3 +727,4 @@ private fun calculateReadableDate(timestamp: Long): String {
         else -> SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(msgTime.time)
     }
 }
+

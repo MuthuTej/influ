@@ -119,10 +119,10 @@ class ChatViewModel : ViewModel() {
         _replyingTo.value = null
     }
 
-    fun sendUpload(link: String) {
+    fun sendUpload(link: String, platform: String = "YouTube") {
         val otherUserId = currentOtherUserId ?: return
         val collaborationId = currentCollaborationId ?: run {
-            sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link))
+            sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link, "platform" to platform))
             return
         }
 
@@ -133,38 +133,75 @@ class ChatViewModel : ViewModel() {
                 val token = result.token ?: return@addOnSuccessListener
                 
                 viewModelScope.launch {
-                    val videoResult = BackendRepository.getVideoByUrl(
-                        videoUrl = link,
-                        userId = currentUserId,
-                        collaborationId = collaborationId,
-                        token = token
-                    )
-                    
-                    videoResult.onSuccess { data ->
-                        val title = data.optString("title", "Video")
-                        val viewCount = data.optInt("viewCount", 0)
-                        
-                        sendMessage(
-                            text = "Content Uploaded: $title",
-                            type = "UPLOAD",
-                            metadata = mapOf(
-                                "link" to link,
-                                "title" to title,
-                                "viewCount" to viewCount
-                            )
+                    if (platform.equals("Instagram", ignoreCase = true)) {
+                        // Instagram Scraper Flow
+                        val scrapeResult = BackendRepository.scrapeInstagramPost(
+                            postUrl = link,
+                            collaborationId = collaborationId,
+                            token = token
                         )
-                    }.onFailure { e ->
-                        Log.e("ChatViewModel", "Failed to fetch video info: ${e.message}")
-                        sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link))
+                        
+                        scrapeResult.onSuccess { success ->
+                            if (success) {
+                                sendMessage(
+                                    text = "Instagram Post Uploaded",
+                                    type = "UPLOAD",
+                                    metadata = mapOf(
+                                        "link" to link,
+                                        "platform" to "Instagram",
+                                        "status" to "SCRAPED"
+                                    )
+                                )
+                            } else {
+                                Log.e("ChatViewModel", "Instagram scrape returned false")
+                                sendMessage("Instagram Post Uploaded (Pending verification)", "UPLOAD", mapOf("link" to link, "platform" to "Instagram"))
+                            }
+                        }.onFailure { e ->
+                            Log.e("ChatViewModel", "Instagram scrape failed: ${e.message}")
+                            sendMessage("Instagram Post Uploaded", "UPLOAD", mapOf("link" to link, "platform" to "Instagram"))
+                        }
+                    } else {
+                        // YouTube (Default) Flow
+                        val videoResult = BackendRepository.getVideoByUrl(
+                            videoUrl = link,
+                            userId = currentUserId,
+                            collaborationId = collaborationId,
+                            token = token
+                        )
+                        
+                        videoResult.onSuccess { data ->
+                            val title = data.optString("title", "Video")
+                            val viewCount = data.optInt("viewCount", 0)
+                            
+                            sendMessage(
+                                text = "Content Uploaded: $title",
+                                type = "UPLOAD",
+                                metadata = mapOf(
+                                    "link" to link,
+                                    "title" to title,
+                                    "viewCount" to viewCount,
+                                    "platform" to "YouTube"
+                                )
+                            )
+                        }.onFailure { e ->
+                            Log.e("ChatViewModel", "Failed to fetch video info: ${e.message}")
+                            sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link, "platform" to "YouTube"))
+                        }
                     }
                 }
             }?.addOnFailureListener {
-                sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link))
+                sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link, "platform" to platform))
             }
         }
     }
     
     fun updateMessageStatus(messageId: String, status: String) {
+        val currentList = _messages.value.toMutableList()
+        val index = currentList.indexOfFirst { it.id == messageId }
+        if (index != -1) {
+            currentList[index] = currentList[index].copy(status = status)
+            _messages.value = currentList
+        }
         repository.updateMessageStatus(messageId, status)
     }
 

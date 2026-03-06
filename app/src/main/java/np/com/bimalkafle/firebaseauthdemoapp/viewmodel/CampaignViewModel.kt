@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
+import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -21,8 +22,11 @@ class CampaignViewModel : ViewModel() {
     // Screen 1 Fields
     var title by mutableStateOf("")
     var description by mutableStateOf("")
-    var category by mutableStateOf("")
-    var subCategory by mutableStateOf("")
+    
+    // Multiselect Categories
+    var selectedCategories by mutableStateOf(setOf<String>())
+    var selectedSubCategories by mutableStateOf(mapOf<String, Set<String>>())
+    
     var selectedPlatforms by mutableStateOf(setOf<String>())
     var platformFormats by mutableStateOf(mapOf<String, Set<String>>())
     var startDate by mutableStateOf<Date?>(null)
@@ -57,7 +61,61 @@ class CampaignViewModel : ViewModel() {
     private val _wishlistedCampaigns = MutableLiveData<List<CampaignDetail>>(emptyList())
     val wishlistedCampaigns: LiveData<List<CampaignDetail>> = _wishlistedCampaigns
 
+    // Recommendation Streams
+    private val _overallRecommendedCampaigns = MutableLiveData<List<CampaignDetail>>()
+    val overallRecommendedCampaigns: LiveData<List<CampaignDetail>> = _overallRecommendedCampaigns
+
+    private val _youtubeRecommendedCampaigns = MutableLiveData<List<CampaignDetail>>()
+    val youtubeRecommendedCampaigns: LiveData<List<CampaignDetail>> = _youtubeRecommendedCampaigns
+
+    private val _instagramRecommendedCampaigns = MutableLiveData<List<CampaignDetail>>()
+    val instagramRecommendedCampaigns: LiveData<List<CampaignDetail>> = _instagramRecommendedCampaigns
+
     private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    fun fetchRecommendedCampaigns(token: String, allCampaigns: List<CampaignDetail>? = null) {
+        viewModelScope.launch {
+            val query = """
+                query GetCampaignRecommendations {
+                  getRecommendedCampaigns(topN: 30) { id score }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                val data = jsonObject.optJSONObject("data")
+                if (data != null) {
+                    val recs = parseRecs(data.optJSONArray("getRecommendedCampaigns"))
+                    val availableCampaigns = allCampaigns ?: _campaigns.value ?: emptyList()
+
+                    val sortedList = sortCampaigns(availableCampaigns, recs)
+
+                    _overallRecommendedCampaigns.postValue(sortedList)
+                    _youtubeRecommendedCampaigns.postValue(sortedList.filter { it.platforms?.any { p -> p.platform.equals("YouTube", true) } == true })
+                    _instagramRecommendedCampaigns.postValue(sortedList.filter { it.platforms?.any { p -> p.platform.equals("Instagram", true) } == true })
+                }
+            }.onFailure {
+                Log.e("CampaignViewModel", "Failed to fetch recommendations", it)
+            }
+        }
+    }
+
+    private fun parseRecs(array: JSONArray?): List<Pair<String, Double>> {
+        val list = mutableListOf<Pair<String, Double>>()
+        if (array != null) {
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i)
+                list.add(obj.optString("id") to obj.optDouble("score"))
+            }
+        }
+        return list
+    }
+
+    private fun sortCampaigns(all: List<CampaignDetail>, recs: List<Pair<String, Double>>): List<CampaignDetail> {
+        val idToScore = recs.toMap()
+        return all.filter { idToScore.containsKey(it.id) }
+            .sortedByDescending { idToScore[it.id] }
+    }
 
     fun toggleWishlist(campaign: CampaignDetail, token: String) {
         viewModelScope.launch {
@@ -116,6 +174,10 @@ class CampaignViewModel : ViewModel() {
                       budgetMax
                       startDate
                       endDate
+                      categories {
+                        category
+                        subCategories
+                      }
                       platforms {
                         platform
                         formats
@@ -129,12 +191,20 @@ class CampaignViewModel : ViewModel() {
                       brand {
                         id
                         name
+                        about
+                        profileUrl
                         logoUrl
                         isVerified
                         averageRating
-                        brandCategory {
+                        brandCategories {
                           category
-                          subCategory
+                          subCategories
+                        }
+                        targetAudience {
+                          ageMin
+                          ageMax
+                          gender
+                          locations
                         }
                       }
                     }
@@ -188,6 +258,10 @@ class CampaignViewModel : ViewModel() {
                     budgetMax
                     startDate
                     endDate
+                    categories {
+                      category
+                      subCategories
+                    }
                     platforms {
                       platform
                       formats
@@ -201,12 +275,24 @@ class CampaignViewModel : ViewModel() {
                     brand {
                       id
                       name
+                      email
+                      role
+                      profileCompleted
+                      updatedAt
+                      about
+                      profileUrl
                       logoUrl
                       isVerified
                       averageRating
-                      brandCategory {
+                      brandCategories {
                         category
-                        subCategory
+                        subCategories
+                      }
+                      targetAudience {
+                        ageMin
+                        ageMax
+                        gender
+                        locations
                       }
                     }
                   }
@@ -215,6 +301,15 @@ class CampaignViewModel : ViewModel() {
 
             val result = GraphQLClient.query(query = query, token = token)
             result.onSuccess { jsonObject ->
+                val errors = jsonObject.optJSONArray("errors")
+                if (errors != null && errors.length() > 0) {
+                    val errorMsg = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
+                    Log.e("CampaignViewModel", "GraphQL Error: ${'$'}errorMsg")
+                    _error.postValue(errorMsg)
+                    _loading.postValue(false)
+                    return@onSuccess
+                }
+
                 try {
                     val data = jsonObject.optJSONObject("data")
                     val campaignsArray = data?.optJSONArray("getCampaigns")
@@ -227,6 +322,7 @@ class CampaignViewModel : ViewModel() {
                             }
                         }
                         _campaigns.postValue(list)
+                        fetchRecommendedCampaigns(token, list)
                     } else {
                         _campaigns.postValue(emptyList())
                     }
@@ -234,11 +330,12 @@ class CampaignViewModel : ViewModel() {
                     Log.e("CampaignViewModel", "Parsing error", e)
                     _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
+                _loading.postValue(false)
             }.onFailure {
                 Log.e("CampaignViewModel", "Network error", it)
                 _error.postValue("Network error: ${'$'}{it.message}")
+                _loading.postValue(false)
             }
-            _loading.postValue(false)
         }
     }
 
@@ -258,6 +355,10 @@ class CampaignViewModel : ViewModel() {
                     budgetMax
                     startDate
                     endDate
+                    categories {
+                      category
+                      subCategories
+                    }
                     platforms {
                       platform
                       formats
@@ -271,12 +372,24 @@ class CampaignViewModel : ViewModel() {
                     brand {
                       id
                       name
+                      email
+                      role
+                      profileCompleted
+                      updatedAt
+                      about
+                      profileUrl
                       logoUrl
                       isVerified
                       averageRating
-                      brandCategory {
+                      brandCategories {
                         category
-                        subCategory
+                        subCategories
+                      }
+                      targetAudience {
+                        ageMin
+                        ageMax
+                        gender
+                        locations
                       }
                     }
                   }
@@ -286,6 +399,14 @@ class CampaignViewModel : ViewModel() {
             val variables = mapOf("id" to id)
             val result = GraphQLClient.query(query = query, variables = variables, token = token)
             result.onSuccess { jsonObject ->
+                val errors = jsonObject.optJSONArray("errors")
+                if (errors != null && errors.length() > 0) {
+                    val errorMsg = errors.getJSONObject(0).optString("message", "Unknown GraphQL Error")
+                    _error.postValue(errorMsg)
+                    _loading.postValue(false)
+                    return@onSuccess
+                }
+
                 try {
                     val data = jsonObject.optJSONObject("data")
                     val campaignObj = data?.optJSONObject("getCampaignById")
@@ -298,11 +419,12 @@ class CampaignViewModel : ViewModel() {
                     Log.e("CampaignViewModel", "Parsing error", e)
                     _error.postValue("Parsing error: ${'$'}{e.message}")
                 }
+                _loading.postValue(false)
             }.onFailure {
                 Log.e("CampaignViewModel", "Network error", it)
                 _error.postValue("Network error: ${'$'}{it.message}")
+                _loading.postValue(false)
             }
-            _loading.postValue(false)
         }
     }
 
@@ -325,6 +447,10 @@ class CampaignViewModel : ViewModel() {
                     budgetMax
                     startDate
                     endDate
+                    categories {
+                      category
+                      subCategories
+                    }
                     platforms {
                       platform
                       formats
@@ -338,12 +464,24 @@ class CampaignViewModel : ViewModel() {
                     brand {
                       id
                       name
+                      email
+                      role
+                      profileCompleted
+                      updatedAt
+                      about
+                      profileUrl
                       logoUrl
                       isVerified
                       averageRating
-                      brandCategory {
+                      brandCategories {
                         category
-                        subCategory
+                        subCategories
+                      }
+                      targetAudience {
+                        ageMin
+                        ageMax
+                        gender
+                        locations
                       }
                     }
                   }
@@ -363,7 +501,13 @@ class CampaignViewModel : ViewModel() {
                 "locations" to selectedLocations.toList()
             )
 
-            val categoriesJson = listOf(mapOf("category" to category, "subCategory" to subCategory))
+            val categoriesJson = selectedCategories.map { cat ->
+                val subCats = selectedSubCategories[cat] ?: emptySet()
+                mapOf(
+                    "category" to cat,
+                    "subCategories" to if (subCats.isEmpty()) listOf("General") else subCats.toList()
+                )
+            }
 
             val input = mutableMapOf<String, Any>(
                 "title" to title,
@@ -394,40 +538,73 @@ class CampaignViewModel : ViewModel() {
                     val errorMsg = errors?.optJSONObject(0)?.optString("message") ?: "Failed to create campaign"
                     _error.postValue(errorMsg)
                 }
+                _loading.postValue(false)
             }.onFailure {
                 Log.e("CampaignViewModel", "Error creating campaign", it)
                 _error.postValue(it.message ?: "Network error")
+                _loading.postValue(false)
             }
-            _loading.postValue(false)
         }
     }
 
     private fun parseCampaignDetail(json: JSONObject): CampaignDetail {
         val brandJson = json.optJSONObject("brand")
         val brand = brandJson?.let {
-            val categoryJson = it.optJSONObject("brandCategory")
-            val category = categoryJson?.let { cat ->
-                BrandCategory(cat.optString("category"), cat.optString("subCategory"))
+            val categoriesArray = it.optJSONArray("brandCategories")
+            val brandCategories = mutableListOf<BrandCategory>()
+            if (categoriesArray != null) {
+                for (i in 0 until categoriesArray.length()) {
+                    val catObj = categoriesArray.optJSONObject(i)
+                    if (catObj != null) {
+                        val subCatsArray = catObj.optJSONArray("subCategories")
+                        val subCats = mutableListOf<String>()
+                        if (subCatsArray != null) {
+                            for (j in 0 until subCatsArray.length()) {
+                                subCats.add(subCatsArray.getString(j))
+                            }
+                        }
+                        brandCategories.add(BrandCategory(catObj.optString("category"), subCats))
+                    }
+                }
             }
+
+            val targetAudienceObj = it.optJSONObject("targetAudience")
+            val brandTargetAudience = if (targetAudienceObj != null) {
+                val locationsArray = targetAudienceObj.optJSONArray("locations")
+                val locations = if (locationsArray != null) {
+                    val lList = mutableListOf<String>()
+                    for (i in 0 until locationsArray.length()) {
+                        lList.add(locationsArray.getString(i))
+                    }
+                    lList
+                } else null
+                
+                TargetAudience(
+                    ageMin = if (targetAudienceObj.isNull("ageMin")) null else targetAudienceObj.optInt("ageMin"),
+                    ageMax = if (targetAudienceObj.isNull("ageMax")) null else targetAudienceObj.optInt("ageMax"),
+                    gender = targetAudienceObj.optString("gender", null as String?),
+                    locations = locations
+                )
+            } else null
             
             Brand(
-                it.optString("id"),
-                it.optString("email"),
-                it.optString("name"),
-                it.optString("role"),
-                it.optBoolean("profileCompleted"),
-                it.optString("updatedAt"),
-                category,
-                it.optString("about"),
-                it.optString("profileUrl"),
-                it.optString("logoUrl"),
-                it.optString("govtId"),
-                it.optBoolean("isVerified"),
-                null,
-                it.optDouble("averageRating").takeIf { it != 0.0 },
-                it.optString("fcmToken"),
-                null, // Use campaign level platforms
-                null  // Use campaign level audience
+                id = it.optString("id"),
+                email = it.optString("email"),
+                name = it.optString("name"),
+                role = it.optString("role"),
+                profileCompleted = if (it.has("profileCompleted")) it.optBoolean("profileCompleted") else null,
+                updatedAt = it.optString("updatedAt", null as String?),
+                brandCategories = brandCategories,
+                about = it.optString("about"),
+                profileUrl = it.optString("profileUrl"),
+                logoUrl = it.optString("logoUrl"),
+                govtId = it.optString("govtId"),
+                isVerified = if (it.has("isVerified")) it.optBoolean("isVerified") else null,
+                reviews = null,
+                averageRating = if (it.has("averageRating")) it.optDouble("averageRating").takeIf { it != 0.0 } else null,
+                fcmToken = it.optString("fcmToken"),
+                preferredPlatforms = null, // Use campaign level platforms
+                targetAudience = brandTargetAudience
             )
         }
 
@@ -478,6 +655,22 @@ class CampaignViewModel : ViewModel() {
             )
         }
 
+        val categoriesArray = json.optJSONArray("categories")
+        val categories = mutableListOf<BrandCategory>()
+        if (categoriesArray != null) {
+            for (i in 0 until categoriesArray.length()) {
+                val cat = categoriesArray.getJSONObject(i)
+                val subCatsArray = cat.optJSONArray("subCategories")
+                val subCats = mutableListOf<String>()
+                if (subCatsArray != null) {
+                    for (j in 0 until subCatsArray.length()) {
+                        subCats.add(subCatsArray.getString(j))
+                    }
+                }
+                categories.add(BrandCategory(cat.optString("category"), subCats))
+            }
+        }
+
         return CampaignDetail(
             json.optString("id"),
             json.optString("title"),
@@ -490,13 +683,16 @@ class CampaignViewModel : ViewModel() {
             json.optString("endDate"),
             audience,
             platforms,
-            brand
+            brand,
+            categories
         )
     }
     
     fun clearState() {
         title = ""
         description = ""
+        selectedCategories = emptySet()
+        selectedSubCategories = emptyMap()
         selectedPlatforms = emptySet()
         platformFormats = emptyMap()
         startDate = null
