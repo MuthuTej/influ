@@ -87,10 +87,30 @@ fun CollaborationAnalyticsPage(
                     }
                 }
 
-                if (collaboration.status == "PENDING") {
-                    item { StatusPlaceholder("Proposal not accepted till now", Icons.Default.HourglassEmpty) }
-                } else if (collaboration.status == "ACCEPTED") {
-                    item { StatusPlaceholder("Payment is not completed", Icons.Default.Payment) }
+                if (collaboration.status != "COMPLETED") {
+                    val statusMessage = when (collaboration.status) {
+                        "PENDING" -> "Collaboration proposal is pending"
+                        "ACCEPTED" -> "Collaboration is accepted, waiting for next steps"
+                        "NEGOTIATION" -> "Collaboration is currently under negotiation"
+                        "BRIEF_FINALIZED" -> "Campaign brief is finalized, moving to production"
+                        "WAITING_FOR_PAYMENT" -> "Waiting for payment to be processed"
+                        "IN_PROGRESS" -> "Collaboration is currently in progress"
+                        "REVOKED" -> "Collaboration has been revoked"
+                        "REJECTED" -> "Collaboration proposal was rejected"
+                        else -> "Collaboration is in ${collaboration.status.replace("_", " ").lowercase()} status"
+                    }
+                    val statusIcon = when (collaboration.status) {
+                        "PENDING" -> Icons.Default.HourglassEmpty
+                        "ACCEPTED" -> Icons.Default.CheckCircle
+                        "NEGOTIATION" -> Icons.Default.Gavel
+                        "BRIEF_FINALIZED" -> Icons.Default.Assignment
+                        "WAITING_FOR_PAYMENT" -> Icons.Default.Payments
+                        "IN_PROGRESS" -> Icons.Default.WorkOutline
+                        "REVOKED" -> Icons.Default.Block
+                        "REJECTED" -> Icons.Default.Cancel
+                        else -> Icons.Default.Info
+                    }
+                    item { StatusPlaceholder(statusMessage, statusIcon) }
                 } else {
                     item {
                         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
