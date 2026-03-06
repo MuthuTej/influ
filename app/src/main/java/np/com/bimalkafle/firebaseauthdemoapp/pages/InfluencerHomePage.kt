@@ -37,6 +37,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.delay
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
@@ -93,6 +94,9 @@ fun InfluencerHomePage(
     var firebaseToken by remember { mutableStateOf<String?>(null) }
     val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
 
+    // State to handle debug visibility
+    var showDebugInfo by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         val currentUser = FirebaseAuth.getInstance().currentUser
         currentUser?.getIdToken(true)
@@ -105,6 +109,15 @@ fun InfluencerHomePage(
                     notificationViewModel.fetchUnreadCount(currentUser.uid, token)
                 }
             }
+    }
+
+    // Effect to show debug info briefly when an error occurs or data is empty
+    LaunchedEffect(influencerError, campaignError, collaborations, campaigns) {
+        if (influencerError != null || campaignError != null || collaborations.isEmpty() || campaigns.isEmpty()) {
+            showDebugInfo = true
+            delay(100) // Show for 100ms (as close to "a millisecond" while still being visible/removable)
+            showDebugInfo = false
+        }
     }
 
     LaunchedEffect(authState.value) {
@@ -166,9 +179,9 @@ fun InfluencerHomePage(
 
                 item { InfluencerHeaderAndReachSection(influencerProfile, navController, unreadCount) }
 
-                // Checklist item for debugging
+                // Checklist item for debugging - Controlled by showDebugInfo
                 item {
-                    if (influencerError != null || campaignError != null || collaborations.isEmpty() || campaigns.isEmpty()) {
+                    if (showDebugInfo) {
                         FetchStatusChecklist(
                             influencerId = influencerProfile?.id,
                             tokenPresent = firebaseToken != null,
@@ -434,8 +447,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                         .align(Alignment.CenterStart)
                         .fillMaxWidth(0.65f)
                         .padding(top = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                    verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         shape = CircleShape,
                         color = Color.White,
