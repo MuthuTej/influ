@@ -119,16 +119,16 @@ fun RestrictedActionPanel(
                     item { ActionCard("Submit Script", Icons.Default.EditNote) { showScript = true } }
                 }
                 if (status == "SCRIPT_SENT" && isBrand) {
-                    item { ActionCard("Approve Script", Icons.Default.CheckCircle) { onStatusUpdate("IN_PROGRESS") } }
-                }
-                
-                // Implementation Phase
-                if (status == "IN_PROGRESS" && !isBrand) {
-                    item { ActionCard("Complete Work", Icons.Default.CloudUpload) { showUpload = true } }
+                    item { ActionCard("Approve Script", Icons.Default.CheckCircle) { onStatusUpdate("WAITING_FOR_PAYMENT") } }
                 }
                 
                 if (status == "WAITING_FOR_PAYMENT" && isBrand) {
-                    item { ActionCard("Release Payment", Icons.Default.Payments) { onStatusUpdate("COMPLETED") } }
+                    item { ActionCard("Pay Now", Icons.Default.Payments) { onStatusUpdate("IN_PROGRESS") } }
+                }
+
+                // Implementation Phase
+                if (status == "IN_PROGRESS" && !isBrand) {
+                    item { ActionCard("Complete Work", Icons.Default.CloudUpload) { showUpload = true } }
                 }
 
                 // Always available (except when completed)
@@ -210,7 +210,7 @@ fun RestrictedActionPanel(
             onDismiss = { showUpload = false },
             onSend = { link ->
                 onSendUpload(link)
-                onStatusUpdate("WAITING_FOR_PAYMENT")
+                onStatusUpdate("COMPLETED")
                 showUpload = false
             }
         )
