@@ -64,7 +64,7 @@ fun DiscoverBrandsScreen(
     val categories = listOf("Food", "Fashion", "Tech")
     var selectedBudget by remember { mutableStateOf("Budget") }
     val budgets = listOf("$1000", "$5000", "$10000+")
-    val themeColor = Color(0xFFFF8383)
+    val themeColor = MaterialTheme.colorScheme.primary
     var selectedBottomNavItem by remember { mutableStateOf("Search") }
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
@@ -281,7 +281,7 @@ fun FilterChip(label: String, options: List<String>, selectedOption: String, onO
         Surface(
             onClick = { expanded = true },
             shape = RoundedCornerShape(16.dp),
-            color = if (selectedOption != label) Color(0xFFFF8383).copy(alpha = 0.1f) else Color.White.copy(alpha = 0.2f),
+            color = if (selectedOption != label) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.2f),
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
         ) {
             Row(

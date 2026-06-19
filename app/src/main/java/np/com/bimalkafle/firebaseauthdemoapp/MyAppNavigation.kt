@@ -2,12 +2,17 @@ package np.com.bimalkafle.firebaseauthdemoapp
 
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import kotlinx.coroutines.flow.collectLatest
+import np.com.bimalkafle.firebaseauthdemoapp.network.SessionManager
 import np.com.bimalkafle.firebaseauthdemoapp.pages.*
 import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatListScreen
 import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatScreen
@@ -20,7 +25,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MyAppNavigation(
-    modifier: Modifier = Modifier, 
+    modifier: Modifier = Modifier,
     authViewModel: AuthViewModel,
     splashViewModel: SplashViewModel,
     brandViewModel: BrandViewModel,
@@ -29,6 +34,20 @@ fun MyAppNavigation(
     notificationViewModel: NotificationViewModel
 ) {
     val navController = rememberNavController()
+    val context = LocalContext.current
+
+    // Any GraphQL/REST call that gets a 401/403 back from the backend fires this event
+    // (see GraphQLClient/BackendRepository) so a stale/expired Firebase token doesn't
+    // just leave the user stuck on a screen that silently keeps failing.
+    LaunchedEffect(Unit) {
+        SessionManager.sessionExpired.collectLatest {
+            authViewModel.signout()
+            Toast.makeText(context, "Your session has expired. Please sign in again.", Toast.LENGTH_LONG).show()
+            navController.navigate("login") {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
 
     NavHost(navController = navController, startDestination = "splash", modifier = modifier, builder = {
         composable("splash") {
@@ -156,10 +175,11 @@ fun MyAppNavigation(
         }
         composable("brand_history") {
             ProposalPage (
-                modifier = modifier, 
-                navController = navController, 
-                authViewModel = authViewModel, 
-                brandViewModel = brandViewModel
+                modifier = modifier,
+                navController = navController,
+                authViewModel = authViewModel,
+                brandViewModel = brandViewModel,
+                influencerViewModel = influencerViewModel
             )
         }
         composable("brand_profile") {
@@ -232,10 +252,11 @@ fun MyAppNavigation(
         }
         composable("proposals") {
             ProposalPage(
-                modifier = Modifier, 
-                navController = navController, 
-                authViewModel = authViewModel, 
-                brandViewModel = brandViewModel
+                modifier = Modifier,
+                navController = navController,
+                authViewModel = authViewModel,
+                brandViewModel = brandViewModel,
+                influencerViewModel = influencerViewModel
             )
         }
         composable("wishlist") {

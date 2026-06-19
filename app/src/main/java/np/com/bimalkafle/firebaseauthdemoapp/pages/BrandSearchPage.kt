@@ -31,8 +31,11 @@ import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.FilterDropdown
 import np.com.bimalkafle.firebaseauthdemoapp.components.IconBubbleSearch
+import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
+import np.com.bimalkafle.firebaseauthdemoapp.components.SkeletonCard
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 
 @Composable
@@ -172,7 +175,7 @@ fun BrandSearchPageContent(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onCreateCampaignClick,
-                containerColor = Color(0xFFFF8383),
+                containerColor = MaterialTheme.colorScheme.primary,
                 shape = CircleShape
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White)
@@ -193,7 +196,7 @@ fun BrandSearchPageContent(
                         .fillMaxWidth()
                         .wrapContentHeight()
                         .clip(RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp))
-                        .background(Color(0xFFFF8383))
+                        .background(MaterialTheme.colorScheme.primary)
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.vector),
@@ -219,10 +222,10 @@ fun BrandSearchPageContent(
                             }
 
                             Row {
-                                IconBubbleSearch(Icons.Default.Favorite, Color.Red) { navController.navigate("brand_wishlist") }
+                                IconBubbleSearch(Icons.Default.Favorite, Color.Red, contentDescription = "View wishlist") { navController.navigate("brand_wishlist") }
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Box {
-                                    IconBubbleSearch(Icons.Default.Notifications, Color.Black) { navController.navigate("notifications") }
+                                    IconBubbleSearch(Icons.Default.Notifications, Color.Black, contentDescription = "View notifications") { navController.navigate("notifications") }
                                     if (unreadCount > 0) {
                                         Badge(
                                             modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
@@ -254,7 +257,7 @@ fun BrandSearchPageContent(
                                 disabledContainerColor = Color.White,
                                 focusedIndicatorColor = Color.Transparent,
                                 unfocusedIndicatorColor = Color.Transparent,
-                                cursorColor = Color(0xFFFF8383)
+                                cursorColor = MaterialTheme.colorScheme.primary
                             )
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -303,7 +306,7 @@ fun BrandSearchPageContent(
                     ) {
                         Text("${filteredInfluencers.size} Influencers Found", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
                         if (selectedPlatform != "All" || selectedCategory != "All" || selectedFollowerRange != "All" || searchQuery.isNotEmpty()) {
-                            Text("Clear All", color = Color(0xFFFF8383), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
+                            Text("Clear All", color = MaterialTheme.colorScheme.primary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
                                 onPlatformSelected("All")
                                 onCategorySelected("All")
                                 onFollowerRangeSelected("All")
@@ -316,16 +319,16 @@ fun BrandSearchPageContent(
 
             // ---------------- RESULTS SECTION ----------------
             if (isLoading) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFFFF8383))
-                    }
+                items(3) {
+                    SkeletonCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), height = 180.dp)
                 }
             } else if (filteredInfluencers.isEmpty()) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                        Text("No influencers match your criteria.", color = Color.Gray, fontWeight = FontWeight.Medium)
-                    }
+                    EmptyState(
+                        icon = Icons.Default.SearchOff,
+                        title = "No influencers found",
+                        subtitle = "Try adjusting your filters or search terms."
+                    )
                 }
             } else {
                 items(paginatedInfluencers) { influencer ->
@@ -350,7 +353,7 @@ fun BrandSearchPageContent(
                             Button(
                                 onClick = { if (currentPage > 1) onPageChange(currentPage - 1) },
                                 enabled = currentPage > 1,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) { Text("Previous") }
 
                             Spacer(modifier = Modifier.width(16.dp))
@@ -360,7 +363,7 @@ fun BrandSearchPageContent(
                             Button(
                                 onClick = { if (currentPage < totalPages) onPageChange(currentPage + 1) },
                                 enabled = currentPage < totalPages,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) { Text("Next") }
                         }
                     }

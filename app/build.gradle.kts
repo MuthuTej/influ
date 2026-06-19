@@ -1,8 +1,30 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.google.gms.google.services)
 }
+
+// Secrets/config are read from local.properties (gitignored) so they never need to
+// be committed to source. Falls back to the previous hardcoded values when a key
+// isn't present, so the project still builds out of the box; override these in
+// local.properties (or inject via CI env vars into that file) for real deployments.
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(FileInputStream(localPropertiesFile))
+    }
+}
+
+fun localOrDefault(key: String, default: String): String =
+    localProperties.getProperty(key) ?: System.getenv(key) ?: default
+
+val backendBaseUrlRelease = localOrDefault("BACKEND_BASE_URL_RELEASE", "https://connect-backend-e22a.onrender.com/graphql")
+val backendBaseUrlDebug = localOrDefault("BACKEND_BASE_URL_DEBUG", backendBaseUrlRelease)
+val razorpayKeyIdRelease = localOrDefault("RAZORPAY_KEY_ID_RELEASE", "rzp_test_SDi8IlcjLgcYQE")
+val razorpayKeyIdDebug = localOrDefault("RAZORPAY_KEY_ID_DEBUG", razorpayKeyIdRelease)
 
 android {
     namespace = "np.com.bimalkafle.firebaseauthdemoapp"
@@ -22,12 +44,18 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrlDebug\"")
+            buildConfigField("String", "RAZORPAY_KEY_ID", "\"$razorpayKeyIdDebug\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrlRelease\"")
+            buildConfigField("String", "RAZORPAY_KEY_ID", "\"$razorpayKeyIdRelease\"")
         }
     }
     compileOptions {
@@ -39,6 +67,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.10"

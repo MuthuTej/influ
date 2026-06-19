@@ -14,7 +14,7 @@ class ChatRepository {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    fun getUsers(currentUserRole: String): Flow<List<ChatUser>> = callbackFlow {
+    fun getUsers(currentUserRole: String, onError: (String) -> Unit = {}): Flow<List<ChatUser>> = callbackFlow {
         val currentUserId = auth.currentUser?.uid
         
         val targetCollection = if (currentUserRole.equals("BRAND", ignoreCase = true)) {
@@ -27,6 +27,7 @@ class ChatRepository {
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e("ChatRepository", "Error fetching users from $targetCollection: ${error.message}")
+                    onError(error.message ?: "Failed to load contacts")
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
@@ -59,7 +60,7 @@ class ChatRepository {
         awaitClose { subscription.remove() }
     }
 
-    fun getMessages(otherUserId: String, collaborationId: String? = null): Flow<List<ChatMessage>> = callbackFlow {
+    fun getMessages(otherUserId: String, collaborationId: String? = null, onError: (String) -> Unit = {}): Flow<List<ChatMessage>> = callbackFlow {
         val currentUserId = auth.currentUser?.uid ?: run {
             trySend(emptyList())
             return@callbackFlow
@@ -70,6 +71,7 @@ class ChatRepository {
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e("ChatRepository", "Error fetching messages: ${error.message}")
+                    onError(error.message ?: "Failed to load messages")
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
@@ -89,7 +91,7 @@ class ChatRepository {
         awaitClose { subscription.remove() }
     }
 
-    fun getAllMyMessages(): Flow<List<ChatMessage>> = callbackFlow {
+    fun getAllMyMessages(onError: (String) -> Unit = {}): Flow<List<ChatMessage>> = callbackFlow {
         val currentUserId = auth.currentUser?.uid ?: run {
             trySend(emptyList())
             return@callbackFlow
@@ -108,6 +110,7 @@ class ChatRepository {
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e("ChatRepository", "Error fetching sent messages: ${error.message}")
+                    onError(error.message ?: "Failed to load conversations")
                     return@addSnapshotListener
                 }
                 sentMessages = snapshot?.documents?.mapNotNull { it.toObject(ChatMessage::class.java) } ?: emptyList()
@@ -119,6 +122,7 @@ class ChatRepository {
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e("ChatRepository", "Error fetching received messages: ${error.message}")
+                    onError(error.message ?: "Failed to load conversations")
                     return@addSnapshotListener
                 }
                 receivedMessages = snapshot?.documents?.mapNotNull { it.toObject(ChatMessage::class.java) } ?: emptyList()
@@ -196,11 +200,4 @@ class ChatRepository {
         }
     }
 
-    fun updateMessageStatus(messageId: String, status: String) {
-        db.collection("messages").document(messageId)
-            .update("status", status)
-            .addOnFailureListener { e ->
-                Log.e("ChatRepository", "Error updating message status", e)
-            }
-    }
 }

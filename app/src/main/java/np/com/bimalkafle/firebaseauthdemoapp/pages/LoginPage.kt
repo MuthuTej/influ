@@ -113,8 +113,7 @@ fun LoginPageContent(
     var passwordVisible by remember { mutableStateOf(false) }
     var rememberMe by remember { mutableStateOf(false) }
 
-    val themeColor = Color(0xFFFF8383)
-
+    val themeColor = MaterialTheme.colorScheme.primary
     Column(
         modifier = Modifier
             .fillMaxWidth()

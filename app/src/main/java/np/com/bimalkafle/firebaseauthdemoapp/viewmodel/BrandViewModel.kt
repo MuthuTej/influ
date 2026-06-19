@@ -44,6 +44,11 @@ class BrandViewModel : ViewModel() {
     private val _wishlistedInfluencers = MutableLiveData<List<InfluencerProfile>>(emptyList())
     val wishlistedInfluencers: LiveData<List<InfluencerProfile>> = _wishlistedInfluencers
 
+    // Stale-while-revalidate: skips a refetch (and its loading flash) if the same
+    // data was fetched within the last minute, so switching tabs doesn't discard
+    // good cached data. Pass force = true (e.g. pull-to-refresh) to bypass it.
+    private val fetchThrottle = FetchThrottle()
+
     fun fetchInfluencerRecommendations(token: String, allInfluencers: List<InfluencerProfile>? = null) {
         viewModelScope.launch {
             val query = """
@@ -91,7 +96,8 @@ class BrandViewModel : ViewModel() {
             .sortedByDescending { idToScore[it.id] }
     }
 
-    fun fetchInfluencers(token: String) {
+    fun fetchInfluencers(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("influencers", force)) return
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
@@ -308,7 +314,8 @@ class BrandViewModel : ViewModel() {
         )
     }
 
-    fun fetchBrandDetails(token: String) {
+    fun fetchBrandDetails(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("brandDetails", force)) return
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
@@ -470,7 +477,8 @@ class BrandViewModel : ViewModel() {
         )
     }
 
-    fun fetchCollaborations(token: String) {
+    fun fetchCollaborations(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("collaborations", force)) return
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
@@ -576,6 +584,10 @@ class BrandViewModel : ViewModel() {
                       timestamp
                       fetchedAt
                     }
+                    # totalViewsDelivered / viewsGrowthSincePosting intentionally
+                    # omitted: live backend hasn't redeployed this schema change
+                    # yet, so requesting them fails GraphQL validation and breaks
+                    # this entire query. Re-add once the deploy is confirmed live.
                   }
                 }
             """.trimIndent()
@@ -788,14 +800,17 @@ class BrandViewModel : ViewModel() {
                     overallAnalytics = overallAnalytics,
                     platformAnalytics = if (platformAnalyticsList.isEmpty()) null else platformAnalyticsList,
                     yt = if (ytList.isEmpty()) null else ytList,
-                    ig = if (igList.isEmpty()) null else igList
+                    ig = if (igList.isEmpty()) null else igList,
+                    totalViewsDelivered = if (obj.isNull("totalViewsDelivered")) null else obj.optInt("totalViewsDelivered"),
+                    viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting")
                 )
             )
         }
         return list
     }
 
-    fun fetchWishlist(token: String) {
+    fun fetchWishlist(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("wishlist", force)) return
         viewModelScope.launch {
             val query = """
                 query GetWishlist {
@@ -886,7 +901,9 @@ class BrandViewModel : ViewModel() {
             result.onSuccess { jsonObject ->
                 val data = jsonObject.optJSONObject("data")
                 if (data != null && data.optJSONObject("updateCollaboration") != null) {
-                    fetchCollaborations(token)
+                    // force = true: this just changed server state, so the cache
+                    // (still holding pre-mutation data) must not block the refetch.
+                    fetchCollaborations(token, force = true)
                     onComplete(true)
                 } else {
                     onComplete(false)
@@ -898,7 +915,8 @@ class BrandViewModel : ViewModel() {
         }
     }
 
-    fun fetchMyCampaigns(token: String) {
+    fun fetchMyCampaigns(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("myCampaigns", force)) return
         _loading.value = true
         viewModelScope.launch {
             val query = """
@@ -930,7 +948,7 @@ class BrandViewModel : ViewModel() {
                     if (campaignsArray != null) {
                         val list = mutableListOf<Campaign>()
                         for (i in 0 until campaignsArray.length()) {
-                            val obj = campaignsArray.getJSONObject(i)
+                            val obj = campaignsArray.optJSONObject(i) ?: continue
                             val platformsArray = obj.optJSONArray("platforms")
                             val platforms = mutableListOf<Platform>()
                             if (platformsArray != null) {
@@ -1183,7 +1201,7 @@ class BrandViewModel : ViewModel() {
             result.onSuccess { jsonObject ->
                 val data = jsonObject.optJSONObject("data")?.optJSONObject("verifyPayment")
                 if (data != null) {
-                    fetchCollaborations(token)
+                    fetchCollaborations(token, force = true)
                     onComplete(true)
                 } else {
                     val errorMsg = jsonObject.optJSONArray("errors")?.optJSONObject(0)?.optString("message") ?: "Verification failed"
@@ -1204,7 +1222,7 @@ class BrandViewModel : ViewModel() {
         
         pollingJob = viewModelScope.launch {
             while (true) {
-                fetchCollaborations(token)
+                fetchCollaborations(token, force = true)
                 kotlinx.coroutines.delay(5000)
             }
         }

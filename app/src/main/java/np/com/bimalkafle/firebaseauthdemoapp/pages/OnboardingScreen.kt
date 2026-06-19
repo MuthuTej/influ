@@ -25,8 +25,8 @@ import androidx.navigation.compose.rememberNavController
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
 
-private val brandThemeColor = Color(0xFFFF8383)
-
+private val brandThemeColor: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
 @Composable
 fun OnboardingScreen(navController: NavController) {
     val context = LocalContext.current

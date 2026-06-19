@@ -45,6 +45,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeInsights
 import np.com.bimalkafle.firebaseauthdemoapp.model.Platform
 import np.com.bimalkafle.firebaseauthdemoapp.model.YoutubeDemographics
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -175,7 +176,7 @@ fun InfluencerProfileContent(
         }
     }
 
-    val themeColor = Color(0xFFFF8383)
+    val themeColor = MaterialTheme.colorScheme.primary
     val detailSoftGray = Color(0xFFF8F9FA)
     val detailDarkerGray = Color(0xFF6C757D)
     val platformsColors = mapOf(
@@ -190,13 +191,14 @@ fun InfluencerProfileContent(
     ) { padding ->
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = themeColor)
+                LoadingState(message = "Loading your profile…")
             }
         } else {
             Column(
                 modifier = modifier
                     .fillMaxSize()
                     .background(Color.White)
+                    .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = padding.calculateBottomPadding())
             ) {
@@ -595,7 +597,7 @@ fun InfluencerDetailSection(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = Color(0xFFFF8383),
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
@@ -667,7 +669,7 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
                     val ageData = demographics.groupBy { d -> d.ageGroup ?: "Other" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
                     val values = ageData.values.toList()
                     val labels = ageData.keys.toList()
-                    val colors = listOf(Color(0xFF6C63FF), Color(0xFFFF8383), Color(0xFF4CAF50), Color(0xFFFFC107), Color(0xFF2196F3), Color(0xFF9C27B0)).take(values.size)
+                    val colors = listOf(Color(0xFF6C63FF), MaterialTheme.colorScheme.primary, Color(0xFF4CAF50), Color(0xFFFFC107), Color(0xFF2196F3), Color(0xFF9C27B0)).take(values.size)
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
                         InfluencerDonutChart(values, colors, modifier = Modifier.fillMaxSize(), strokeWidth = 10.dp)
                         Text("${values.sum().toInt()}%", fontWeight = FontWeight.Bold, fontSize = 14.sp)

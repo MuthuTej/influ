@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import np.com.bimalkafle.firebaseauthdemoapp.components.AppPullToRefreshBox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -36,7 +37,10 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.utils.formatCompactCount
+import np.com.bimalkafle.firebaseauthdemoapp.utils.formatCompactCurrency
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.computeBrandHeroStats
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 import java.time.Instant
 import java.time.LocalDateTime
@@ -49,9 +53,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
+import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 
-private val brandThemeColor = Color(0xFFFF8383)
-
+private val brandThemeColor: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
 @Composable
 fun BrandHomePage(
     modifier: Modifier = Modifier,
@@ -130,51 +136,64 @@ fun BrandHomePage(
     ) { padding ->
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = brandThemeColor)
+                LoadingState(message = "Loading your dashboard…")
             }
         } else {
-            LazyColumn(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(bottom = padding.calculateBottomPadding())
-                    .background(Color(0xFFF8F9FE))
-            ) {
-                item { BrandHeaderAndReachSection(brandProfile, navController, unreadCount) }
-                item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                        ActiveCampaignSection(
-                            collaborations = collaborations,
-                            brandViewModel = brandViewModel,
-                            brandName = brandProfile?.name ?: "Brand",
-                            onCollaborationClick = { id ->
-                                navController.navigate("collaboration_analytics/$id")
-                            },
-                            onViewAllClick = {
-                                navController.navigate("brand_history")
-                            }
-                        )
-                        TopPicksSectionBrand(
-                            overallTopInfluencers = overallTopInfluencers,
-                            youtubeTopInfluencers = youtubeTopInfluencers,
-                            instagramTopInfluencers = instagramTopInfluencers,
-                            wishlistedInfluencers = wishlistedInfluencers,
-                            onWishlistToggle = { influencer ->
-                                firebaseToken?.let { token ->
-                                    brandViewModel.toggleWishlist(influencer, token)
-                                }
-                            },
-                            navController = navController
-                        )
+            AppPullToRefreshBox(
+                isRefreshing = isLoading,
+                onRefresh = {
+                    val currentUser = FirebaseAuth.getInstance().currentUser
+                    currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                        firebaseToken = result.token
+                        firebaseToken?.let { token ->
+                            brandViewModel.fetchCollaborations(token, force = true)
+                            brandViewModel.fetchInfluencers(token, force = true)
+                            brandViewModel.fetchBrandDetails(token, force = true)
+                            notificationViewModel.fetchNotifications(currentUser.uid, token, force = true)
+                        }
                     }
-                }
-                item {
-                    Spacer(modifier = Modifier.height(40.dp))
-                    Button(
-                        onClick = { authViewModel.signout() },
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = brandThemeColor)
-                    ) {
-                        Text("Sign Out")
+                },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                LazyColumn(
+                    modifier = modifier
+                        .fillMaxSize()
+                        .padding(bottom = padding.calculateBottomPadding())
+                        .background(Color(0xFFF8F9FE))
+                ) {
+                    item {
+                        val heroStats = remember(collaborations) { computeBrandHeroStats(collaborations) }
+                        BrandHeaderAndReachSection(brandProfile, navController, unreadCount, heroStats)
+                    }
+                    item {
+                        Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                            ActiveCampaignSection(
+                                collaborations = collaborations,
+                                brandViewModel = brandViewModel,
+                                brandName = brandProfile?.name ?: "Brand",
+                                onCollaborationClick = { id ->
+                                    navController.navigate("collaboration_analytics/$id")
+                                },
+                                onViewAllClick = {
+                                    navController.navigate("brand_history")
+                                }
+                            )
+                            TopPicksSectionBrand(
+                                overallTopInfluencers = overallTopInfluencers,
+                                youtubeTopInfluencers = youtubeTopInfluencers,
+                                instagramTopInfluencers = instagramTopInfluencers,
+                                wishlistedInfluencers = wishlistedInfluencers,
+                                onWishlistToggle = { influencer ->
+                                    firebaseToken?.let { token ->
+                                        brandViewModel.toggleWishlist(influencer, token)
+                                    }
+                                },
+                                navController = navController
+                            )
+                        }
+                    }
+                    item {
+                        Spacer(modifier = Modifier.height(40.dp))
                     }
                 }
             }
@@ -183,7 +202,12 @@ fun BrandHomePage(
 }
 
 @Composable
-fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoapp.model.Brand?, navController: NavController, unreadCount: Int) {
+fun BrandHeaderAndReachSection(
+    brandProfile: np.com.bimalkafle.firebaseauthdemoapp.model.Brand?,
+    navController: NavController,
+    unreadCount: Int,
+    heroStats: np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandHeroStats
+) {
     Box(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
@@ -218,12 +242,12 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                         .offset(y = (-4).dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconBubble(Icons.Default.Campaign, Color(0xFF1877F2)) { navController.navigate("all_campaigns") }
+                    IconBubble(Icons.Default.Campaign, Color(0xFF1877F2), contentDescription = "View all campaigns") { navController.navigate("all_campaigns") }
                     Spacer(modifier = Modifier.width(8.dp))
-                    IconBubble(Icons.Default.Favorite, Color(0xFFE1306C)) { navController.navigate("brand_wishlist") }
+                    IconBubble(Icons.Default.Favorite, Color(0xFFE1306C), contentDescription = "View wishlist") { navController.navigate("brand_wishlist") }
                     Spacer(modifier = Modifier.width(8.dp))
                     Box {
-                        IconBubble(Icons.Default.Notifications, Color.Black) { navController.navigate("notifications") }
+                        IconBubble(Icons.Default.Notifications, Color.Black, contentDescription = "View notifications") { navController.navigate("notifications") }
                         if (unreadCount > 0) {
                             Badge(
                                 modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
@@ -295,13 +319,21 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
                             modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("Total Reach", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                            Text("2.4 M", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Total Reach Delivered", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                            Text(formatCompactCount(heroStats.totalReachDelivered), fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            if (heroStats.reachGrowth > 0) {
+                                Text(
+                                    "+${formatCompactCount(heroStats.reachGrowth)} since posting",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White.copy(alpha = 0.85f)
+                                )
+                            }
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                BrandStatChip("Engagement", "6.1 %", Modifier.weight(1f))
-                                BrandStatChip("Leads", "1.2 K", Modifier.weight(1f))
-                                BrandStatChip("Spent", "18.4K", Modifier.weight(1f))
+                                BrandStatChip("Pending", heroStats.pendingApplicationsCount.toString(), Modifier.weight(1f))
+                                BrandStatChip("Active", heroStats.activeCollaborationsCount.toString(), Modifier.weight(1f))
+                                BrandStatChip("Spent", formatCompactCurrency(heroStats.totalSpent), Modifier.weight(1f))
                             }
                         }
                     }
@@ -326,14 +358,14 @@ fun BrandHeaderAndReachSection(brandProfile: np.com.bimalkafle.firebaseauthdemoa
 }
 
 @Composable
-fun IconBubble(icon: ImageVector, tint: Color, onClick: () -> Unit = {}) {
+fun IconBubble(icon: ImageVector, tint: Color, contentDescription: String? = null, onClick: () -> Unit = {}) {
     Surface(
         shape = CircleShape,
         color = Color(0xFFF5F5F5),
         modifier = Modifier.size(42.dp).clickable { onClick() }
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -387,7 +419,11 @@ fun ActiveCampaignSection(
         }
         Spacer(modifier = Modifier.height(8.dp))
         if (collaborations.isEmpty()) {
-            Text("No active campaigns found.", fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, color = Color.Gray, modifier = Modifier.padding(16.dp))
+            EmptyState(
+                icon = Icons.Default.Campaign,
+                title = "No active collaborations yet",
+                subtitle = "Find an influencer to start your first campaign."
+            )
         } else {
             val configuration = LocalConfiguration.current
             val screenWidth = configuration.screenWidthDp.dp
@@ -577,7 +613,11 @@ fun TopPicksSectionBrand(
         }
         Spacer(modifier = Modifier.height(16.dp))
         if (filteredInfluencers.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { Text("No recommendations found for $selectedPlatform", color = Color.Gray) }
+            EmptyState(
+                icon = Icons.Default.Groups,
+                title = "No recommendations yet",
+                subtitle = "We couldn't find $selectedPlatform influencers to recommend right now."
+            )
         } else {
             filteredInfluencers.forEach { influencer ->
                 BrandCardBrand(

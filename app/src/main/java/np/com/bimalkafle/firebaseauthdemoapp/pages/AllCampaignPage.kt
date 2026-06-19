@@ -40,8 +40,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private val brandThemeColor = Color(0xFFFF8383)
-
+private val brandThemeColor: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AllCampaignPage(

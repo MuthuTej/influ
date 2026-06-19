@@ -46,6 +46,11 @@ class CampaignViewModel : ViewModel() {
     private val _error = MutableLiveData<String?>()
     val error: LiveData<String?> = _error
 
+    // See FetchThrottle.kt — skips a refetch (and its loading flash) if the same
+    // data was fetched within the last minute, so switching tabs doesn't discard
+    // good cached data. Pass force = true (e.g. pull-to-refresh) to bypass it.
+    private val fetchThrottle = FetchThrottle()
+
     private val _createCampaignSuccess = MutableLiveData<Boolean>()
     val createCampaignSuccess: LiveData<Boolean> = _createCampaignSuccess
 
@@ -159,7 +164,8 @@ class CampaignViewModel : ViewModel() {
         return _wishlistedCampaigns.value?.any { it.id == campaignId } ?: false
     }
 
-    fun fetchWishlist(token: String) {
+    fun fetchWishlist(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("wishlist", force)) return
         viewModelScope.launch {
             val query = """
                 query GetWishlist {
@@ -240,7 +246,8 @@ class CampaignViewModel : ViewModel() {
         }
     }
 
-    fun fetchCampaigns(token: String) {
+    fun fetchCampaigns(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("campaigns", force)) return
         _loading.value = true
         _error.value = null
         viewModelScope.launch {

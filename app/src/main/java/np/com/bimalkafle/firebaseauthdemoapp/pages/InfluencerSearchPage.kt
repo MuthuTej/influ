@@ -29,8 +29,10 @@ import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.FilterDropdown
 import np.com.bimalkafle.firebaseauthdemoapp.components.IconBubbleSearch
+import np.com.bimalkafle.firebaseauthdemoapp.components.SkeletonCard
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -133,7 +135,7 @@ fun InfluencerSearchPage(
                         .fillMaxWidth()
                         .wrapContentHeight()
                         .clip(RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp))
-                        .background(Color(0xFFFF8383))
+                        .background(MaterialTheme.colorScheme.primary)
                 ) {
                     // Wavy background pattern
                     Image(
@@ -177,6 +179,7 @@ fun InfluencerSearchPage(
                                 IconBubbleSearch(
                                     icon = Icons.Default.Favorite,
                                     tint = Color.Red,
+                                    contentDescription = "View wishlist",
                                     onClick = { navController.navigate("wishlist") }
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
@@ -184,6 +187,7 @@ fun InfluencerSearchPage(
                                     IconBubbleSearch(
                                         icon = Icons.Default.Notifications,
                                         tint = Color.Black,
+                                        contentDescription = "View notifications",
                                         onClick = { navController.navigate("notifications") }
                                     )
                                     if (unreadCount > 0) {
@@ -233,7 +237,7 @@ fun InfluencerSearchPage(
                                 disabledContainerColor = Color.White,
                                 focusedIndicatorColor = Color.Transparent,
                                 unfocusedIndicatorColor = Color.Transparent,
-                                cursorColor = Color(0xFFFF8383)
+                                cursorColor = MaterialTheme.colorScheme.primary
                             )
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -343,7 +347,7 @@ fun InfluencerSearchPage(
                     if (selectedPlatform != "All" || selectedCategory != "All" || selectedBudgetRange != "All" || searchQuery.isNotEmpty()) {
                         Text(
                             text = "Clear All",
-                            color = Color(0xFFFF8383),
+                            color = MaterialTheme.colorScheme.primary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable {
@@ -360,16 +364,16 @@ fun InfluencerSearchPage(
 
             // ---------------- RESULTS SECTION ----------------
             if (isLoading) {
-                 item {
-                     Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                         CircularProgressIndicator(color = Color(0xFFFF8383))
-                     }
-                 }
+                items(3) {
+                    SkeletonCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), height = 180.dp)
+                }
             } else if (filteredCampaigns.isEmpty()) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                        Text("No campaigns found matching your search.", color = Color.Gray, fontWeight = FontWeight.Medium)
-                    }
+                    EmptyState(
+                        icon = Icons.Default.SearchOff,
+                        title = "No campaigns found",
+                        subtitle = "Try adjusting your filters or search terms."
+                    )
                 }
             } else {
                 items(paginatedCampaigns) { campaign ->
@@ -402,7 +406,7 @@ fun InfluencerSearchPage(
                             Button(
                                 onClick = { if (currentPage > 1) currentPage-- },
                                 enabled = currentPage > 1,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
                                 Text("Previous")
                             }
@@ -419,7 +423,7 @@ fun InfluencerSearchPage(
                             Button(
                                 onClick = { if (currentPage < totalPages) currentPage++ },
                                 enabled = currentPage < totalPages,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
                                 Text("Next")
                             }

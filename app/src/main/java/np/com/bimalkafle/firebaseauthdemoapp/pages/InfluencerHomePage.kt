@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import np.com.bimalkafle.firebaseauthdemoapp.components.AppPullToRefreshBox
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -46,15 +47,21 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
+import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.utils.formatCompactCount
+import np.com.bimalkafle.firebaseauthdemoapp.utils.formatCompactCurrency
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.computeInfluencerHeroStats
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-private val brandThemeColor = Color(0xFFFF8383)
+private val brandThemeColor: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
 private val youtubeColor = Color(0xFFFF0000)
 private val instagramColor = Color(0xFFE1306C)
 private val facebookColor = Color(0xFF1877F2)
@@ -167,159 +174,168 @@ fun InfluencerHomePage(
 
         if (isLoading && campaigns.isEmpty() && collaborations.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = brandThemeColor)
+                LoadingState(message = "Loading your dashboard…")
             }
         } else {
-            LazyColumn(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(bottom = padding.calculateBottomPadding())
-                    .background(Color(0xFFF8F9FE))
+            AppPullToRefreshBox(
+                isRefreshing = isLoading,
+                onRefresh = {
+                    val currentUser = FirebaseAuth.getInstance().currentUser
+                    currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                        firebaseToken = result.token
+                        firebaseToken?.let { token ->
+                            influencerViewModel.fetchInfluencerDetails(token, force = true)
+                            influencerViewModel.fetchCollaborations(token, force = true)
+                            campaignViewModel.fetchCampaigns(token, force = true)
+                            notificationViewModel.fetchUnreadCount(currentUser.uid, token, force = true)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
             ) {
+                LazyColumn(
+                    modifier = modifier
+                        .fillMaxSize()
+                        .padding(bottom = padding.calculateBottomPadding())
+                        .background(Color(0xFFF8F9FE))
+                ) {
 
-                item { InfluencerHeaderAndReachSection(influencerProfile, navController, unreadCount) }
-
-                // Checklist item for debugging - Controlled by showDebugInfo
-                item {
-                    if (showDebugInfo) {
-                        FetchStatusChecklist(
-                            influencerId = influencerProfile?.id,
-                            tokenPresent = firebaseToken != null,
-                            collabCount = collaborations.size,
-                            campaignCount = campaigns.size,
-                            influencerError = influencerError,
-                            campaignError = campaignError
-                        )
-                    }
-                }
-
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 16.dp)
-                    ) {
-                        ActiveCollaborationsSection(
-                            collaborations = collaborations,
-                            navController = navController,
-                            onViewAllClick = {
-                                navController.navigate("proposals")
-                            }
-                        )
-                        
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Text(
-                            text = "Top Picks for You",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        ) {
-                            TabRow(
-                                selectedTabIndex = platforms.indexOf(selectedPlatform),
-                                containerColor = Color.Transparent,
-                                indicator = { tabPositions ->
-                                    val currentTabColor = when (selectedPlatform) {
-                                        "YouTube" -> youtubeColor
-                                        "Instagram" -> instagramColor
-                                        "Facebook" -> facebookColor
-                                        "All" -> brandThemeColor
-                                        else -> brandThemeColor
-                                    }
-                                    TabRowDefaults.SecondaryIndicator(
-                                        modifier = Modifier.tabIndicatorOffset(tabPositions[platforms.indexOf(selectedPlatform)]),
-                                        color = currentTabColor
-                                    )
-                                }
-                            ) {
-                                platforms.forEach { platform ->
-                                    Tab(
-                                        selected = selectedPlatform == platform,
-                                        onClick = { selectedPlatform = platform },
-                                        icon = {
-                                            if (platform == "All") {
-                                                Icon(
-                                                    imageVector = Icons.Default.Campaign,
-                                                    contentDescription = "All",
-                                                    modifier = Modifier.size(24.dp),
-                                                    tint = if (selectedPlatform == platform) brandThemeColor else Color.Gray
-                                                )
-                                            } else {
-                                                val iconRes = when (platform) {
-                                                    "YouTube" -> R.drawable.ic_youtube
-                                                    "Instagram" -> R.drawable.ic_instagram
-                                                    "Facebook" -> R.drawable.ic_facebook
-                                                    else -> R.drawable.ic_youtube
-                                                }
-                                                val iconColor = when (platform) {
-                                                    "YouTube" -> youtubeColor
-                                                    "Instagram" -> instagramColor
-                                                    "Facebook" -> facebookColor
-                                                    else -> Color.Gray
-                                                }
-                                                Icon(
-                                                    painter = painterResource(id = iconRes),
-                                                    contentDescription = platform,
-                                                    modifier = Modifier.size(24.dp),
-                                                    tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f)
-                                                )
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                }
-
-                if (filteredCampaigns.isEmpty()) {
                     item {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().height(200.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val emptyMessage = if (campaigns.isEmpty()) "No campaigns available." else "No campaigns found for $selectedPlatform"
-                            Text(emptyMessage, color = Color.Gray)
+                        val heroStats = remember(collaborations) { computeInfluencerHeroStats(collaborations) }
+                        InfluencerHeaderAndReachSection(influencerProfile, navController, unreadCount, heroStats)
+                    }
+
+                    // Checklist item for debugging - Controlled by showDebugInfo
+                    item {
+                        if (showDebugInfo) {
+                            FetchStatusChecklist(
+                                influencerId = influencerProfile?.id,
+                                tokenPresent = firebaseToken != null,
+                                collabCount = collaborations.size,
+                                campaignCount = campaigns.size,
+                                influencerError = influencerError,
+                                campaignError = campaignError
+                            )
                         }
                     }
-                } else {
-                    items(filteredCampaigns) { campaign ->
-                        CampaignCardInfluencer(
-                            campaign = campaign,
-                            isWishlisted = wishlistedCampaigns.any { it.id == campaign.id },
-                            onWishlistToggle = { 
-                                firebaseToken?.let { token ->
-                                    campaignViewModel.toggleWishlist(campaign, token)
-                                }
-                            },
+
+                    item {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            onCardClick = {
-                                 navController.navigate("campaign_detail/${campaign.id}")
-                            }
-                        )
-                    }
-                }
+                                .padding(top = 16.dp)
+                        ) {
+                            ActiveCollaborationsSection(
+                                collaborations = collaborations,
+                                navController = navController,
+                                onViewAllClick = {
+                                    navController.navigate("proposals")
+                                }
+                            )
+                            
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Text(
+                                text = "Top Picks for You",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                item {
-                    Spacer(modifier = Modifier.height(40.dp))
-                    Button(
-                        onClick = {
-                            authViewModel.signout()
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = brandThemeColor)
-                    ) {
-                        Text("Sign Out", fontWeight = FontWeight.Bold)
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            ) {
+                                TabRow(
+                                    selectedTabIndex = platforms.indexOf(selectedPlatform),
+                                    containerColor = Color.Transparent,
+                                    indicator = { tabPositions ->
+                                        val currentTabColor = when (selectedPlatform) {
+                                            "YouTube" -> youtubeColor
+                                            "Instagram" -> instagramColor
+                                            "Facebook" -> facebookColor
+                                            "All" -> brandThemeColor
+                                            else -> brandThemeColor
+                                        }
+                                        TabRowDefaults.SecondaryIndicator(
+                                            modifier = Modifier.tabIndicatorOffset(tabPositions[platforms.indexOf(selectedPlatform)]),
+                                            color = currentTabColor
+                                        )
+                                    }
+                                ) {
+                                    platforms.forEach { platform ->
+                                        Tab(
+                                            selected = selectedPlatform == platform,
+                                            onClick = { selectedPlatform = platform },
+                                            icon = {
+                                                if (platform == "All") {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Campaign,
+                                                        contentDescription = "All",
+                                                        modifier = Modifier.size(24.dp),
+                                                        tint = if (selectedPlatform == platform) brandThemeColor else Color.Gray
+                                                    )
+                                                } else {
+                                                    val iconRes = when (platform) {
+                                                        "YouTube" -> R.drawable.ic_youtube
+                                                        "Instagram" -> R.drawable.ic_instagram
+                                                        "Facebook" -> R.drawable.ic_facebook
+                                                        else -> R.drawable.ic_youtube
+                                                    }
+                                                    val iconColor = when (platform) {
+                                                        "YouTube" -> youtubeColor
+                                                        "Instagram" -> instagramColor
+                                                        "Facebook" -> facebookColor
+                                                        else -> Color.Gray
+                                                    }
+                                                    Icon(
+                                                        painter = painterResource(id = iconRes),
+                                                        contentDescription = platform,
+                                                        modifier = Modifier.size(24.dp),
+                                                        tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f)
+                                                    )
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
+
+                    if (filteredCampaigns.isEmpty()) {
+                        item {
+                            EmptyState(
+                                icon = Icons.Default.Campaign,
+                                title = "No campaigns yet",
+                                subtitle = if (campaigns.isEmpty()) "Check back soon for new campaigns." else "No campaigns found for $selectedPlatform."
+                            )
+                        }
+                    } else {
+                        items(filteredCampaigns) { campaign ->
+                            CampaignCardInfluencer(
+                                campaign = campaign,
+                                isWishlisted = wishlistedCampaigns.any { it.id == campaign.id },
+                                onWishlistToggle = { 
+                                    firebaseToken?.let { token ->
+                                        campaignViewModel.toggleWishlist(campaign, token)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                onCardClick = {
+                                     navController.navigate("campaign_detail/${campaign.id}")
+                                }
+                            )
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(40.dp))
                     }
                 }
             }
@@ -378,7 +394,12 @@ fun StatusItem(label: String, success: Boolean, suffix: String = "") {
 }
 
 @Composable
-fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navController: NavController, unreadCount: Int) {
+fun InfluencerHeaderAndReachSection(
+    influencerProfile: InfluencerProfile?,
+    navController: NavController,
+    unreadCount: Int,
+    heroStats: np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerHeroStats
+) {
     Box(modifier = Modifier.fillMaxWidth()) {
         // Pink background area
         Box(
@@ -420,6 +441,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                     IconBubbleInfluencer(
                         icon = Icons.Default.Favorite,
                         tint = instagramColor,
+                        contentDescription = "View wishlist",
                         onClick = { navController.navigate("wishlist") }
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -427,6 +449,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                         IconBubbleInfluencer(
                             icon = Icons.Default.Notifications,
                             tint = Color.Black,
+                            contentDescription = "View notifications",
                             onClick = { navController.navigate("notifications") }
                         )
                         if (unreadCount > 0) {
@@ -511,15 +534,15 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text("Total Earnings", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                            Text("₹ 18.4K", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(formatCompactCurrency(heroStats.totalEarnings), fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                InfluencerStatChip("Engagement", "6.1 %", Modifier.weight(1f))
-                                InfluencerStatChip("Leads", "1.2 K", Modifier.weight(1f))
-                                InfluencerStatChip("Reach", "2.4 M", Modifier.weight(1f))
+                                InfluencerStatChip("Awaiting", heroStats.awaitingResponseCount.toString(), Modifier.weight(1f))
+                                InfluencerStatChip("Active", heroStats.activeCollaborationsCount.toString(), Modifier.weight(1f))
+                                InfluencerStatChip("Views Generated", formatCompactCount(heroStats.totalViewsGenerated), Modifier.weight(1f))
                             }
                         }
                     }
@@ -545,7 +568,7 @@ fun InfluencerHeaderAndReachSection(influencerProfile: InfluencerProfile?, navCo
 }
 
 @Composable
-private fun IconBubbleInfluencer(icon: ImageVector, tint: Color, onClick: () -> Unit = {}) {
+private fun IconBubbleInfluencer(icon: ImageVector, tint: Color, contentDescription: String? = null, onClick: () -> Unit = {}) {
     Surface(
         shape = CircleShape,
         color = Color(0xFFF5F5F5),
@@ -554,7 +577,7 @@ private fun IconBubbleInfluencer(icon: ImageVector, tint: Color, onClick: () -> 
             .clickable { onClick() }
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -615,11 +638,10 @@ fun ActiveCollaborationsSection(
         Spacer(modifier = Modifier.height(12.dp))
 
         if (collaborations.isEmpty()) {
-            Text(
-                text = "No active collaborations found.",
-                fontStyle = FontStyle.Italic,
-                color = Color.Gray,
-                modifier = Modifier.padding(16.dp)
+            EmptyState(
+                icon = Icons.Default.WorkOutline,
+                title = "No active collaborations yet",
+                subtitle = "Apply to a campaign to get started."
             )
         } else {
             val configuration = LocalConfiguration.current

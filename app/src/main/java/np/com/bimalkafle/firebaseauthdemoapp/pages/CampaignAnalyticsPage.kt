@@ -42,7 +42,8 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 
 // App theme colors
-private val themeColor_campaign = Color(0xFFFF8383)
+private val themeColor_campaign: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
 private val softGray = Color(0xFFF8F9FA)
 private val darkerGray = Color(0xFF6C757D)
 private val greenAccent = Color(0xFF28A745)
@@ -299,17 +300,20 @@ fun PerformanceComparisonVisitsCard() {
                 Point(4f, 500f),
                 Point(5f, 400f)
             )
+            val sharedYMax = (lineData + lineData2).maxOf { it.y } * 1.1f
             Box(modifier = Modifier.height(150.dp).fillMaxWidth()){
                 LineChart(
                     modifier = Modifier.fillMaxSize(),
                     data = lineData,
-                    lineColor = blueColor
+                    lineColor = blueColor,
+                    yMaxOverride = sharedYMax
                 )
                 LineChart(
                     modifier = Modifier.fillMaxSize(),
                     data = lineData2,
                     lineColor = tealColor,
-                    showDashedLines = false
+                    showDashedLines = false,
+                    yMaxOverride = sharedYMax
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -367,6 +371,7 @@ fun LocationAnalyticsCard() {
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
+        var selectedYear by remember { mutableStateOf(2026) }
         Column(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -376,11 +381,11 @@ fun LocationAnalyticsCard() {
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { /* TODO */ }) {
+                IconButton(onClick = { selectedYear-- }) {
                     Icon(Icons.Default.ArrowBackIos, contentDescription = "Previous Year")
                 }
-                Text("2026", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                IconButton(onClick = { /* TODO */ }) {
+                Text("$selectedYear", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                IconButton(onClick = { selectedYear++ }) {
                     Icon(Icons.Default.ArrowForwardIos, contentDescription = "Next Year")
                 }
             }
@@ -538,13 +543,16 @@ private fun LineChart(
     modifier: Modifier = Modifier,
     data: List<Point>,
     lineColor: Color,
-    showDashedLines: Boolean = true
+    showDashedLines: Boolean = true,
+    yMaxOverride: Float? = null
 ) {
     Canvas(modifier = modifier) {
         val xMin = 0f
         val xMax = data.maxOf { it.x }
         val yMin = 0f
-        val yMax = 1000f // Hardcoded for consistency with design
+        // Scale to the data (with headroom) by default; callers overlaying multiple
+        // series on one chart should pass a shared yMaxOverride so the lines stay comparable.
+        val yMax = yMaxOverride ?: (data.maxOf { it.y } * 1.1f).coerceAtLeast(1f)
 
         val xRange = xMax - xMin
         val yRange = yMax - yMin
@@ -590,7 +598,7 @@ private fun BarChart(
     data: List<BarData>,
     barColors: Pair<Color, Color>
 ) {
-    val yMax = 1000f // Hardcoded for consistency with design
+    val yMax = (data.flatMap { listOf(it.before, it.after) }.maxOrNull() ?: 0f).let { max -> (max * 1.1f).coerceAtLeast(1f) }
 
     Row(
         modifier = modifier,

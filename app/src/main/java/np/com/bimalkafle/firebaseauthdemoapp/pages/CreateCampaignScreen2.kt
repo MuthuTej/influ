@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -94,7 +95,7 @@ fun CreateCampaignScreen2(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(Color(0xFFFF8383))
+                .background(MaterialTheme.colorScheme.primary)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.vector),
@@ -158,7 +159,7 @@ fun CreateCampaignScreen2(
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFFFF8383)
+                color = MaterialTheme.colorScheme.primary
             )
             RangeSlider(
                 value = campaignViewModel.budgetMin.toFloat()..campaignViewModel.budgetMax.toFloat(),
@@ -169,8 +170,8 @@ fun CreateCampaignScreen2(
                 valueRange = 0f..1000000f,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
-                    thumbColor = Color(0xFFFF8383),
-                    activeTrackColor = Color(0xFFFF8383)
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary
                 )
             )
 
@@ -207,7 +208,7 @@ fun CreateCampaignScreen2(
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFFFF8383)
+                color = MaterialTheme.colorScheme.primary
             )
             RangeSlider(
                 value = campaignViewModel.ageMin.toFloat()..campaignViewModel.ageMax.toFloat(),
@@ -218,8 +219,8 @@ fun CreateCampaignScreen2(
                 valueRange = 1f..100f,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
-                    thumbColor = Color(0xFFFF8383),
-                    activeTrackColor = Color(0xFFFF8383)
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary
                 )
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -268,7 +269,7 @@ fun CreateCampaignScreen2(
                     .height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isFormValid) Color(0xFFFF8383) else Color.LightGray
+                    containerColor = if (isFormValid) MaterialTheme.colorScheme.primary else Color.LightGray
                 )
             ) {
                 if (loading) {
@@ -289,7 +290,7 @@ fun LocationChip(name: String, isSelected: Boolean, onSelected: () -> Unit) {
         label = { Text(name) },
         shape = RoundedCornerShape(8.dp),
         colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Color(0xFFFF8383),
+            selectedContainerColor = MaterialTheme.colorScheme.primary,
             selectedLabelColor = Color.White
         )
     )
@@ -301,10 +302,10 @@ fun GenderButton(text: String, isSelected: Boolean, onClick: () -> Unit, modifie
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, if (isSelected) Color(0xFFFF8383) else Color.LightGray),
+        border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.LightGray),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (isSelected) Color(0xFFFF8383).copy(alpha = 0.1f) else Color.White,
-            contentColor = if (isSelected) Color(0xFFFF8383) else Color.Gray
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.White,
+            contentColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
         )
     ) {
         Text(text)

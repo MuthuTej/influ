@@ -1,7 +1,9 @@
 package np.com.bimalkafle.firebaseauthdemoapp.utils
 
 import android.app.Activity
+import android.widget.Toast
 import com.razorpay.Checkout
+import np.com.bimalkafle.firebaseauthdemoapp.BuildConfig
 import org.json.JSONObject
 
 object RazorpayService {
@@ -12,8 +14,9 @@ object RazorpayService {
         userContact: String?
     ) {
         val checkout = Checkout()
-        // [FIXME] Hardcoded test key. This MUST match RAZORPAY_KEY_ID in backend .env
-        checkout.setKeyID("rzp_test_SDi8IlcjLgcYQE") 
+        // Key must match RAZORPAY_KEY_ID configured in the backend's .env; sourced from
+        // BuildConfig (see app/build.gradle.kts) so debug/release can use different keys.
+        checkout.setKeyID(BuildConfig.RAZORPAY_KEY_ID)
 
         try {
             val options = JSONObject()
@@ -43,6 +46,11 @@ object RazorpayService {
             checkout.open(activity, options)
         } catch (e: Exception) {
             e.printStackTrace()
+            Toast.makeText(
+                activity,
+                "Unable to start payment: ${e.message ?: "Unknown error"}. Please try again.",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 }

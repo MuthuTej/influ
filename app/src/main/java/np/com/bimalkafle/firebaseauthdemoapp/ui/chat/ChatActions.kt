@@ -29,6 +29,8 @@ import android.app.Activity
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.utils.RazorpayService
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.components.StatusBadge
+import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.Dimens
 
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 
@@ -68,9 +70,16 @@ fun RestrictedActionPanel(
         "REVOKED" -> "Proposal withdrawn"
         else -> status.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
     }
+    val proposalStatus = remember(status) {
+        try {
+            np.com.bimalkafle.firebaseauthdemoapp.pages.ProposalStatus.valueOf(status.uppercase())
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     Surface(
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         shadowElevation = 8.dp,
         modifier = Modifier.fillMaxWidth()
@@ -78,40 +87,32 @@ fun RestrictedActionPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp)
+                .padding(vertical = Dimens.space12)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    .padding(start = Dimens.space16, end = Dimens.space16, bottom = Dimens.space12),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = "Actions",
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                
-                Surface(
-                    color = Color(0xFFFF8383).copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text(
-                        text = statusMessage,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFFFF8383),
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
+
+                StatusBadge(
+                    label = statusMessage,
+                    color = proposalStatus?.color ?: MaterialTheme.colorScheme.primary,
+                    icon = proposalStatus?.icon
+                )
             }
 
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(horizontal = Dimens.space12),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.space8)
             ) {
                 // Negotiation Phase
                 if (status == "PENDING" || status == "NEGOTIATION") {
@@ -135,7 +136,31 @@ fun RestrictedActionPanel(
                 }
                 
                 if (status == "WAITING_FOR_PAYMENT" && isBrand) {
-                    item { ActionCard("Pay Now", Icons.Default.Payments) { onStatusUpdate("IN_PROGRESS") } }
+                    item {
+                        ActionCard("Pay Now", Icons.Default.Payments) {
+                            // Status moves to IN_PROGRESS only via the server-verified
+                            // payment.service.js path once Razorpay confirms payment —
+                            // never by setting it directly from this button.
+                            val collabId = collaborationId
+                            if (collabId != null && activity != null && brandViewModel != null) {
+                                FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                    val token = result.token
+                                    if (token != null) {
+                                        brandViewModel.createCollaborationPaymentOrder(token, collabId, "FULL") { orderData ->
+                                            if (orderData != null) {
+                                                RazorpayService.startPayment(
+                                                    activity = activity,
+                                                    orderData = orderData,
+                                                    userEmail = FirebaseAuth.getInstance().currentUser?.email,
+                                                    userContact = null
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Implementation Phase
@@ -284,8 +309,8 @@ fun ContentUploadDialog(
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                             colors = TextFieldDefaults.colors(
-                                focusedIndicatorColor = Color(0xFFFF8383),
-                                cursorColor = Color(0xFFFF8383)
+                                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                cursorColor = MaterialTheme.colorScheme.primary
                             )
                         )
                         if (links.size > 1) {
@@ -302,7 +327,7 @@ fun ContentUploadDialog(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Add Another Link", color = Color(0xFFFF8383))
+                    Text("Add Another Link", color = MaterialTheme.colorScheme.primary)
                 }
 
                 if (selectedPlatform == "Instagram") {
@@ -322,7 +347,7 @@ fun ContentUploadDialog(
                     if (filteredLinks.isNotEmpty()) onSend(filteredLinks, selectedPlatform) 
                 },
                 enabled = links.any { it.isNotBlank() },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Text("Upload")
             }
@@ -344,34 +369,35 @@ fun ActionCard(
     Surface(
         modifier = Modifier
             .clickable(onClick = onClick)
-            .width(100.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = Color(0xFFF8F9FA),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE9ECEF))
+            .width(100.dp)
+            .defaultMinSize(minHeight = Dimens.minTouchTarget),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp)
+            modifier = Modifier.padding(vertical = Dimens.space12, horizontal = Dimens.space4)
         ) {
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFFF8383).copy(alpha = 0.1f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
-                    tint = Color(0xFFFF8383),
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(Dimens.space8))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.Black,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -451,8 +477,8 @@ fun NegotiationDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFFF8383),
-                        cursorColor = Color(0xFFFF8383)
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary
                     ),
                     singleLine = true
                 )
@@ -475,7 +501,7 @@ fun NegotiationDialog(
                                 onCheckedChange = {
                                     if (it) selectedDeliverables[option] = 1 else selectedDeliverables.remove(option)
                                 },
-                                colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFF8383))
+                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
                             )
                             Text(text = option, fontSize = 14.sp)
                         }
@@ -511,7 +537,7 @@ fun NegotiationDialog(
                     val finalBudget = budget.toIntOrNull() ?: initialAmount
                     onSend(finalBudget, selectedPlatform, selectedDeliverables.toMap())
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383)),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text("Send Proposal", fontWeight = FontWeight.Bold)
@@ -559,7 +585,7 @@ fun DeliverablesDialog(
                                 onCheckedChange = {
                                     if (it) selectedDeliverables[option] = 1 else selectedDeliverables.remove(option)
                                 },
-                                colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFF8383))
+                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
                             )
                             Text(text = option, fontSize = 14.sp)
                         }
@@ -594,7 +620,7 @@ fun DeliverablesDialog(
                 onClick = {
                     onSend(selectedDeliverables.toMap())
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383)),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text("Update Deliverables", fontWeight = FontWeight.Bold)
@@ -630,8 +656,8 @@ fun TextInputDialog(
                 minLines = if (multiline) 3 else 1,
                 maxLines = if (multiline) 5 else 1,
                 colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color(0xFFFF8383),
-                    cursorColor = Color(0xFFFF8383)
+                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                    cursorColor = MaterialTheme.colorScheme.primary
                 )
             )
         },
@@ -641,7 +667,7 @@ fun TextInputDialog(
                     if (text.isNotBlank()) onSend(text) 
                 },
                 enabled = text.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Text("Send")
             }

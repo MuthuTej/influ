@@ -35,10 +35,13 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.ErrorState
+import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 
-private val influencerDetailThemeColor = Color(0xFFFF8383)
+private val influencerDetailThemeColor: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
 private val detailSoftGray = Color(0xFFF8F9FA)
 private val detailDarkerGray = Color(0xFF6C757D)
 private val platformsColors = mapOf(
@@ -93,11 +96,11 @@ fun BrandInfluencerDetailContent(
     Box(modifier = Modifier.fillMaxSize().background(detailSoftGray)) {
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = influencerDetailThemeColor)
+                LoadingState(message = "Loading profile…")
             }
         } else if (error != null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Error: $error", color = Color.Red)
+                ErrorState(message = error)
             }
         } else if (influencer != null) {
             Column(
@@ -543,7 +546,7 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
                     val ageData = demographics.groupBy { d -> d.ageGroup ?: "Other" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
                     val values = ageData.values.toList()
                     val labels = ageData.keys.toList()
-                    val colors = listOf(Color(0xFF6C63FF), Color(0xFFFF8383), Color(0xFF4CAF50), Color(0xFFFFC107), Color(0xFF2196F3), Color(0xFF9C27B0)).take(values.size)
+                    val colors = listOf(Color(0xFF6C63FF), MaterialTheme.colorScheme.primary, Color(0xFF4CAF50), Color(0xFFFFC107), Color(0xFF2196F3), Color(0xFF9C27B0)).take(values.size)
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
                         InfluencerDonutChart(values, colors, modifier = Modifier.fillMaxSize(), strokeWidth = 10.dp)
                         Text("${values.sum().toInt()}%", fontWeight = FontWeight.Bold, fontSize = 14.sp)

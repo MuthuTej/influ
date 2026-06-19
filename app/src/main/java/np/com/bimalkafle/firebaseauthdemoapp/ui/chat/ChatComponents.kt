@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,8 +33,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import np.com.bimalkafle.firebaseauthdemoapp.components.NotificationBadge
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatItem
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatMessage
+import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.Dimens
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Description
@@ -45,74 +48,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.filled.Remove
 
-val BrandThemeColor = Color(0xFFFF8383)
-val ChatBubbleSelfColor = BrandThemeColor
+val BrandThemeColor: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
+val ChatBubbleSelfColor: Color
+    @Composable get() = BrandThemeColor
 val ChatBubbleOtherColor = Color(0xFFF2F2F7) // Light Gray for iOS-like feel
-
-@Composable
-fun ActionButtons(
-    status: String,
-    isMe: Boolean,
-    onAccept: () -> Unit,
-    onReject: () -> Unit,
-    onModify: () -> Unit
-) {
-    if (status == "PENDING" && !isMe) {
-        Row(
-            modifier = Modifier.padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = onAccept,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.height(36.dp)
-            ) {
-                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Accept", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            }
-
-            Button(
-                onClick = onReject,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)), // Softer Red
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.height(36.dp)
-            ) {
-                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Reject", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            }
-
-            OutlinedButton(
-                onClick = onModify,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF42A5F5)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF42A5F5)),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.height(36.dp)
-            ) {
-                Text("Modify", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    } else if (status != "PENDING") {
-        Surface(
-            color = if (status == "ACCEPTED") Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.padding(top = 8.dp)
-        ) {
-            Text(
-                text = "${status.lowercase().replaceFirstChar { it.uppercase() }}",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (status == "ACCEPTED") Color(0xFF2E7D32) else Color(0xFFC62828),
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-            )
-        }
-    }
-}
 
 @Composable
 fun ChatListItem(
@@ -120,95 +60,78 @@ fun ChatListItem(
     onClick: () -> Unit
 ) {
     Surface(
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = Dimens.space16, vertical = Dimens.space12),
             verticalAlignment = Alignment.CenterVertically
         ) {
 
-            // 👤 Profile icon/image
+            // Profile icon/image
             Box(
                 modifier = Modifier
                     .size(52.dp)
                     .clip(CircleShape)
-                    .background(Color.LightGray.copy(alpha = 0.3f)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (chat.profileImageUrl != null) {
                     AsyncImage(
                         model = chat.profileImageUrl,
-                        contentDescription = null,
+                        contentDescription = "${chat.name}'s profile photo",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Default.Person,
-                        contentDescription = null,
+                        contentDescription = "${chat.name}'s profile photo",
                         modifier = Modifier.size(30.dp),
-                        tint = Color.Gray
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(Dimens.space16))
 
-            // 📝 Name + last message
+            // Name + last message
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = chat.name,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = Color(0xFF1A1A1A)
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = chat.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(Dimens.space4))
                 Text(
                     text = chat.lastMessage,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = if (chat.unreadCount > 0) Color.Black else Color.Gray,
-                    fontWeight = if (chat.unreadCount > 0) FontWeight.Medium else FontWeight.Normal,
-                    fontSize = 14.sp
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (chat.unreadCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (chat.unreadCount > 0) FontWeight.Medium else FontWeight.Normal
                 )
             }
 
-            // ⏰ Time + unread count
+            // Time + unread count
             Column(
                 horizontalAlignment = Alignment.End
             ) {
                 Text(
                     text = chat.time,
-                    fontSize = 12.sp,
-                    color = if (chat.unreadCount > 0) BrandThemeColor else Color.Gray,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (chat.unreadCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = if (chat.unreadCount > 0) FontWeight.SemiBold else FontWeight.Normal
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(Dimens.space8))
 
-                if (chat.unreadCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .background(BrandThemeColor, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = chat.unreadCount.toString(),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+                NotificationBadge(count = chat.unreadCount)
             }
         }
     }
@@ -290,9 +213,9 @@ fun ChatTopBar(
 fun MessageBubble(
     message: ChatMessage,
     allMessages: List<ChatMessage>,
-    onSwipeToReply: () -> Unit = {},
-    onUpdateStatus: (String, String) -> Unit = { _, _ -> },
-    onModify: (ChatMessage) -> Unit = {}
+    isGroupStart: Boolean = true,
+    isGroupEnd: Boolean = true,
+    onSwipeToReply: () -> Unit = {}
 ) {
     val isMe = message.isMe
     val offsetX = remember { Animatable(0f) }
@@ -304,16 +227,39 @@ fun MessageBubble(
         allMessages.find { it.id == message.replyToId }
     }
 
+    // The sharp "tail" corner only appears on the message that starts a
+    // consecutive run from the same sender; corners facing a same-sender
+    // neighbor are squared off so the run reads as one continuous block
+    // instead of a stack of identical standalone bubbles.
+    val cornerLarge = 18.dp
+    val cornerSmall = 4.dp
     val bubbleShape = if (isMe) {
-        RoundedCornerShape(topStart = 18.dp, topEnd = 4.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
+        RoundedCornerShape(
+            topStart = cornerLarge,
+            topEnd = if (isGroupStart) cornerSmall else cornerLarge,
+            bottomStart = cornerLarge,
+            bottomEnd = if (isGroupEnd) cornerLarge else cornerSmall
+        )
     } else {
-        RoundedCornerShape(topStart = 4.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
+        RoundedCornerShape(
+            topStart = if (isGroupStart) cornerSmall else cornerLarge,
+            topEnd = cornerLarge,
+            bottomStart = if (isGroupEnd) cornerLarge else cornerSmall,
+            bottomEnd = cornerLarge
+        )
     }
+    val onBubbleColor = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val maxBubbleWidth = (LocalConfiguration.current.screenWidthDp * 0.78f).dp
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp, horizontal = 12.dp)
+            .padding(
+                top = if (isGroupStart) Dimens.space8 else Dimens.space2,
+                bottom = Dimens.space2,
+                start = Dimens.space12,
+                end = Dimens.space12
+            )
     ) {
         if (offsetX.value > 0) {
             Icon(
@@ -321,9 +267,9 @@ fun MessageBubble(
                 contentDescription = "Reply",
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 16.dp)
+                    .padding(start = Dimens.space16)
                     .size(24.dp),
-                tint = if (offsetX.value > swipeThreshold) BrandThemeColor else Color.Gray
+                tint = if (offsetX.value > swipeThreshold) BrandThemeColor else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -355,43 +301,43 @@ fun MessageBubble(
                 shape = bubbleShape,
                 color = if (isMe) ChatBubbleSelfColor else ChatBubbleOtherColor,
                 shadowElevation = 1.dp,
-                modifier = Modifier.widthIn(max = 280.dp)
+                modifier = Modifier.widthIn(max = maxBubbleWidth)
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp)
+                    modifier = Modifier.padding(horizontal = Dimens.space12, vertical = Dimens.space8)
                 ) {
                     // --- Quotation Box for Replies ---
                     if (repliedMessage != null) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 8.dp)
+                                .padding(bottom = Dimens.space8)
                                 .background(
-                                    color = if (isMe) Color.Black.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.6f),
-                                    shape = RoundedCornerShape(8.dp)
+                                    color = if (isMe) Color.Black.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.04f),
+                                    shape = MaterialTheme.shapes.small
                                 )
-                                .padding(8.dp)
+                                .padding(Dimens.space8)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .width(4.dp)
+                                    .width(3.dp)
                                     .height(30.dp)
-                                    .background(if (isMe) Color.White.copy(alpha = 0.7f) else BrandThemeColor, CircleShape)
+                                    .background(if (isMe) onBubbleColor.copy(alpha = 0.7f) else MaterialTheme.colorScheme.primary, CircleShape)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(Dimens.space8))
                             Column {
                                 Text(
                                     text = if (repliedMessage.isMe) "You" else "Responder",
+                                    style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    color = if (isMe) Color.White.copy(alpha = 0.9f) else BrandThemeColor
+                                    color = if (isMe) onBubbleColor.copy(alpha = 0.9f) else MaterialTheme.colorScheme.primary
                                 )
                                 Text(
                                     text = repliedMessage.text,
-                                    fontSize = 12.sp,
+                                    style = MaterialTheme.typography.bodySmall,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    color = if (isMe) Color.White.copy(alpha = 0.7f) else Color.Gray
+                                    color = onBubbleColor.copy(alpha = 0.7f)
                                 )
                             }
                         }
@@ -401,30 +347,87 @@ fun MessageBubble(
                     if (message.type == "TEXT") {
                         Text(
                             text = message.text,
-                            color = if (isMe) Color.White else Color.Black,
-                            fontSize = 15.sp,
-                            lineHeight = 20.sp
+                            color = onBubbleColor,
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     } else {
                         when (message.type) {
-                            "NEGOTIATION" -> NegotiationBubble(message, isMe, onUpdateStatus) { onModify(message) }
-                            "DELIVERABLES" -> DeliverablesBubble(message, isMe, onUpdateStatus) { onModify(message) }
-                            "BRIEF" -> ActionBubble(message, "Campaign Brief", Icons.Default.Description, isMe, onUpdateStatus) { onModify(message) }
-                            "SCRIPT" -> ActionBubble(message, "Script", Icons.Default.EditNote, isMe, onUpdateStatus) { onModify(message) }
-                            "FEEDBACK" -> ActionBubble(message, "Feedback", Icons.Default.Feedback, isMe, onUpdateStatus) { onModify(message) }
-                            "UPLOAD" -> ActionBubble(message, "Upload", Icons.Default.CloudUpload, isMe, onUpdateStatus) { onModify(message) }
-                            else -> Text(
-                                text = message.text,
-                                color = if (isMe) Color.White else Color.Black
+                            "NEGOTIATION" -> NegotiationBubble(message, isMe)
+                            "DELIVERABLES" -> DeliverablesBubble(message, isMe)
+                            "BRIEF" -> RichContentCard(Icons.Default.Description, "Campaign Brief", isMe, content = message.metadata["link"]?.toString() ?: message.text)
+                            "SCRIPT" -> RichContentCard(Icons.Default.EditNote, "Script", isMe, content = message.metadata["content"]?.toString() ?: message.text)
+                            "FEEDBACK" -> RichContentCard(Icons.Default.Feedback, "Feedback", isMe, content = message.metadata["feedback"]?.toString() ?: message.text)
+                            "UPLOAD" -> RichContentCard(Icons.Default.CloudUpload, "Upload", isMe, content = message.metadata["link"]?.toString() ?: message.text)
+                            else -> Text(text = message.text, color = onBubbleColor)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Dimens.space4))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(
+                            text = message.timeFormatted,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = onBubbleColor.copy(alpha = 0.65f)
+                        )
+                        if (isMe) {
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Sent",
+                                modifier = Modifier.size(12.dp),
+                                tint = onBubbleColor.copy(alpha = 0.65f)
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Standalone "Replying to X" banner, extracted from MessageInputBar so it can sit
+ * above whichever input/action bar a screen actually uses (RestrictedActionPanel),
+ * since MessageInputBar's own TextField isn't the one wired up in ChatScreen.
+ */
+@Composable
+fun ReplyPreviewBanner(
+    replyingTo: ChatMessage?,
+    chatName: String,
+    onCancelReply: () -> Unit
+) {
+    AnimatedVisibility(visible = replyingTo != null) {
+        if (replyingTo != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = message.timeFormatted,
-                        fontSize = 10.sp,
-                        color = if (isMe) Color.White.copy(alpha = 0.7f) else Color.Gray,
-                        modifier = Modifier.align(Alignment.End)
+                        text = "Replying to ${if (replyingTo.isMe) "You" else chatName}",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        color = BrandThemeColor
+                    )
+                    Text(
+                        text = replyingTo.text,
+                        maxLines = 1,
+                        fontSize = 12.sp,
+                        overflow = TextOverflow.Ellipsis,
+                        color = Color.Gray
+                    )
+                }
+                IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cancel reply",
+                        tint = Color.Gray
                     )
                 }
             }
@@ -556,211 +559,121 @@ fun MessageInputBar(
 }
 
 
+/**
+ * Shared shell for every "rich" message type (Brief, Script, Negotiation,
+ * Deliverables, Feedback, Upload) — one consistent icon/title/content/list
+ * treatment instead of four near-identical hand-rolled cards. Purely
+ * informational: the real accept/reject/progress actions live in the
+ * collaboration's Actions panel, not here.
+ */
 @Composable
-fun NegotiationBubble(
-    message: ChatMessage, 
+fun RichContentCard(
+    icon: ImageVector,
+    title: String,
     isMe: Boolean,
-    onUpdateStatus: (String, String) -> Unit,
-    onModify: () -> Unit
+    content: String? = null,
+    highlight: String? = null,
+    items: List<String> = emptyList()
 ) {
-    val amount = message.metadata?.get("amount")?.toString() ?: "0"
-    val platform = message.metadata?.get("platform")?.toString() ?: ""
-    val itemsMap = message.metadata?.get("items") as? Map<String, Any> ?: emptyMap()
-    
-    val displayItems = itemsMap.entries.map { "${it.key} (x${it.value})" }
-    
+    val onCardColor = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if(isMe) Color.White.copy(alpha = 0.2f) else Color.White),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = if (isMe) onCardColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(Dimens.space12)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Default.AttachMoney, 
-                    contentDescription = null, 
-                    tint = if(isMe) Color.White else BrandThemeColor,
-                    modifier = Modifier.background(
-                        if(isMe) Color.Transparent else BrandThemeColor.copy(alpha = 0.1f), 
-                        CircleShape
-                    ).padding(4.dp)
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (isMe) onCardColor else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .background(
+                            if (isMe) Color.Transparent else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            CircleShape
+                        )
+                        .padding(Dimens.space4)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = if (platform.isNotEmpty()) "Proposal on $platform" else "Proposal",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = if (isMe) Color.White else Color.Black
-                    )
-                    Text(
-                        text = "₹$amount",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 20.sp,
-                        color = if (isMe) Color.White else BrandThemeColor
-                    )
-                }
+                Spacer(modifier = Modifier.width(Dimens.space8))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = onCardColor
+                )
             }
-            
-            if (displayItems.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                displayItems.forEach { item ->
+
+            if (highlight != null) {
+                Spacer(modifier = Modifier.height(Dimens.space4))
+                Text(
+                    text = highlight,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = if (isMe) onCardColor else MaterialTheme.colorScheme.primary
+                )
+            }
+
+            if (content != null) {
+                Spacer(modifier = Modifier.height(Dimens.space4))
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = onCardColor.copy(alpha = 0.85f)
+                )
+            }
+
+            if (items.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(Dimens.space8))
+                items.forEach { item ->
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-                        Box(modifier = Modifier.size(6.dp).background(if(isMe) Color.White.copy(alpha=0.7f) else Color.Gray, CircleShape))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(onCardColor.copy(alpha = 0.5f), CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(Dimens.space8))
                         Text(
                             text = item,
-                            color = if (isMe) Color.White.copy(alpha = 0.9f) else Color.DarkGray,
-                            fontSize = 14.sp
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = onCardColor.copy(alpha = 0.85f)
                         )
                     }
                 }
             }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(color = if(isMe) Color.White.copy(alpha=0.2f) else Color.LightGray.copy(alpha=0.2f))
-            
-            ActionButtons(
-                status = message.status,
-                isMe = isMe,
-                onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
-                onReject = { onUpdateStatus(message.id, "REJECTED") },
-                onModify = onModify
-            )
         }
     }
 }
 
 @Composable
-fun DeliverablesBubble(
-    message: ChatMessage, 
-    isMe: Boolean,
-    onUpdateStatus: (String, String) -> Unit,
-    onModify: () -> Unit
-) {
+fun NegotiationBubble(message: ChatMessage, isMe: Boolean) {
+    val amount = message.metadata?.get("amount")?.toString() ?: "0"
+    val platform = message.metadata?.get("platform")?.toString() ?: ""
     val itemsMap = message.metadata?.get("items") as? Map<String, Any> ?: emptyMap()
-    
+    val displayItems = itemsMap.entries.map { "${it.key} (x${it.value})" }
+
+    RichContentCard(
+        icon = Icons.Default.AttachMoney,
+        title = if (platform.isNotEmpty()) "Proposal on $platform" else "Proposal",
+        isMe = isMe,
+        highlight = "₹$amount",
+        items = displayItems
+    )
+}
+
+@Composable
+fun DeliverablesBubble(message: ChatMessage, isMe: Boolean) {
+    val itemsMap = message.metadata?.get("items") as? Map<String, Any> ?: emptyMap()
     val displayItems = if (itemsMap.isNotEmpty()) {
         itemsMap.entries.map { "${it.key} (x${it.value})" }
     } else {
         message.metadata?.get("items") as? List<String> ?: emptyList()
     }
 
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if(isMe) Color.White.copy(alpha = 0.2f) else Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.List, 
-                    contentDescription = null, 
-                    tint = if(isMe) Color.White else BrandThemeColor,
-                    modifier = Modifier.background(
-                        if(isMe) Color.Transparent else BrandThemeColor.copy(alpha = 0.1f), 
-                        CircleShape
-                    ).padding(4.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Deliverables",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = if (isMe) Color.White else Color.Black
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            displayItems.forEach { item ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-                    Box(modifier = Modifier.size(6.dp).background(if(isMe) Color.White.copy(alpha=0.7f) else Color.Gray, CircleShape))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = item,
-                        color = if (isMe) Color.White.copy(alpha = 0.9f) else Color.DarkGray,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(color = if(isMe) Color.White.copy(alpha=0.2f) else Color.LightGray.copy(alpha=0.2f))
-
-            ActionButtons(
-                status = message.status,
-                isMe = isMe,
-                onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
-                onReject = { onUpdateStatus(message.id, "REJECTED") },
-                onModify = onModify
-            )
-        }
-    }
-}
-
-@Composable
-fun ActionBubble(
-    message: ChatMessage, 
-    title: String, 
-    icon: ImageVector, 
-    isMe: Boolean,
-    onUpdateStatus: (String, String) -> Unit,
-    onModify: () -> Unit
-) {
-    val contentKey = when (message.type) {
-        "BRIEF", "UPLOAD" -> "link"
-        "SCRIPT" -> "content"
-        "FEEDBACK" -> "feedback"
-        else -> "text"
-    }
-    val content = message.metadata?.get(contentKey)?.toString() ?: message.text
-
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if(isMe) Color.White.copy(alpha = 0.2f) else Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (isMe) Color.White else BrandThemeColor,
-                    modifier = Modifier.background(
-                        if(isMe) Color.Transparent else BrandThemeColor.copy(alpha = 0.1f), 
-                        CircleShape
-                    ).padding(4.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = if (isMe) Color.White else Color.Black
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = content,
-                color = if (isMe) Color.White.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.8f),
-                fontSize = 14.sp,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(color = if(isMe) Color.White.copy(alpha=0.2f) else Color.LightGray.copy(alpha=0.2f))
-            
-            ActionButtons(
-                status = message.status,
-                isMe = isMe,
-                onAccept = { onUpdateStatus(message.id, "ACCEPTED") },
-                onReject = { onUpdateStatus(message.id, "REJECTED") },
-                onModify = onModify
-            )
-        }
-    }
+    RichContentCard(
+        icon = Icons.Default.List,
+        title = "Deliverables",
+        isMe = isMe,
+        items = displayItems
+    )
 }

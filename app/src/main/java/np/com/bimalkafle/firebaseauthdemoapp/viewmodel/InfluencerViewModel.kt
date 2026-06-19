@@ -35,6 +35,11 @@ class InfluencerViewModel : ViewModel() {
     private val _instagramRecommendedBrands = MutableLiveData<List<Brand>>()
     val instagramRecommendedBrands: LiveData<List<Brand>> = _instagramRecommendedBrands
 
+    // See FetchThrottle.kt — skips a refetch (and its loading flash) if the same
+    // data was fetched within the last minute, so switching tabs doesn't discard
+    // good cached data. Pass force = true (e.g. pull-to-refresh) to bypass it.
+    private val fetchThrottle = FetchThrottle()
+
     fun fetchRecommendedBrands(token: String, allBrands: List<Brand>? = null) {
         viewModelScope.launch {
             val query = """
@@ -82,7 +87,8 @@ class InfluencerViewModel : ViewModel() {
             .sortedByDescending { idToScore[it.id] }
     }
 
-    fun fetchInfluencerDetails(token: String) {
+    fun fetchInfluencerDetails(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("influencerDetails", force)) return
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
@@ -264,7 +270,8 @@ class InfluencerViewModel : ViewModel() {
         }
     }
 
-    fun fetchBrands(token: String) {
+    fun fetchBrands(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("brands", force)) return
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
@@ -467,7 +474,8 @@ class InfluencerViewModel : ViewModel() {
     private val _collaborations = MutableLiveData<List<Collaboration>>()
     val collaborations: LiveData<List<Collaboration>> = _collaborations
 
-    fun fetchCollaborations(token: String) {
+    fun fetchCollaborations(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("collaborations", force)) return
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
@@ -487,6 +495,10 @@ class InfluencerViewModel : ViewModel() {
                     brand { id email name role about profileUrl logoUrl }
                     campaign { id brandId title description budgetMin budgetMax startDate endDate status createdAt updatedAt }
                     influencer { name bio logoUrl updatedAt }
+                    # totalViewsDelivered / viewsGrowthSincePosting intentionally
+                    # omitted: live backend hasn't redeployed this schema change
+                    # yet, so requesting them fails GraphQL validation and breaks
+                    # this entire query. Re-add once the deploy is confirmed live.
                   }
                 }
             """.trimIndent()
@@ -498,43 +510,6 @@ class InfluencerViewModel : ViewModel() {
                     val collaborationsArray = data?.optJSONArray("getCollaborations")
                     if (collaborationsArray != null) {
                         _collaborations.postValue(parseCollaborations(collaborationsArray))
-                        val list = mutableListOf<Collaboration>()
-                        for (i in 0 until collaborationsArray.length()) {
-                            val obj = collaborationsArray.optJSONObject(i) ?: continue
-                            val brandObj = obj.optJSONObject("brand")
-                            val campaignObj = obj.optJSONObject("campaign")
-                            
-                            val pricingArray = obj.optJSONArray("pricing")
-                            val pricingList = mutableListOf<Pricing>()
-                            if (pricingArray != null) {
-                                for (j in 0 until pricingArray.length()) {
-                                    val pObj = pricingArray.optJSONObject(j) ?: continue
-                                    pricingList.add(Pricing(
-                                        platform = pObj.optString("platform"),
-                                        deliverable = pObj.optString("deliverable"),
-                                        price = pObj.optInt("price"),
-                                        currency = pObj.optString("currency")
-                                    ))
-                                }
-                            }
-
-                            list.add(Collaboration(
-                                id = obj.optString("id"),
-                                campaignId = obj.optString("campaignId"),
-                                brandId = obj.optString("brandId"),
-                                influencerId = obj.optString("influencerId"),
-                                status = obj.optString("status"),
-                                message = obj.optString("message"),
-                                pricing = pricingList,
-                                initiatedBy = "",
-                                createdAt = "",
-                                updatedAt = obj.optString("updatedAt"),
-                                brand = Brand(brandObj.optString("id"), "", brandObj.optString("name"), "", null, null, null, null, null, brandObj.optString("logoUrl"), null),
-                                campaign = Campaign(campaignObj.optString("id"), null, campaignObj.optString("title"), "", campaignObj.optInt("budgetMin"), campaignObj.optInt("budgetMax"), null, null, null, null, null),
-                                influencer = Influencer("Me", null, null, null)
-                            ))
-                        }
-                        _collaborations.postValue(list)
                     }
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Collab parsing error", e)
@@ -635,7 +610,9 @@ class InfluencerViewModel : ViewModel() {
                     razorpayOrderId = obj.optString("razorpayOrderId"),
                     advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),
                     finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
-                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount")
+                    totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount"),
+                    totalViewsDelivered = if (obj.isNull("totalViewsDelivered")) null else obj.optInt("totalViewsDelivered"),
+                    viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting")
                 )
             )
         }
@@ -653,8 +630,8 @@ class InfluencerViewModel : ViewModel() {
         _error.value = null
         viewModelScope.launch {
             val mutation = """
-                mutation ApplyToCampaign(${'$'}campaignId: ID!, ${'$'}message: String!, ${'$'}pricing: [CollaborationPricingInput!]!) {
-                  applyToCampaign(campaignId: ${'$'}campaignId, message: ${'$'}message, pricing: ${'$'}pricing) {
+                mutation ApplyToCampaign(${'$'}input: CreateProposalInput!) {
+                  applyToCampaign(input: ${'$'}input) {
                     id
                     status
                   }
@@ -662,9 +639,11 @@ class InfluencerViewModel : ViewModel() {
             """.trimIndent()
 
             val variables = mapOf(
-                "campaignId" to campaignId,
-                "message" to message,
-                "pricing" to pricing
+                "input" to mapOf(
+                    "campaignId" to campaignId,
+                    "message" to message,
+                    "pricing" to pricing
+                )
             )
 
             val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
@@ -778,10 +757,12 @@ class InfluencerViewModel : ViewModel() {
             )
 
             val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
-            result.onSuccess { 
-                fetchCollaborations(token)
-                onComplete(true) 
-            }.onFailure { 
+            result.onSuccess {
+                // force = true: this just changed server state, so the cache
+                // (still holding pre-mutation data) must not block the refetch.
+                fetchCollaborations(token, force = true)
+                onComplete(true)
+            }.onFailure {
                 _error.postValue(it.message)
                 onComplete(false)
             }
@@ -795,7 +776,7 @@ class InfluencerViewModel : ViewModel() {
         
         pollingJob = viewModelScope.launch {
             while (true) {
-                fetchCollaborations(token)
+                fetchCollaborations(token, force = true)
                 kotlinx.coroutines.delay(5000)
             }
         }

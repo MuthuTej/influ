@@ -26,12 +26,13 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrandWishlistPage(navController: NavController, brandViewModel: BrandViewModel) {
-    val themeColor = Color(0xFFFF8383)
+    val themeColor = MaterialTheme.colorScheme.primary
     val wishlistedInfluencers by brandViewModel.wishlistedInfluencers.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
 
@@ -120,16 +121,11 @@ fun BrandWishlistPage(navController: NavController, brandViewModel: BrandViewMod
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.FavoriteBorder,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("No wishlisted influencers yet", color = Color.Gray)
-                    }
+                    EmptyState(
+                        icon = Icons.Default.FavoriteBorder,
+                        title = "No wishlisted influencers yet",
+                        subtitle = "Tap the heart on an influencer to save them here."
+                    )
                 }
             } else {
                 LazyColumn(

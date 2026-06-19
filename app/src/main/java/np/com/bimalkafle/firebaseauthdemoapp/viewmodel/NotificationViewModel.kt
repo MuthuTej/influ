@@ -20,7 +20,13 @@ class NotificationViewModel : ViewModel() {
     private val _isLoading = MutableLiveData<Boolean>()
     val loading: LiveData<Boolean> = _isLoading
 
-    fun fetchNotifications(userId: String, token: String) {
+    // See FetchThrottle.kt — skips a refetch (and its loading flash) if the same
+    // data was fetched within the last minute, so switching tabs doesn't discard
+    // good cached data. Pass force = true (e.g. pull-to-refresh) to bypass it.
+    private val fetchThrottle = FetchThrottle()
+
+    fun fetchNotifications(userId: String, token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("notifications", force)) return
         viewModelScope.launch {
             _isLoading.postValue(true)
             val result = BackendRepository.getNotifications(token)
@@ -49,7 +55,8 @@ class NotificationViewModel : ViewModel() {
         }
     }
 
-    fun fetchUnreadCount(userId: String, token: String) {
+    fun fetchUnreadCount(userId: String, token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("unreadCount", force)) return
         viewModelScope.launch {
             val result = BackendRepository.getUnreadNotificationCount(token)
             result.onSuccess { count ->

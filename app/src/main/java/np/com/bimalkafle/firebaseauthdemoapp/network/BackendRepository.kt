@@ -3,13 +3,15 @@ package np.com.bimalkafle.firebaseauthdemoapp.network
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import np.com.bimalkafle.firebaseauthdemoapp.BuildConfig
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
 object BackendRepository {
-    private const val BACKEND_URL = "https://connect-backend-e22a.onrender.com/graphql"
-//    private const val BACKEND_URL = "http://192.168.1.8:5001/graphql"
+    // See app/build.gradle.kts — override via local.properties (BACKEND_BASE_URL_DEBUG/_RELEASE)
+    // instead of editing this file for a different environment.
+    private val BACKEND_URL = BuildConfig.BACKEND_BASE_URL
 
     suspend fun signUp(name: String, role: String, token: String): Result<String> = withContext(Dispatchers.IO) {
         try {
@@ -46,6 +48,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -94,6 +100,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -146,6 +156,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -198,6 +212,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -261,6 +279,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -302,6 +324,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -348,6 +374,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -388,6 +418,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -435,6 +469,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -492,6 +530,10 @@ object BackendRepository {
                 }
 
                 val responseCode = connection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                    SessionManager.notifySessionExpired()
+                    return@withContext Result.failure(UnauthorizedException())
+                }
                 Log.d("BackendRepository", "connectYouTube - Response Code: $responseCode")
 
                 if (responseCode == HttpURLConnection.HTTP_OK) {
@@ -565,6 +607,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -620,6 +666,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -676,6 +726,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -737,6 +791,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)
@@ -808,6 +866,10 @@ object BackendRepository {
             connection.outputStream.use { it.write(requestBody.toByteArray()) }
 
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonResponse = JSONObject(response)

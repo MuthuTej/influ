@@ -91,7 +91,12 @@ data class Collaboration(
     val platformAnalytics: List<CollaborationAnalytics>? = null,
     val yt: List<YouTubeVideoData>? = null,
     val ig: List<InstagramPostData>? = null,
-    val youtubeVideoId: String? = null
+    val youtubeVideoId: String? = null,
+    // Latest synced view count / growth across submitted content (see the
+    // daily content-performance cron job and Collaboration.totalViewsDelivered
+    // / viewsGrowthSincePosting resolvers on the backend).
+    val totalViewsDelivered: Int? = null,
+    val viewsGrowthSincePosting: Int? = null
 )
 
 data class Campaign(

@@ -35,8 +35,7 @@ fun ForgotPasswordPage(
     var email by remember { mutableStateOf("") }
     val authState = authViewModel.authState.observeAsState()
     val context = LocalContext.current
-    val themeColor = Color(0xFFFF8383)
-
+    val themeColor = MaterialTheme.colorScheme.primary
     LaunchedEffect(authState.value) {
         if (authState.value is AuthState.PasswordResetSent) {
             Toast.makeText(context, "Reset link sent to your email", Toast.LENGTH_LONG).show()
@@ -50,6 +49,7 @@ fun ForgotPasswordPage(
         modifier = modifier
             .fillMaxSize()
             .background(Color.White)
+            .imePadding()
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Image(

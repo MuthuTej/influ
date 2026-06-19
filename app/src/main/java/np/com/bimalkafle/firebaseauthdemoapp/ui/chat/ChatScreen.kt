@@ -8,7 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +40,10 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.ChatViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.components.AppCard
+import np.com.bimalkafle.firebaseauthdemoapp.components.StatusBadge
+import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.Dimens
+import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.LocalAppColors
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -118,50 +122,64 @@ fun ChatScreen(
 
     val messages by viewModel.messages.collectAsState()
     val chatName by viewModel.chatName.collectAsState()
+    val replyingTo by viewModel.replyingTo.collectAsState()
+    val chatError by viewModel.error.collectAsState()
+    val contactInfoWarning by viewModel.contactInfoWarning.collectAsState()
+    val localContext = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(chatError) {
+        chatError?.let {
+            android.widget.Toast.makeText(localContext, "Chat error: $it", android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(contactInfoWarning) {
+        contactInfoWarning?.let {
+            android.widget.Toast.makeText(localContext, it, android.widget.Toast.LENGTH_LONG).show()
+            viewModel.clearContactInfoWarning()
+        }
+    }
 
     var isProfileExpanded by remember { mutableStateOf(false) }
-    var modificationMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var showContactWarning by remember { mutableStateOf(false) }
 
+    // Contact Regex for Phone numbers, Emails, and WhatsApp/Telegram links
+    val contactRegex = remember {
+        Regex("""([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|\+?\d[\d\-\s()]{7,15}\d|(wa\.me|t\.me|telegram\.me)/[a-zA-Z0-9_]+)""")
+    }
+
+    fun containsContactInfo(text: String?): Boolean {
+        if (text == null) return false
+        // Remove spaces to catch obfuscated numbers like 9 8 7 6 5 4 3 2 1 0
+        val textWithoutSpaces = text.replace(Regex("""\s+"""), "")
+        if (Regex("""\d{10}""").containsMatchIn(textWithoutSpaces)) return true
+        return contactRegex.containsMatchIn(text)
+    }
+
+    fun hasContactInfo(text: String, metadata: Map<String, Any>?): Boolean {
+        if (containsContactInfo(text)) return true
+        metadata?.values?.forEach { value ->
+            if (value is String && containsContactInfo(value)) return true
+        }
+        return false
+    }
 
     BackHandler(enabled = isProfileExpanded) {
         isProfileExpanded = false
     }
     
-    // Modification Dialogs
-    if (modificationMessage != null) {
-        val msg = modificationMessage!!
-        when (msg.type) {
-            "NEGOTIATION", "DELIVERABLES" -> {
-                val currentAmount = msg.metadata["amount"]?.toString()?.toIntOrNull() ?: 
-                                   currentCollaboration?.pricing?.firstOrNull()?.price ?: 0
-                val currentPlatform = msg.metadata["platform"]?.toString() ?: 
-                                     currentCollaboration?.pricing?.firstOrNull()?.platform ?: "Instagram"
-                @Suppress("UNCHECKED_CAST")
-                val currentItems = msg.metadata["items"] as? Map<String, Int> ?: emptyMap()
-
-                NegotiationDialog(
-                    initialAmount = currentAmount,
-                    initialPlatform = currentPlatform,
-                    initialDeliverables = currentItems,
-                    collaboration = currentCollaboration,
-                    onDismiss = { modificationMessage = null },
-                    onSend = { amount, platform, deliverables ->
-                        val delStr = deliverables.entries.joinToString { "${it.key} (x${it.value})" }
-                        viewModel.sendMessage(
-                            text = "Negotiated Proposal: ₹$amount on $platform - $delStr", 
-                            type = "NEGOTIATION", 
-                            metadata = mapOf(
-                                "amount" to amount,
-                                "platform" to platform,
-                                "items" to deliverables
-                            )
-                        )
-                        viewModel.updateMessageStatus(msg.id, "MODIFIED")
-                        modificationMessage = null
-                    }
-                )
+    if (showContactWarning) {
+        AlertDialog(
+            onDismissRequest = { showContactWarning = false },
+            title = { Text("Action Blocked") },
+            text = { Text("Sharing contact information (Phone number, Email, or direct links) is not allowed on this platform to protect privacy and security.") },
+            confirmButton = {
+                Button(onClick = { showContactWarning = false }) {
+                    Text("Understood")
+                }
             }
-        }
+        )
     }
 
     Scaffold(
@@ -241,14 +259,14 @@ fun ChatScreen(
                                         imageVector = Icons.Default.WorkOutline,
                                         contentDescription = null,
                                         modifier = Modifier.size(12.dp),
-                                        tint = if (collaborationId == null) Color(0xFFFF8383) else Color.Gray
+                                        tint = if (collaborationId == null) MaterialTheme.colorScheme.primary else Color.Gray
                                     )
                                     Spacer(Modifier.width(6.dp))
                                     Text(
                                         text = currentCollaboration?.campaign?.title ?: "Select Project",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (collaborationId == null) Color(0xFFFF8383) else Color.DarkGray,
+                                        color = if (collaborationId == null) MaterialTheme.colorScheme.primary else Color.DarkGray,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.widthIn(max = 180.dp)
@@ -286,7 +304,7 @@ fun ChatScreen(
                                                 text = { 
                                                     Column {
                                                         Text(collab.campaign.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                                        Text(collab.status, fontSize = 10.sp, color = Color(0xFFFF8383), fontWeight = FontWeight.Bold)
+                                                        Text(collab.status, fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                                     }
                                                 },
                                                 onClick = {
@@ -362,7 +380,7 @@ fun ChatScreen(
                                         Icons.Default.WorkOutline,
                                         contentDescription = null,
                                         modifier = Modifier.size(48.dp),
-                                        tint = Color(0xFFFF8383).copy(alpha = 0.6f)
+                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                                     )
                                 }
                             }
@@ -385,7 +403,7 @@ fun ChatScreen(
                             Spacer(Modifier.height(40.dp))
                             Button(
                                 onClick = { showCollabDropdown = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383)),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.height(54.dp).fillMaxWidth(0.8f),
                                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
@@ -404,8 +422,8 @@ fun ChatScreen(
                                 },
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.height(54.dp).fillMaxWidth(0.8f),
-                                border = BorderStroke(1.5.dp, Color(0xFFFF8383)),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8383))
+                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                             ) {
                                 Text(
                                     if (isBrand) "Invite to Campaign" else "Find Campaigns", 
@@ -421,14 +439,8 @@ fun ChatScreen(
                         messages = messages,
                         collaboration = currentCollaboration,
                         isBrand = isBrand,
-                        onReply = { _ ->
-                            // Replying functionality placeholder
-                        },
-                        onUpdateStatus = { messageId, status ->
-                            viewModel.updateMessageStatus(messageId, status)
-                        },
-                        onModify = { message ->
-                            modificationMessage = message
+                        onReply = { message ->
+                            viewModel.setReplyingTo(message)
                         },
                         onCollaborationStatusUpdate = { newStatus ->
                             FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
@@ -448,12 +460,22 @@ fun ChatScreen(
                         color = Color.White,
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                      Column {
+                        ReplyPreviewBanner(
+                            replyingTo = replyingTo,
+                            chatName = chatName,
+                            onCancelReply = { viewModel.setReplyingTo(null) }
+                        )
                         RestrictedActionPanel(
                             status = currentCollaboration?.status,
                             collaborationId = collaborationId,
                             isBrand = isBrand,
                             onSend = { text, type, metadata ->
-                                viewModel.sendMessage(text, type, metadata)
+                                if (hasContactInfo(text, metadata)) {
+                                    showContactWarning = true
+                                } else {
+                                    viewModel.sendMessage(text, type, metadata)
+                                }
                             },
                             onSendUpload = { link, platform ->
                                 viewModel.sendUpload(link, platform)
@@ -471,6 +493,7 @@ fun ChatScreen(
                             collaboration = currentCollaboration,
                             brandViewModel = brandViewModel
                         )
+                      }
                     }
                 }
             }
@@ -517,14 +540,19 @@ private sealed interface ChatUiItem {
     data class ProposalHeader(val collaboration: Collaboration) : ChatUiItem
 }
 
+/** Two messages belong to the same visual group if the same person sent them within a few minutes of each other. */
+private fun isSameGroup(message: ChatMessage, neighbor: ChatUiItem?): Boolean {
+    if (neighbor !is ChatUiItem.MessageItem) return false
+    return message.isMe == neighbor.message.isMe &&
+        kotlin.math.abs(message.timestamp - neighbor.message.timestamp) < 3 * 60 * 1000
+}
+
 @Composable
 fun MessagesList(
     messages: List<ChatMessage>,
     collaboration: Collaboration?,
     isBrand: Boolean,
     onReply: (ChatMessage) -> Unit,
-    onUpdateStatus: (String, String) -> Unit,
-    onModify: (ChatMessage) -> Unit,
     onCollaborationStatusUpdate: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -565,7 +593,7 @@ fun MessagesList(
         contentPadding = PaddingValues(vertical = 16.dp, horizontal = 0.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        items(uiItems) { item ->
+        itemsIndexed(uiItems) { index, item ->
             when (item) {
                 is ChatUiItem.ProposalHeader -> {
                     ProposalSummaryCard(
@@ -596,12 +624,14 @@ fun MessagesList(
                     }
                 }
                 is ChatUiItem.MessageItem -> {
+                    val previous = uiItems.getOrNull(index - 1)
+                    val next = uiItems.getOrNull(index + 1)
                     MessageBubble(
                         message = item.message,
                         allMessages = messages,
-                        onSwipeToReply = { onReply(item.message) },
-                        onUpdateStatus = onUpdateStatus,
-                        onModify = onModify
+                        isGroupStart = !isSameGroup(item.message, previous),
+                        isGroupEnd = !isSameGroup(item.message, next),
+                        onSwipeToReply = { onReply(item.message) }
                     )
                 }
             }
@@ -618,95 +648,98 @@ fun ProposalSummaryCard(
     val pricing = collaboration.pricing?.firstOrNull()
     val status = collaboration.status
     val initiatedByMe = if (isBrand) collaboration.initiatedBy == "BRAND" else collaboration.initiatedBy == "INFLUENCER"
+    val proposalStatus = remember(status) {
+        try {
+            np.com.bimalkafle.firebaseauthdemoapp.pages.ProposalStatus.valueOf(status.uppercase())
+        } catch (e: Exception) {
+            null
+        }
+    }
 
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    AppCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(horizontal = Dimens.space16, vertical = Dimens.space12),
+        contentPadding = PaddingValues(Dimens.space20)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    color = Color(0xFFFF8383).copy(alpha = 0.1f),
-                    shape = CircleShape,
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.WorkOutline, null, tint = Color(0xFFFF8383), modifier = Modifier.size(22.dp))
-                    }
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("INITIAL PROPOSAL", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                    Text(collaboration.campaign.title, fontWeight = FontWeight.Black, fontSize = 17.sp, color = Color.Black)
-                }
-                
-                Surface(
-                    color = Color(0xFFF2F2F7),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = status,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.Black
-                    )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                shape = CircleShape,
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.WorkOutline, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                 }
             }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = Color(0xFFF5F5F5))
-            Spacer(Modifier.height(16.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text("DELIVERABLE", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    Text(pricing?.deliverable ?: "N/A", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("BUDGET", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    Text("${pricing?.currency ?: "INR"} ${pricing?.price ?: 0}", fontWeight = FontWeight.Black, fontSize = 16.sp, color = Color(0xFFFF8383))
-                }
+            Spacer(Modifier.width(Dimens.space12))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "INITIAL PROPOSAL",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+                Text(collaboration.campaign.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             }
 
-            // CTAs for PENDING status
-            if (status == "PENDING") {
-                Spacer(Modifier.height(20.dp))
-                if (!initiatedByMe) {
-                    // I am the receiver - show Accept/Reject
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
-                            onClick = { onAction("ACCEPTED") },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Accept", fontWeight = FontWeight.ExtraBold)
-                        }
-                        OutlinedButton(
-                            onClick = { onAction("REJECTED") },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            border = BorderStroke(1.5.dp, Color(0xFFF44336)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF44336)),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Reject", fontWeight = FontWeight.ExtraBold)
-                        }
-                    }
-                } else {
-                    // I am the sender - show Revoke
+            StatusBadge(
+                label = proposalStatus?.displayName ?: status,
+                color = proposalStatus?.color ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                icon = proposalStatus?.icon
+            )
+        }
+
+        Spacer(Modifier.height(Dimens.space16))
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+        Spacer(Modifier.height(Dimens.space16))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column {
+                Text("DELIVERABLE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                Text(pricing?.deliverable ?: "N/A", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("BUDGET", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                Text("${pricing?.currency ?: "INR"} ${pricing?.price ?: 0}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        // CTAs for PENDING status
+        if (status == "PENDING" || status == "NEGOTIATION") {
+            val appColors = LocalAppColors.current
+            Spacer(Modifier.height(Dimens.space20))
+            if (!initiatedByMe) {
+                // I am the receiver - show Accept/Reject
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.space12)) {
                     Button(
-                        onClick = { onAction("REVOKED") },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                        shape = RoundedCornerShape(12.dp)
+                        onClick = { onAction("ACCEPTED") },
+                        modifier = Modifier.weight(1f).defaultMinSize(minHeight = Dimens.minTouchTarget),
+                        colors = ButtonDefaults.buttonColors(containerColor = appColors.success),
+                        shape = MaterialTheme.shapes.medium
                     ) {
-                        Text("Withdraw Proposal", fontWeight = FontWeight.ExtraBold)
+                        Text("Accept", style = MaterialTheme.typography.titleSmall)
                     }
+                    OutlinedButton(
+                        onClick = { onAction("REJECTED") },
+                        modifier = Modifier.weight(1f).defaultMinSize(minHeight = Dimens.minTouchTarget),
+                        border = BorderStroke(1.5.dp, appColors.error),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = appColors.error),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text("Reject", style = MaterialTheme.typography.titleSmall)
+                    }
+                }
+            } else {
+                // I am the sender - show Revoke
+                Button(
+                    onClick = { onAction("REVOKED") },
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
+                    colors = ButtonDefaults.buttonColors(containerColor = appColors.textSecondary),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Text("Withdraw Proposal", style = MaterialTheme.typography.titleSmall)
                 }
             }
         }

@@ -28,14 +28,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
+import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
+import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.model.Notification
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private val themeColor = Color(0xFFFF8383)
-
+private val themeColor: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationPage(
@@ -107,9 +109,14 @@ fun NotificationPage(
                 .background(Color(0xFFF8F9FE))
         ) {
             if (isLoading && notifications.isEmpty()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = themeColor)
+                LoadingState(modifier = Modifier.align(Alignment.Center), message = "Loading notifications…")
             } else if (notifications.isEmpty()) {
-                EmptyNotifications(modifier = Modifier.align(Alignment.Center))
+                EmptyState(
+                    modifier = Modifier.align(Alignment.Center),
+                    icon = Icons.Default.NotificationsNone,
+                    title = "No notifications yet",
+                    subtitle = "We'll notify you when something important happens."
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -210,36 +217,6 @@ fun NotificationItem(
                 )
             }
         }
-    }
-}
-
-@Composable
-fun EmptyNotifications(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            Icons.Default.NotificationsNone,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = Color.LightGray
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            "No notifications yet",
-            fontSize = 18.sp,
-            color = Color.Gray,
-            fontWeight = FontWeight.Medium
-        )
-        Text(
-            "We'll notify you when something important happens",
-            fontSize = 14.sp,
-            color = Color.LightGray,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp)
-        )
     }
 }
 

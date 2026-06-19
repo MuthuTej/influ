@@ -146,7 +146,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(Color(0xFFFF8383))
+                .background(MaterialTheme.colorScheme.primary)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.vector),
@@ -199,7 +199,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 label = { Text("Creator Name") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -209,7 +209,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 trailingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -218,7 +218,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 label = { Text("Short Bio / About") },
                 modifier = Modifier.fillMaxWidth().height(100.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -227,7 +227,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 label = { Text("Logo URL") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -248,7 +248,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                         },
                         label = { Text(category) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFFFF8383),
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
                             selectedLabelColor = Color.White
                         )
                     )
@@ -275,7 +275,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                 },
                                 label = { Text(subCat, fontSize = 12.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFFF8383).copy(alpha = 0.7f),
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                                     selectedLabelColor = Color.White
                                 )
                             )
@@ -295,7 +295,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (isPlatformSelected) Color(0xFFFF8383).copy(alpha = 0.1f) else Color(0xFFF5F5F5))
+                            .background(if (isPlatformSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFF5F5F5))
                             .clickable {
                                 selectedPlatforms = if (isPlatformSelected) selectedPlatforms - platform else selectedPlatforms + platform
                                 if (isPlatformSelected) {
@@ -318,7 +318,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                         Checkbox(
                             checked = isPlatformSelected,
                             onCheckedChange = null,
-                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFF8383))
+                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
                         )
                     }
 
@@ -347,7 +347,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                     },
                                     label = { Text(format, fontSize = 12.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFFFF8383).copy(alpha = 0.7f),
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                                         selectedLabelColor = Color.White
                                     )
                                 )
@@ -364,7 +364,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 selectedPlatforms.forEach { platform ->
                     val selectedFormats = platformDeliverables[platform] ?: emptySet()
                     if (selectedFormats.isNotEmpty()) {
-                        Text(platform, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp), color = Color(0xFFFF8383))
+                        Text(platform, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp), color = MaterialTheme.colorScheme.primary)
                         selectedFormats.forEach { deliverable ->
                             OutlinedTextField(
                                 value = deliverablePricing[platform]?.get(deliverable) ?: "",
@@ -379,7 +379,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                                 shape = RoundedCornerShape(8.dp),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
                             )
                         }
                     }
@@ -420,7 +420,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                     label = { Text("Instagram Profile URL") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383)),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
                     enabled = !isInstagramConnected && !isInstagramConnecting
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -456,7 +456,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                     label = { Text("Facebook Profile URL") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383)),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
                     enabled = !isFacebookConnected && !isFacebookConnecting
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -568,7 +568,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 contentPadding = PaddingValues()
             ) {
                 Box(
-                    modifier = Modifier.fillMaxSize().background(if (isLoading) Color.Gray else Color(0xFFFF8383)),
+                    modifier = Modifier.fillMaxSize().background(if (isLoading) Color.Gray else MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))

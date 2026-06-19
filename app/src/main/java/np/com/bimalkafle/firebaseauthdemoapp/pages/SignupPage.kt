@@ -141,8 +141,7 @@ fun SignupPageContent(
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     val roles = listOf("BRAND", "INFLUENCER")
 
-    val themeColor = Color(0xFFFF8383)
-
+    val themeColor = MaterialTheme.colorScheme.primary
     Column(
         modifier = modifier
             .fillMaxSize()

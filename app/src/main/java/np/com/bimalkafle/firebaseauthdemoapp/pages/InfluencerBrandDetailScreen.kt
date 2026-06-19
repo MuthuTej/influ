@@ -41,13 +41,16 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.ErrorState
+import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.model.Brand
 import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignDetail
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-private val themeColor = Color(0xFFFF8383)
+private val themeColor: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
 private val softGray = Color(0xFFF8F9FE)
 private val darkerGray = Color(0xFF6C757D)
 private val cardBg = Color(0xFFFFFFFF)
@@ -84,14 +87,9 @@ fun InfluencerBrandDetailScreen(
             .padding(bottom = padding.calculateBottomPadding())
             .background(softGray)) {
             if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = themeColor)
+                LoadingState(modifier = Modifier.align(Alignment.Center), message = "Loading campaign…")
             } else if (error != null) {
-                Text(
-                    text = "Error: $error",
-                    color = Color.Red,
-                    modifier = Modifier.align(Alignment.Center),
-                    fontSize = 14.sp
-                )
+                ErrorState(message = error ?: "Unknown error", modifier = Modifier.align(Alignment.Center))
             } else if (campaign != null) {
                 InfluencerBrandDetailContent(campaign = campaign!!, navController = navController)
             } else {

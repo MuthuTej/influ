@@ -81,7 +81,7 @@ fun CreateCampaignScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(Color(0xFFFF8383))
+                .background(MaterialTheme.colorScheme.primary)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.vector),
@@ -133,6 +133,7 @@ fun CreateCampaignScreen(
                 .fillMaxSize()
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color.White)
+                .imePadding()
                 .padding(24.dp)
                 .verticalScroll(rememberScrollState())
         ) {
@@ -145,7 +146,7 @@ fun CreateCampaignScreen(
                 label = { Text("Campaign Name *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -156,7 +157,7 @@ fun CreateCampaignScreen(
                 label = { Text("Campaign Brief *") },
                 modifier = Modifier.fillMaxWidth().height(100.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -184,7 +185,7 @@ fun CreateCampaignScreen(
                         },
                         label = { Text(category) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFFFF8383),
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
                             selectedLabelColor = Color.White
                         )
                     )
@@ -211,7 +212,7 @@ fun CreateCampaignScreen(
                                 },
                                 label = { Text(subCat, fontSize = 12.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFFF8383).copy(alpha = 0.7f),
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                                     selectedLabelColor = Color.White
                                 )
                             )
@@ -232,7 +233,7 @@ fun CreateCampaignScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (isPlatformSelected) Color(0xFFFF8383).copy(alpha = 0.1f) else Color(0xFFF5F5F5))
+                            .background(if (isPlatformSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFF5F5F5))
                             .clickable {
                                 campaignViewModel.selectedPlatforms = if (isPlatformSelected) {
                                     campaignViewModel.selectedPlatforms - platform
@@ -249,7 +250,7 @@ fun CreateCampaignScreen(
                         Checkbox(
                             checked = isPlatformSelected,
                             onCheckedChange = null,
-                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFF8383))
+                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
                         )
                     }
 
@@ -273,7 +274,7 @@ fun CreateCampaignScreen(
                                     label = { Text(format, fontSize = 12.sp) },
                                     shape = RoundedCornerShape(20.dp),
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFFFF8383),
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
                                         selectedLabelColor = Color.White
                                     )
                                 )
@@ -313,7 +314,7 @@ fun CreateCampaignScreen(
                     .height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isFormValid) Color(0xFFFF8383) else Color.LightGray
+                    containerColor = if (isFormValid) MaterialTheme.colorScheme.primary else Color.LightGray
                 )
             ) {
                 Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)

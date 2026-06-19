@@ -78,7 +78,7 @@ fun InfluencerApplyCampaignScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(Color(0xFFFF8383))
+                .background(MaterialTheme.colorScheme.primary)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.vector),
@@ -143,6 +143,7 @@ fun InfluencerApplyCampaignScreen(
                 .fillMaxSize()
                 .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
                 .background(Color.White)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp)
         ) {
@@ -165,7 +166,7 @@ fun InfluencerApplyCampaignScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFFF8383),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = Color(0xFFEEEEEE),
                     focusedContainerColor = Color(0xFFFAFAFA),
                     unfocusedContainerColor = Color(0xFFFAFAFA)
@@ -182,7 +183,7 @@ fun InfluencerApplyCampaignScreen(
                 shape = RoundedCornerShape(12.dp),
                 minLines = 3,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFFF8383),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = Color(0xFFEEEEEE)
                 )
             )
@@ -219,7 +220,7 @@ fun InfluencerApplyCampaignScreen(
                                     color = when(platformName.lowercase()) {
                                         "youtube" -> Color(0xFFCC0000)
                                         "instagram" -> Color(0xFFE4405F)
-                                        else -> Color(0xFFFF8383)
+                                        else -> MaterialTheme.colorScheme.primary
                                     },
                                     fontSize = 14.sp
                                 )
@@ -311,6 +312,10 @@ fun InfluencerApplyCampaignScreen(
                                 onComplete = { success ->
                                     if (success) {
                                         Toast.makeText(context, "Application submitted successfully!", Toast.LENGTH_LONG).show()
+                                        // Force-refresh so History/Home reflect this new
+                                        // collaboration immediately instead of waiting out
+                                        // the stale-while-revalidate cache window.
+                                        influencerViewModel.fetchCollaborations(token, force = true)
                                         onApplySuccess()
                                     }
                                 }
@@ -322,7 +327,7 @@ fun InfluencerApplyCampaignScreen(
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383))
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -67,7 +68,7 @@ fun CampaignDetailsPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(Color(0xFFFF8383))
+                .background(MaterialTheme.colorScheme.primary)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.vector),
@@ -194,7 +195,7 @@ fun CampaignDetailsPage(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFFF8383)),
+                        .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("SEARCH INFLUENCER", color = Color.White, fontWeight = FontWeight.Bold)

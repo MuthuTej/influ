@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 fun IconBubbleSearch(
     icon: ImageVector,
     tint: Color,
+    contentDescription: String? = null,
     onClick: (() -> Unit)? = null
 ) {
     Surface(
@@ -45,7 +46,7 @@ fun IconBubbleSearch(
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(20.dp))
         }
     }
 }

@@ -26,12 +26,14 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WishlistScreen(navController: NavController, campaignViewModel: CampaignViewModel) {
-    val themeColor = Color(0xFFFF8383)
+    val themeColor = MaterialTheme.colorScheme.primary
     var selectedBottomNavItem by remember { mutableStateOf("History") }
     val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
@@ -100,55 +102,12 @@ fun WishlistScreen(navController: NavController, campaignViewModel: CampaignView
             }
         },
         bottomBar = {
-            val items = listOf("Home", "Search", "", "History", "Profile")
-            val icons = mapOf(
-                "Home" to Icons.Default.Home,
-                "Search" to Icons.Default.Search,
-                "History" to Icons.Default.History,
-                "Profile" to Icons.Default.Person
+            CmnBottomNavigationBar(
+                selectedItem = selectedBottomNavItem,
+                onItemSelected = { selectedBottomNavItem = it },
+                navController = navController,
+                isBrand = false
             )
-
-            NavigationBar(
-                containerColor = Color.White,
-                tonalElevation = 8.dp,
-                modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-            ) {
-                items.forEach { item ->
-                    if (item.isEmpty()) {
-                        FloatingActionButton(
-                            onClick = { /* Navigate to create proposal or similar */ },
-                            containerColor = themeColor,
-                            shape = CircleShape,
-                            modifier = Modifier.offset(y = (-16).dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
-                        }
-                    } else {
-                        NavigationBarItem(
-                            icon = { Icon(icons[item]!!, contentDescription = item) },
-                            label = { Text(item) },
-                            selected = selectedBottomNavItem == item,
-                            onClick = { 
-                                selectedBottomNavItem = item 
-                                if (item == "Home") {
-                                    navController.navigate("influencer_home")
-                                } else if (item == "Search") {
-                                    navController.navigate("discover")
-                                } else if (item == "Profile") {
-                                    navController.navigate("influencerProfile")
-                                }
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = themeColor,
-                                unselectedIconColor = Color.Gray,
-                                selectedTextColor = themeColor,
-                                unselectedTextColor = Color.Gray,
-                                indicatorColor = themeColor.copy(alpha = 0.1f)
-                            )
-                        )
-                    }
-                }
-            }
         }
     ) { paddingValues ->
         if (wishlistedCampaigns.isEmpty()) {
@@ -158,16 +117,11 @@ fun WishlistScreen(navController: NavController, campaignViewModel: CampaignView
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.FavoriteBorder,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("No wishlisted campaigns yet", color = Color.Gray)
-                }
+                EmptyState(
+                    icon = Icons.Default.FavoriteBorder,
+                    title = "No wishlisted campaigns yet",
+                    subtitle = "Tap the heart on a campaign to save it here."
+                )
             }
         } else {
             LazyColumn(

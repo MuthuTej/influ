@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import np.com.bimalkafle.firebaseauthdemoapp.components.AppPullToRefreshBox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,11 +40,14 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.utils.RazorpayService
 import android.app.Activity
 import androidx.compose.ui.platform.LocalContext
 
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
+import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 
 enum class ProposalStatus(val displayName: String, val color: Color, val icon: ImageVector) {
     PENDING("Pending", Color(0xFFFFC107), Icons.Default.HourglassEmpty),
@@ -118,35 +122,46 @@ fun ProposalPage(
     modifier: Modifier = Modifier,
     navController: NavController,
     authViewModel: AuthViewModel,
-    brandViewModel: BrandViewModel
+    brandViewModel: BrandViewModel,
+    influencerViewModel: InfluencerViewModel
 ) {
     var selectedTab by remember { mutableStateOf(ProposalType.RECEIVED) }
     var selectedStatus by remember { mutableStateOf<ProposalStatus?>(null) }
 
-    val collaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
-    val isLoading by brandViewModel.loading.observeAsState(initial = false)
-    val error by brandViewModel.error.observeAsState()
-    
     val authState = authViewModel.authState.observeAsState()
     var isBrand by remember { mutableStateOf(false) }
-    
+
+    // History must read from whichever ViewModel actually holds this user's
+    // collaborations — previously this always read brandViewModel, so influencers
+    // saw a permanently empty History tab regardless of their real data.
+    val brandCollaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
+    val influencerCollaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
+    val collaborations = if (isBrand) brandCollaborations else influencerCollaborations
+
+    val brandLoading by brandViewModel.loading.observeAsState(initial = false)
+    val influencerLoading by influencerViewModel.loading.observeAsState(initial = false)
+    val isLoading = if (isBrand) brandLoading else influencerLoading
+
+    val brandError by brandViewModel.error.observeAsState()
+    val influencerError by influencerViewModel.error.observeAsState()
+    val error = if (isBrand) brandError else influencerError
+
     LaunchedEffect(authState.value) {
         if (authState.value is np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated) {
              val role = (authState.value as np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated).role
              isBrand = role.equals("BRAND", ignoreCase = true)
+
+             FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                 val firebaseToken = result.token
+                 if (firebaseToken != null) {
+                     if (isBrand) brandViewModel.fetchCollaborations(firebaseToken)
+                     else influencerViewModel.fetchCollaborations(firebaseToken)
+                 }
+             }
         }
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(Unit) {
-        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-            val firebaseToken = result.token
-            if (firebaseToken != null) {
-                brandViewModel.fetchCollaborations(firebaseToken)
-            }
-        }
-    }
 
     error?.let {
         LaunchedEffect(it) {
@@ -158,7 +173,7 @@ fun ProposalPage(
         .filter { it.type == selectedTab && (selectedStatus == null || it.status == selectedStatus) }
 
     val configuration = LocalConfiguration.current
-    val headerColor = Color(0xFFFF8383)
+    val headerColor = MaterialTheme.colorScheme.primary
     val headerHeight = 120.dp
     val contentPaddingTop = headerHeight - 20.dp
 
@@ -252,7 +267,7 @@ fun ProposalPage(
 
                 if (isLoading && collaborations.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = headerColor)
+                        LoadingState(message = "Loading your proposals…")
                     }
                 } else {
                     StatusFilterRow(
@@ -262,35 +277,60 @@ fun ProposalPage(
                         }
                     )
 
-                    if (proposals.isEmpty()) {
-                        EmptyState(isLoading)
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(bottom = 16.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(proposals) { proposal ->
-                                PremiumProposalCard(
-                                    proposal = proposal,
-                                    isBrand = isBrand,
-                                    brandViewModel = brandViewModel,
-                                    onClick = {
-                                        navController.navigate("collaboration_analytics/${proposal.id}")
-                                    },
-                                    onChat = {
-                                        val otherUserId = if (isBrand) proposal.influencerId else proposal.brandId
-                                        val otherUserName = proposal.otherPartyName
-                                        navController.navigate("chat/$otherUserId/$otherUserName?collaborationId=${proposal.id}")
-                                    },
-                                    onAction = { status ->
-                                        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-                                            val token = result.token
-                                            if (token != null) {
-                                                brandViewModel.updateCollaborationStatus(token, proposal.id, status) { success -> }
+                    AppPullToRefreshBox(
+                        isRefreshing = isLoading,
+                        onRefresh = {
+                            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                result.token?.let { token ->
+                                    if (isBrand) brandViewModel.fetchCollaborations(token, force = true)
+                                    else influencerViewModel.fetchCollaborations(token, force = true)
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (proposals.isEmpty()) {
+                            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                item {
+                                    EmptyState(
+                                        icon = Icons.Default.Inbox,
+                                        title = "No proposals found",
+                                        subtitle = if (selectedTab == ProposalType.RECEIVED) "Proposals from brands will show up here." else "Proposals you send will show up here."
+                                    )
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                contentPadding = PaddingValues(bottom = 16.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(proposals) { proposal ->
+                                    PremiumProposalCard(
+                                        proposal = proposal,
+                                        isBrand = isBrand,
+                                        brandViewModel = brandViewModel,
+                                        onClick = {
+                                            navController.navigate("collaboration_analytics/${proposal.id}")
+                                        },
+                                        onChat = {
+                                            val otherUserId = if (isBrand) proposal.influencerId else proposal.brandId
+                                            val otherUserName = proposal.otherPartyName
+                                            navController.navigate("chat/$otherUserId/$otherUserName?collaborationId=${proposal.id}")
+                                        },
+                                        onAction = { status ->
+                                            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                                                val token = result.token
+                                                if (token != null) {
+                                                    if (isBrand) {
+                                                        brandViewModel.updateCollaborationStatus(token, proposal.id, status) { }
+                                                    } else {
+                                                        influencerViewModel.updateCollaborationStatus(token, proposal.id, status) { }
+                                                    }
+                                                }
                                             }
                                         }
-                                    }
-                                )
+                                    )
+                                }
                             }
                         }
                     }
@@ -326,7 +366,7 @@ fun ProposalToggle(selectedTab: ProposalType, onTabSelected: (ProposalType) -> U
                 Text(
                     text = label,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) Color(0xFFFF8383) else Color.Gray,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
                     fontSize = 15.sp
                 )
             }
@@ -448,8 +488,8 @@ fun PremiumProposalCard(
                 OutlinedButton(
                     onClick = { onChat() },
                     modifier = Modifier.weight(1f).height(48.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8383)),
-                    border = BorderStroke(1.dp, Color(0xFFFF8383)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -495,7 +535,7 @@ fun PremiumProposalCard(
                             }
                         },
                         modifier = Modifier.weight(1f).height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8383)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -553,24 +593,6 @@ fun PremiumStatusBadge(status: ProposalStatus) {
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
-        }
-    }
-}
-
-@Composable
-fun EmptyState(isLoading: Boolean) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (!isLoading) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Default.Inbox,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = Color.LightGray
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("No proposals found", color = Color.Gray, fontWeight = FontWeight.Medium)
-            }
         }
     }
 }

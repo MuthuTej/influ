@@ -38,6 +38,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.BrandCategory
 import np.com.bimalkafle.firebaseauthdemoapp.model.PreferredPlatform
 import np.com.bimalkafle.firebaseauthdemoapp.model.TargetAudience
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 
 @Composable
 fun BrandProfilePage(
@@ -144,20 +145,20 @@ fun BrandProfileContent(
         }
     }
 
-    val themeColor = Color(0xFFFF8383)
-
+    val themeColor = MaterialTheme.colorScheme.primary
     Scaffold(
         bottomBar = bottomBar
     ) { padding ->
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = themeColor)
+                LoadingState(message = "Loading your profile…")
             }
         } else {
             Column(
                 modifier = modifier
                     .fillMaxSize()
                     .background(Color.White)
+                    .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = padding.calculateBottomPadding())
             ) {
@@ -491,7 +492,7 @@ fun DetailInfoSection(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = Color(0xFFFF8383),
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))

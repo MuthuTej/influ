@@ -1,59 +1,72 @@
 package np.com.bimalkafle.firebaseauthdemoapp.ui.theme
 
-import android.app.Activity
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
+/**
+ * Extended semantic colors (Success/Warning) that Material3's ColorScheme has no
+ * native slot for. Read via LocalAppColors.current inside any @Composable.
+ */
+val LocalAppColors = staticCompositionLocalOf { LightAppColors }
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = LightAppColors.brandPrimary,
+    onPrimary = LightAppColors.onBrandPrimary,
+    secondary = LightAppColors.brandPrimary,
+    onSecondary = LightAppColors.onBrandPrimary,
+    background = LightAppColors.surfaceSubtle,
+    onBackground = LightAppColors.textPrimary,
+    surface = LightAppColors.surfaceElevated,
+    onSurface = LightAppColors.textPrimary,
+    surfaceVariant = LightAppColors.surfaceSubtle,
+    onSurfaceVariant = LightAppColors.textSecondary,
+    error = LightAppColors.error,
+    onError = LightAppColors.onError,
+    outline = LightAppColors.divider,
 )
 
+private val DarkColorScheme = darkColorScheme(
+    primary = DarkAppColors.brandPrimary,
+    onPrimary = DarkAppColors.onBrandPrimary,
+    secondary = DarkAppColors.brandPrimary,
+    onSecondary = DarkAppColors.onBrandPrimary,
+    background = DarkAppColors.surfaceSubtle,
+    onBackground = DarkAppColors.textPrimary,
+    surface = DarkAppColors.surfaceElevated,
+    onSurface = DarkAppColors.textPrimary,
+    surfaceVariant = DarkAppColors.surfaceSubtle,
+    onSurfaceVariant = DarkAppColors.textSecondary,
+    error = DarkAppColors.error,
+    onError = DarkAppColors.onError,
+    outline = DarkAppColors.divider,
+)
+
+/**
+ * darkTheme defaults to false rather than following the system setting: most
+ * screens still hardcode light-only colors (Color.White/Color.Black literals)
+ * and would render unreadable if dark mode turned on before that screen-by-screen
+ * migration is complete. Both Light and Dark token values already exist above —
+ * flip this default once the migration sweep is done and spot-checked (see the
+ * implementation plan's dark mode release gate).
+ */
 @Composable
 fun FirebaseAuthDemoAppTheme(
-    darkTheme: Boolean = false, // Force Light Theme by default
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            // Force dynamic light color scheme even if system is dark
-            dynamicLightColorScheme(context) 
-        }
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val appColors = if (darkTheme) DarkAppColors else LightAppColors
 
-        darkTheme -> DarkColorScheme // This branch is effectively unreachable with default false, but kept for completeness if manually overridden
-        else -> LightColorScheme
+    CompositionLocalProvider(LocalAppColors provides appColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            shapes = AppShapes,
+            content = content
+        )
     }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
 }

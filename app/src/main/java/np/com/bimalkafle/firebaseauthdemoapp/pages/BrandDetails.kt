@@ -67,7 +67,7 @@ fun BrandDetailsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(Color(0xFFFF8383))
+                .background(MaterialTheme.colorScheme.primary)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.vector),
@@ -137,7 +137,7 @@ fun BrandDetailsScreen(
         ) {
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color(0xFFFF8383))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
                 Image(
@@ -168,9 +168,9 @@ fun BrandDetailsScreen(
                         .fillMaxWidth()
                         .height(50.dp),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFFFF8383)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                 ) {
-                    Text("GO TO HOME SCREEN", color = Color(0xFFFF8383), fontWeight = FontWeight.Bold)
+                    Text("GO TO HOME SCREEN", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -187,7 +187,7 @@ fun BrandDetailsScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xFFFF8383)),
+                            .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("CREATE CAMPAIGN", color = Color.White, fontWeight = FontWeight.Bold)

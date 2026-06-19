@@ -109,32 +109,41 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     override fun onPaymentSuccess(razorpayPaymentId: String?, data: PaymentData?) {
         val paymentId = razorpayPaymentId ?: data?.paymentId
         val signature = data?.signature
-        val orderId = data?.orderId
-        
-        Log.d("Razorpay", "Payment Success: $paymentId, Order: $orderId")
-        
-        if (paymentId != null && signature != null) {
-            // We need collaborationId and paymentType. 
-            // These should be passed to Razorpay in notes or stored locally.
-            // RazorpayService.kt should include these in notes.
-            val notes = data?.data?.optJSONObject("notes")
-            val collaborationId = notes?.optString("collaborationId")
-            val paymentType = notes?.optString("paymentType", "FULL")
-            
-            if (collaborationId != null && paymentType != null) {
-                FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-                    val token = result.token
-                    if (token != null) {
-                        brandViewModel.verifyPayment(token, collaborationId, paymentId, signature, paymentType) { success ->
-                            if (success) {
-                                Toast.makeText(this, "Payment Verified Successfully", Toast.LENGTH_LONG).show()
-                            } else {
-                                Toast.makeText(this, "Payment Verification Failed", Toast.LENGTH_LONG).show()
-                            }
-                        }
+
+        Log.d("Razorpay", "Payment Success: $paymentId, Order: ${data?.orderId}")
+
+        if (paymentId.isNullOrBlank() || signature.isNullOrBlank()) {
+            Log.e("Razorpay", "Payment succeeded but paymentId/signature missing from callback data")
+            Toast.makeText(this, "Payment completed, but verification data was incomplete. Please contact support with order ${data?.orderId}.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        // collaborationId/paymentType travel in the Razorpay order notes (set in RazorpayService).
+        val notes = data?.data?.optJSONObject("notes")
+        val collaborationId = notes?.optString("collaborationId")
+        val paymentType = notes?.optString("paymentType", "FULL")
+
+        if (collaborationId.isNullOrBlank()) {
+            Log.e("Razorpay", "Payment succeeded but collaborationId missing from order notes")
+            Toast.makeText(this, "Payment completed, but we couldn't link it to a collaboration automatically. Please contact support with payment ID $paymentId.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+            val token = result.token
+            if (token != null) {
+                brandViewModel.verifyPayment(token, collaborationId, paymentId, signature, paymentType ?: "FULL") { success ->
+                    if (success) {
+                        Toast.makeText(this, "Payment Verified Successfully", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(this, "Payment received but verification failed. Please contact support with payment ID $paymentId.", Toast.LENGTH_LONG).show()
                     }
                 }
+            } else {
+                Toast.makeText(this, "Payment received but we couldn't verify your session. Please reopen the app and contact support with payment ID $paymentId.", Toast.LENGTH_LONG).show()
             }
+        }?.addOnFailureListener {
+            Toast.makeText(this, "Payment received but verification couldn't start. Please contact support with payment ID $paymentId.", Toast.LENGTH_LONG).show()
         }
     }
 

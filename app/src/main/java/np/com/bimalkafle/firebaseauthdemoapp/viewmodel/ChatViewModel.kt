@@ -12,6 +12,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.ChatUser
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatMessage
 import np.com.bimalkafle.firebaseauthdemoapp.repository.ChatRepository
 import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
+import np.com.bimalkafle.firebaseauthdemoapp.utils.ContactInfoFilter
 import org.json.JSONObject
 import android.util.Log
 
@@ -39,6 +40,23 @@ class ChatViewModel : ViewModel() {
     private val _chatList = MutableStateFlow<List<ChatListEntry>>(emptyList())
     val chatList: StateFlow<List<ChatListEntry>> = _chatList
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
+
+    fun clearError() {
+        _error.value = null
+    }
+
+    // Surfaced to the UI as a blocking warning when sendMessage() detects contact
+    // info — see ContactInfoFilter for what this catches and why it's only a
+    // client-side deterrent, not real enforcement.
+    private val _contactInfoWarning = MutableStateFlow<String?>(null)
+    val contactInfoWarning: StateFlow<String?> = _contactInfoWarning
+
+    fun clearContactInfoWarning() {
+        _contactInfoWarning.value = null
+    }
+
     init {
         repository.ensureUserExistsInFirestore()
     }
@@ -46,8 +64,8 @@ class ChatViewModel : ViewModel() {
     fun loadChatList(currentUserRole: String) {
         viewModelScope.launch {
             combine(
-                repository.getUsers(currentUserRole),
-                repository.getAllMyMessages()
+                repository.getUsers(currentUserRole) { _error.value = it },
+                repository.getAllMyMessages { _error.value = it }
             ) { users, messages ->
                 val currentUserId = getCurrentUserId()
                 
@@ -89,7 +107,7 @@ class ChatViewModel : ViewModel() {
         
         viewModelScope.launch {
             val currentUserId = getCurrentUserId()
-            repository.getMessages(otherUserId, collaborationId).collectLatest { list ->
+            repository.getMessages(otherUserId, collaborationId) { _error.value = it }.collectLatest { list ->
                 _messages.value = list.map { it.copy(isMe = it.senderId == currentUserId) }
                 repository.markMessagesAsRead(otherUserId, collaborationId)
             }
@@ -107,6 +125,14 @@ class ChatViewModel : ViewModel() {
     ) {
         val otherUserId = currentOtherUserId ?: return
         if (text.isBlank() && type == "TEXT") return
+
+        if (type == "TEXT") {
+            val reason = ContactInfoFilter.detect(text)
+            if (reason != null) {
+                _contactInfoWarning.value = "Sharing $reason isn't allowed in chat to keep your collaboration protected on the platform."
+                return
+            }
+        }
 
         repository.sendMessage(
             receiverId = otherUserId,
@@ -195,15 +221,5 @@ class ChatViewModel : ViewModel() {
         }
     }
     
-    fun updateMessageStatus(messageId: String, status: String) {
-        val currentList = _messages.value.toMutableList()
-        val index = currentList.indexOfFirst { it.id == messageId }
-        if (index != -1) {
-            currentList[index] = currentList[index].copy(status = status)
-            _messages.value = currentList
-        }
-        repository.updateMessageStatus(messageId, status)
-    }
-
     fun getCurrentUserId(): String = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 }

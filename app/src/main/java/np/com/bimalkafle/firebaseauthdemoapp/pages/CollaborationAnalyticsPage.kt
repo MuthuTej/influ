@@ -33,6 +33,8 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
+import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.CollaborationAnalytics
 import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramPostData
@@ -40,7 +42,8 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeVideoData
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
 // App theme colors
-private val themeColor_campaign = Color(0xFFFF8383)
+private val themeColor_campaign: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
 private val textGray = Color(0xFF8E8E93)
 private val softGray = Color(0xFFF8F9FA)
 
@@ -68,9 +71,14 @@ fun CollaborationAnalyticsPage(
             .background(Color(0xFFF8F9FE))
     ) {
         if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = themeColor_campaign)
+            LoadingState(modifier = Modifier.align(Alignment.Center), message = "Loading analytics…")
         } else if (collaboration == null) {
-            Text("Collaboration not found", modifier = Modifier.align(Alignment.Center))
+            EmptyState(
+                modifier = Modifier.align(Alignment.Center),
+                icon = Icons.Default.BarChart,
+                title = "Collaboration not found",
+                subtitle = "This collaboration may have been removed."
+            )
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -307,8 +315,14 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
             // Detailed Analytics
             val analytics = video.analytics
             if (analytics != null) {
+                // Likes has a reliable public-stats source (video.likeCount) that works
+                // for any video; the Analytics API equivalent only returns real numbers
+                // if the connected YouTube channel actually owns this video, and
+                // otherwise reports a real (non-null) zero that would silently mask the
+                // public number if checked first. Comments/Shares have no Android-side
+                // public fallback wired through yet — see backend TODO on commentCount.
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    VideoStatItem("Likes", analytics.likes?.toString() ?: video.likeCount ?: "0")
+                    VideoStatItem("Likes", video.likeCount ?: analytics.likes?.toString() ?: "0")
                     VideoStatItem("Comments", analytics.comments?.toString() ?: "0")
                     VideoStatItem("Shares", analytics.shares?.toString() ?: "0")
                 }

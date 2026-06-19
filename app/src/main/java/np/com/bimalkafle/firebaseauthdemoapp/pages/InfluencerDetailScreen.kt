@@ -91,7 +91,7 @@ fun InfluencerDetailScreenContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(Color(0xFFFF8383))
+                .background(MaterialTheme.colorScheme.primary)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.vector),
@@ -161,7 +161,7 @@ fun InfluencerDetailScreenContent(
         ) {
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color(0xFFFF8383))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
                 Image(
@@ -212,7 +212,7 @@ fun InfluencerDetailScreenContent(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xFFFF8383)),
+                            .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("APPROACH BRANDS", color = Color.White, fontWeight = FontWeight.Bold)

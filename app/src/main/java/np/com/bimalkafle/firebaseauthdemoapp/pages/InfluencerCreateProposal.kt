@@ -91,7 +91,7 @@ fun InfluencerCreateProposal(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(Color(0xFFFF8383))
+                .background(MaterialTheme.colorScheme.primary)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.vector),
@@ -142,6 +142,7 @@ fun InfluencerCreateProposal(
                 .padding(horizontal = 16.dp)
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color.White)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp)
         ) {
@@ -170,7 +171,7 @@ fun InfluencerCreateProposal(
                         .fillMaxWidth()
                         .menuAnchor(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
                 )
                 ExposedDropdownMenu(expanded = campaignExpanded, onDismissRequest = { campaignExpanded = false }) {
                     myCampaigns.forEach { campaign ->
@@ -187,7 +188,7 @@ fun InfluencerCreateProposal(
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Write a message to the influencer...") },
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
 
             // Unified Deliverables & Pricing section
@@ -222,7 +223,7 @@ fun InfluencerCreateProposal(
                                     color = when(platformName.lowercase()) {
                                         "youtube" -> Color(0xFFCC0000)
                                         "instagram" -> Color(0xFFE4405F)
-                                        else -> Color(0xFFFF8383)
+                                        else -> MaterialTheme.colorScheme.primary
                                     },
                                     fontSize = 14.sp
                                 )
@@ -305,6 +306,10 @@ fun InfluencerCreateProposal(
                                     pricing = finalPricing,
                                     onComplete = { success ->
                                         if (success) {
+                                            // Force-refresh so History/Home reflect this new
+                                            // collaboration immediately instead of waiting out
+                                            // the stale-while-revalidate cache window.
+                                            brandViewModel.fetchCollaborations(token, force = true)
                                             onCreateProposal()
                                         }
                                     }
@@ -323,7 +328,7 @@ fun InfluencerCreateProposal(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFFF8383)),
+                        .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isLoading) {

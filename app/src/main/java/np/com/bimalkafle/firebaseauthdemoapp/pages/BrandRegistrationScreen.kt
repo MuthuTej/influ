@@ -106,7 +106,7 @@ fun BrandRegistrationScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(headerHeight)
-                .background(Color(0xFFFF8383))
+                .background(MaterialTheme.colorScheme.primary)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.vector),
@@ -175,7 +175,7 @@ fun BrandRegistrationScreen(
                 label = { Text("Brand Name *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -196,7 +196,7 @@ fun BrandRegistrationScreen(
                         },
                         label = { Text(category) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFFFF8383),
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
                             selectedLabelColor = Color.White
                         )
                     )
@@ -223,7 +223,7 @@ fun BrandRegistrationScreen(
                                 },
                                 label = { Text(subCat, fontSize = 12.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFFF8383).copy(alpha = 0.7f),
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                                     selectedLabelColor = Color.White
                                 )
                             )
@@ -242,7 +242,7 @@ fun BrandRegistrationScreen(
                     .fillMaxWidth()
                     .height(120.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -259,7 +259,7 @@ fun BrandRegistrationScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (isPlatformSelected) Color(0xFFFF8383).copy(alpha = 0.1f) else Color(0xFFF5F5F5))
+                            .background(if (isPlatformSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFF5F5F5))
                             .clickable {
                                 if (isPlatformSelected) {
                                     selectedPlatforms.remove(platform)
@@ -283,7 +283,7 @@ fun BrandRegistrationScreen(
                         Checkbox(
                             checked = isPlatformSelected,
                             onCheckedChange = null,
-                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFF8383))
+                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
                         )
                     }
 
@@ -305,7 +305,7 @@ fun BrandRegistrationScreen(
                                     },
                                     label = { Text(format, fontSize = 12.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFFFF8383).copy(alpha = 0.7f),
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                                         selectedLabelColor = Color.White
                                     )
                                 )
@@ -338,7 +338,7 @@ fun BrandRegistrationScreen(
                         .fillMaxWidth()
                         .menuAnchor(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
                 )
                 ExposedDropdownMenu(expanded = genderExpanded, onDismissRequest = { genderExpanded = false }) {
                     DropdownMenuItem(text = { Text("Any") }, onClick = { gender = "Any"; genderExpanded = false })
@@ -355,7 +355,7 @@ fun BrandRegistrationScreen(
                 label = { Text("Website URL") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -366,7 +366,7 @@ fun BrandRegistrationScreen(
                 label = { Text("Logo URL") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383))
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -438,7 +438,7 @@ fun BrandRegistrationScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            if (isFormValid && !isLoading) Color(0xFFFF8383) else Color.Gray
+                            if (isFormValid && !isLoading) MaterialTheme.colorScheme.primary else Color.Gray
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -463,7 +463,7 @@ fun AgeInput(label: String, value: String, onValueChange: (String) -> Unit, modi
         label = { Text(label) },
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFFF8383)),
+        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
         trailingIcon = {
             Column {
                 Icon(

@@ -1,6 +1,7 @@
 package np.com.bimalkafle.firebaseauthdemoapp.network
 
 import android.util.Log
+import np.com.bimalkafle.firebaseauthdemoapp.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -14,7 +15,7 @@ import java.net.URL
 
 object GraphQLClient {
 
-    private const val BASE_URL = "https://connect-backend-e22a.onrender.com/graphql"
+    private val BASE_URL = BuildConfig.BACKEND_BASE_URL
     private const val MAX_RETRIES = 3
     private const val RETRY_DELAY_MS = 1000L
 
@@ -69,8 +70,15 @@ object GraphQLClient {
             writer.close()
 
             val responseCode = connection.responseCode
+
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                Log.w("GraphQLClient", "Auth rejected by backend (HTTP $responseCode) — notifying session expiry")
+                SessionManager.notifySessionExpired()
+                return Result.failure(UnauthorizedException())
+            }
+
             val stream = if (responseCode == HttpURLConnection.HTTP_OK) connection.inputStream else connection.errorStream
-            
+
             if (stream != null) {
                 val reader = BufferedReader(InputStreamReader(stream))
                 val response = StringBuilder()
@@ -79,16 +87,20 @@ object GraphQLClient {
                     response.append(line)
                 }
                 reader.close()
-                val jsonResponse = JSONObject(response.toString())
-                
-                return if (responseCode == HttpURLConnection.HTTP_OK) {
-                    Result.success(jsonResponse)
-                } else {
+
+                if (responseCode != HttpURLConnection.HTTP_OK) {
                     Log.e("GraphQLClient", "Server Error Body: $response")
-                    Result.failure(Exception("HTTP Error: $responseCode - $response"))
+                    return Result.failure(ServerException(responseCode, "HTTP Error: $responseCode - $response"))
+                }
+
+                return try {
+                    Result.success(JSONObject(response.toString()))
+                } catch (e: org.json.JSONException) {
+                    Log.e("GraphQLClient", "Malformed JSON response: $response", e)
+                    Result.failure(MalformedResponseException("Server returned an unreadable response", e))
                 }
             } else {
-                return Result.failure(Exception("HTTP Error: $responseCode (No error body)"))
+                return Result.failure(ServerException(responseCode, "HTTP Error: $responseCode (No error body)"))
             }
         } finally {
             connection.disconnect()
