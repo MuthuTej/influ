@@ -584,10 +584,8 @@ class BrandViewModel : ViewModel() {
                       timestamp
                       fetchedAt
                     }
-                    # totalViewsDelivered / viewsGrowthSincePosting intentionally
-                    # omitted: live backend hasn't redeployed this schema change
-                    # yet, so requesting them fails GraphQL validation and breaks
-                    # this entire query. Re-add once the deploy is confirmed live.
+                    totalViewsDelivered
+                    viewsGrowthSincePosting
                   }
                 }
             """.trimIndent()
