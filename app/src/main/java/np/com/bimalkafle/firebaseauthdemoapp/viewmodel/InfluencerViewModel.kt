@@ -492,6 +492,8 @@ class InfluencerViewModel : ViewModel() {
                     initiatedBy
                     createdAt
                     updatedAt
+                    paymentStatus
+                    totalAmount
                     brand { id email name role about profileUrl logoUrl }
                     campaign { id brandId title description budgetMin budgetMax startDate endDate status createdAt updatedAt }
                     influencer { name bio logoUrl updatedAt }
