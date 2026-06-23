@@ -42,6 +42,7 @@ import java.time.format.DateTimeFormatter
 
 private val brandThemeColor: Color
     @Composable get() = MaterialTheme.colorScheme.primary
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AllCampaignPage(
@@ -69,7 +70,7 @@ fun AllCampaignPage(
             contentDescription = null,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(260.dp)
+                .height(220.dp)
                 .alpha(0.2f),
             contentScale = ContentScale.Crop
         )
@@ -80,7 +81,7 @@ fun AllCampaignPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(bottom = 24.dp),
+                    .padding(bottom = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(
@@ -104,8 +105,8 @@ fun AllCampaignPage(
                     shape = CircleShape,
                     color = Color.White,
                     modifier = Modifier
-                        .size(85.dp)
-                        .shadow(12.dp, CircleShape)
+                        .size(70.dp)
+                        .shadow(8.dp, CircleShape)
                 ) {
                     if (!brandProfile?.logoUrl.isNullOrEmpty()) {
                         AsyncImage(
@@ -123,19 +124,19 @@ fun AllCampaignPage(
                             contentDescription = "Brand Profile",
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(12.dp)
+                                .padding(10.dp)
                                 .clip(CircleShape)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
                     text = brandProfile?.name ?: "My Brand",
                     color = Color.White,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 22.sp,
+                    fontSize = 20.sp,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -155,16 +156,16 @@ fun AllCampaignPage(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 20.dp)
+                        .padding(horizontal = 16.dp)
                 ) {
                     Text(
                         "MY CAMPAIGNS",
-                        fontSize = 14.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.sp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 28.dp, bottom = 16.dp),
+                            .padding(top = 20.dp, bottom = 12.dp),
                         color = brandThemeColor,
                         textAlign = TextAlign.Center
                     )
@@ -211,8 +212,8 @@ fun AllCampaignPage(
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(myCampaigns) { campaign ->
                                 CampaignDetailCard(campaign)
@@ -230,80 +231,84 @@ fun AllCampaignPage(
 fun CampaignDetailCard(campaign: Campaign) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEEEEEE))
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF2F2F2))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = campaign.title,
-                    fontSize = 17.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.width(8.dp))
                 campaign.status?.let { status ->
                     StatusBadge(status)
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
             Text(
                 text = campaign.description ?: "No description provided",
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 color = Color.Gray,
-                lineHeight = 18.sp,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(top = 2.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             
             // Platforms Section
             if (!campaign.platforms.isNullOrEmpty()) {
                 campaign.platforms.forEach { platform ->
-                    Column(modifier = Modifier.padding(bottom = 12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val iconRes = when (platform.platform.uppercase()) {
-                                "INSTAGRAM" -> R.drawable.ic_instagram
-                                "YOUTUBE" -> R.drawable.ic_youtube
-                                "FACEBOOK" -> R.drawable.ic_facebook
-                                "TWITTER" -> R.drawable.ic_twitter
-                                else -> R.drawable.ic_instagram
-                            }
-                            Icon(
-                                painter = painterResource(id = iconRes),
-                                contentDescription = null,
-                                tint = brandThemeColor,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(platform.platform, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = brandThemeColor)
+                    Row(
+                        modifier = Modifier.padding(bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val iconRes = when (platform.platform.uppercase()) {
+                            "INSTAGRAM" -> R.drawable.ic_instagram
+                            "YOUTUBE" -> R.drawable.ic_youtube
+                            "FACEBOOK" -> R.drawable.ic_facebook
+                            "TWITTER" -> R.drawable.ic_twitter
+                            else -> R.drawable.ic_instagram
                         }
+                        Icon(
+                            painter = painterResource(id = iconRes),
+                            contentDescription = null,
+                            tint = brandThemeColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = platform.platform, 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 12.sp, 
+                            color = brandThemeColor
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
                         FlowRow(
-                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.Center
                         ) {
                             platform.formats?.forEach { format ->
                                 Surface(
-                                    color = Color(0xFFF8F9FA),
-                                    shape = RoundedCornerShape(6.dp),
-                                    border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFFEEEEEE))
+                                    color = Color(0xFFF1F3F5),
+                                    shape = RoundedCornerShape(4.dp)
                                 ) {
                                     Text(
                                         text = format,
                                         fontSize = 10.sp,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontWeight = FontWeight.Medium,
                                         color = Color.DarkGray
                                     )
                                 }
@@ -313,68 +318,52 @@ fun CampaignDetailCard(campaign: Campaign) {
                 }
             }
 
-            HorizontalDivider(color = Color(0xFFF5F5F5), thickness = 1.dp)
-            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = Color(0xFFF8F8F8), thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
 
             // Info Grid
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(modifier = Modifier.weight(1f)) {
-                    CampaignInfoRow(
-                        icon = Icons.Default.CurrencyRupee,
-                        label = "Budget",
-                        value = if (campaign.budgetMin != null && campaign.budgetMax != null) {
-                            "₹${campaign.budgetMin} - ₹${campaign.budgetMax}"
-                        } else if (campaign.budgetMin != null) {
-                            "₹${campaign.budgetMin}+"
-                        } else if (campaign.budgetMax != null) {
-                            "Up to ₹${campaign.budgetMax}"
-                        } else "TBD"
-                    )
-                }
-                Box(modifier = Modifier.weight(1f)) {
-                    val timeline = if (!campaign.startDate.isNullOrEmpty() && !campaign.endDate.isNullOrEmpty()) {
-                        "${formatDate(campaign.startDate)} - ${formatDate(campaign.endDate)}"
-                    } else if (!campaign.startDate.isNullOrEmpty()) {
-                        formatDate(campaign.startDate)
-                    } else {
-                        "N/A"
-                    }
-                    CampaignInfoRow(
-                        icon = Icons.Default.CalendarToday,
-                        label = "Timeline",
-                        value = timeline
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Footer
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Text(
-                    text = "Created ${formatDate(campaign.createdAt)}",
-                    fontSize = 10.sp,
-                    color = Color.LightGray,
-                    fontWeight = FontWeight.Bold
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CampaignInfoRow(
+                    modifier = Modifier.weight(1.1f),
+                    icon = Icons.Default.CurrencyRupee,
+                    label = "Budget",
+                    value = if (campaign.budgetMin != null && campaign.budgetMax != null) {
+                        "₹${campaign.budgetMin} - ₹${campaign.budgetMax}"
+                    } else if (campaign.budgetMin != null) {
+                        "₹${campaign.budgetMin}+"
+                    } else if (campaign.budgetMax != null) {
+                        "Up to ₹${campaign.budgetMax}"
+                    } else "TBD"
+                )
+                CampaignInfoRow(
+                    modifier = Modifier.weight(0.9f),
+                    icon = Icons.Default.CalendarToday,
+                    label = "Timeline",
+                    value = if (!campaign.startDate.isNullOrEmpty() && !campaign.endDate.isNullOrEmpty()) {
+                        "${formatDateShort(campaign.startDate)} - ${formatDateShort(campaign.endDate)}"
+                    } else "N/A"
                 )
             }
+
+            Text(
+                text = "Created ${formatDateFull(campaign.createdAt)}",
+                fontSize = 9.sp,
+                color = Color.LightGray,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.align(Alignment.End).padding(top = 4.dp)
+            )
         }
     }
 }
 
 @Composable
 fun StatusBadge(status: String) {
-    val backgroundColor = when (status.uppercase()) {
-        "ACTIVE" -> Color(0xFFE8F5E9)
+    val isPrimaryStyle = status.uppercase() == "ACTIVE" || status.uppercase() == "OPEN"
+    val backgroundColor = if (isPrimaryStyle) brandThemeColor.copy(alpha = 0.1f) else when (status.uppercase()) {
         "DRAFT" -> Color(0xFFFFF3E0)
         "COMPLETED" -> Color(0xFFE3F2FD)
         else -> Color(0xFFF5F5F5)
     }
-    val textColor = when (status.uppercase()) {
-        "ACTIVE" -> Color(0xFF2E7D32)
+    val textColor = if (isPrimaryStyle) brandThemeColor else when (status.uppercase()) {
         "DRAFT" -> Color(0xFFEF6C00)
         "COMPLETED" -> Color(0xFF1565C0)
         else -> Color(0xFF757575)
@@ -382,11 +371,11 @@ fun StatusBadge(status: String) {
 
     Surface(
         color = backgroundColor,
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(6.dp)
     ) {
         Text(
             text = status.uppercase(),
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             fontSize = 9.sp,
             fontWeight = FontWeight.Black,
             color = textColor
@@ -395,11 +384,11 @@ fun StatusBadge(status: String) {
 }
 
 @Composable
-fun CampaignInfoRow(icon: ImageVector, label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+fun CampaignInfoRow(modifier: Modifier = Modifier, icon: ImageVector, label: String, value: String) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(28.dp)
+                .size(24.dp)
                 .clip(CircleShape)
                 .background(brandThemeColor.copy(alpha = 0.08f)),
             contentAlignment = Alignment.Center
@@ -408,10 +397,10 @@ fun CampaignInfoRow(icon: ImageVector, label: String, value: String) {
                 imageVector = icon,
                 contentDescription = null,
                 tint = brandThemeColor,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(12.dp)
             )
         }
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(6.dp))
         Column {
             Text(text = label, fontSize = 9.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
             Text(text = value, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
@@ -419,7 +408,19 @@ fun CampaignInfoRow(icon: ImageVector, label: String, value: String) {
     }
 }
 
-fun formatDate(dateString: String?): String {
+fun formatDateShort(dateString: String?): String {
+    if (dateString.isNullOrEmpty()) return "N/A"
+    return try {
+        val instant = if (dateString.contains("T")) Instant.parse(dateString) else Instant.parse("${dateString}T00:00:00Z")
+        val formatter = DateTimeFormatter.ofPattern("d MMM")
+            .withZone(ZoneId.systemDefault())
+        formatter.format(instant)
+    } catch (e: Exception) {
+        dateString.split("T").firstOrNull() ?: dateString
+    }
+}
+
+fun formatDateFull(dateString: String?): String {
     if (dateString.isNullOrEmpty()) return "N/A"
     return try {
         val instant = if (dateString.contains("T")) Instant.parse(dateString) else Instant.parse("${dateString}T00:00:00Z")
