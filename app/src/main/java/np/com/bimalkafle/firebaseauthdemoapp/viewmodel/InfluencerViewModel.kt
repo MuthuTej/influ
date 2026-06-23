@@ -495,10 +495,8 @@ class InfluencerViewModel : ViewModel() {
                     brand { id email name role about profileUrl logoUrl }
                     campaign { id brandId title description budgetMin budgetMax startDate endDate status createdAt updatedAt }
                     influencer { name bio logoUrl updatedAt }
-                    # totalViewsDelivered / viewsGrowthSincePosting intentionally
-                    # omitted: live backend hasn't redeployed this schema change
-                    # yet, so requesting them fails GraphQL validation and breaks
-                    # this entire query. Re-add once the deploy is confirmed live.
+                    totalViewsDelivered
+                    viewsGrowthSincePosting
                   }
                 }
             """.trimIndent()
