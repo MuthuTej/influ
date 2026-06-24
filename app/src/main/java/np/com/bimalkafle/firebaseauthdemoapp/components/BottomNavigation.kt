@@ -28,7 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 
 private val brandThemeColor: Color
@@ -41,15 +43,15 @@ fun CmnBottomNavigationBar(
     isBrand: Boolean = false
 ) {
     val items = if (isBrand) {
-        listOf("Home", "Search", "Connect", "History", "Profile")
+        listOf("Home", "Search", "Negotiation", "History", "Profile")
     } else {
-        listOf("Home", "Search", "Connect", "History", "Profile")
+        listOf("Home", "Search", "Negotiation", "History", "Profile")
     }
 
     val icons = mapOf(
         "Home" to Icons.Default.Home,
         "Search" to Icons.Default.Search,
-        "Connect" to Icons.Default.Chat,
+        "Negotiation" to Icons.Default.Chat,
         "History" to Icons.Default.History,
         "Profile" to Icons.Default.Person
     )
@@ -69,7 +71,15 @@ fun CmnBottomNavigationBar(
                         icon = {
                             Icon(icons[item] ?: Icons.Default.Home, contentDescription = item)
                         },
-                        label = { Text(item) },
+                        label = {
+                            Text(
+                                text = item,
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                softWrap = false
+                            )
+                        },
                         selected = selectedItem == item,
                         onClick = {
                             onItemSelected(item)
@@ -82,7 +92,7 @@ fun CmnBottomNavigationBar(
                                         }
                                     }
                                     "Search" -> navController.navigate("brand_search")
-                                    "Connect" -> navController.navigate("chatList")
+                                    "Negotiation" -> navController.navigate("chatList")
                                     "History" -> navController.navigate("brand_history")
                                     "Profile" -> navController.navigate("brand_profile")
                                 }
@@ -95,7 +105,7 @@ fun CmnBottomNavigationBar(
                                         }
                                     }
                                     "Search" -> navController.navigate("influencer_search")
-                                    "Connect" -> navController.navigate("chatList") // Shared chat list
+                                    "Negotiation" -> navController.navigate("chatList") // Shared chat list
                                     "History" -> navController.navigate("brand_history") // Influencer history/proposals pointing to shared ProposalPage
                                     "Profile" -> navController.navigate("influencerProfile")
                                 }

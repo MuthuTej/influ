@@ -43,11 +43,10 @@ fun RestrictedActionPanel(
     onSendUpload: (String, String) -> Unit = { _, _ -> },
     onStatusUpdate: (String) -> Unit = {},
     collaboration: Collaboration? = null,
-    brandViewModel: BrandViewModel? = null
+    brandViewModel: BrandViewModel? = null,
+    isActionLoading: Boolean = false
 ) {
     var showNegotiation by remember { mutableStateOf(false) }
-    var showBrief by remember { mutableStateOf(false) }
-    var showScript by remember { mutableStateOf(false) }
     var showFeedback by remember { mutableStateOf(false) }
     var showUpload by remember { mutableStateOf(false) }
     
@@ -114,35 +113,17 @@ fun RestrictedActionPanel(
                 contentPadding = PaddingValues(horizontal = Dimens.space12),
                 horizontalArrangement = Arrangement.spacedBy(Dimens.space8)
             ) {
-                // Negotiation Phase
+                // Negotiation — not in timeline
                 if (status == "PENDING" || status == "NEGOTIATION") {
-                    item { ActionCard("Negotiate", Icons.Default.AttachMoney) { showNegotiation = true } }
+                    item { ActionCard("Negotiate", Icons.Default.AttachMoney, enabled = !isActionLoading) { showNegotiation = true } }
                 }
 
-                // Briefing Phase
-                if (status == "ACCEPTED" && isBrand) {
-                    item { ActionCard("Send Brief", Icons.Default.Description) { showBrief = true } }
-                }
-                if (status == "BRIEF_SENT" && !isBrand) {
-                    item { ActionCard("Finalize Brief", Icons.Default.CheckCircle) { onStatusUpdate("BRIEF_FINALIZED") } }
-                }
-
-                // Scripting Phase
-                if (status == "BRIEF_FINALIZED" && !isBrand) {
-                    item { ActionCard("Submit Script", Icons.Default.EditNote) { showScript = true } }
-                }
-                if (status == "SCRIPT_SENT" && isBrand) {
-                    item { ActionCard("Approve Script", Icons.Default.CheckCircle) { onStatusUpdate("WAITING_FOR_PAYMENT") } }
-                }
-                
+                // Payment — status banner is now info-only; this is the single Pay interaction point
                 if (status == "WAITING_FOR_PAYMENT" && isBrand) {
                     item {
-                        ActionCard("Pay Now", Icons.Default.Payments) {
-                            // Status moves to IN_PROGRESS only via the server-verified
-                            // payment.service.js path once Razorpay confirms payment —
-                            // never by setting it directly from this button.
+                        ActionCard("Pay Now", Icons.Default.Payments, isLoading = isActionLoading) {
                             val collabId = collaborationId
-                            if (collabId != null && activity != null && brandViewModel != null) {
+                            if (collabId != null && activity != null && brandViewModel != null && !isActionLoading) {
                                 FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                                     val token = result.token
                                     if (token != null) {
@@ -163,12 +144,12 @@ fun RestrictedActionPanel(
                     }
                 }
 
-                // Implementation Phase
+                // Content upload — not in timeline
                 if (status == "IN_PROGRESS" && !isBrand) {
-                    item { ActionCard("Complete Work", Icons.Default.CloudUpload) { showUpload = true } }
+                    item { ActionCard("Complete Work", Icons.Default.CloudUpload, enabled = !isActionLoading) { showUpload = true } }
                 }
 
-                // Always available (except when completed)
+                // Always available (except terminal states)
                 if (status != "COMPLETED" && status != "REJECTED" && status != "REVOKED") {
                     item { ActionCard("Feedback", Icons.Default.Feedback) { showFeedback = true } }
                 }
@@ -186,33 +167,6 @@ fun RestrictedActionPanel(
                 onSend("Negotiated Proposal: ₹$amount on $platform - $delStr", "NEGOTIATION", mapOf("amount" to amount, "platform" to platform, "items" to deliverables))
                 onStatusUpdate("NEGOTIATION")
                 showNegotiation = false
-            }
-        )
-    }
-
-    if (showBrief) {
-        TextInputDialog(
-            title = "Share Campaign Brief",
-            label = "Brief Link",
-            onDismiss = { showBrief = false },
-            onSend = { link ->
-                onSend("Campaign Brief Shared", "BRIEF", mapOf("link" to link))
-                onStatusUpdate("BRIEF_SENT")
-                showBrief = false
-            }
-        )
-    }
-
-    if (showScript) {
-        TextInputDialog(
-            title = "Submit Script",
-            label = "Script Content",
-            multiline = true,
-            onDismiss = { showScript = false },
-            onSend = { content ->
-                onSend("Script Submitted", "SCRIPT", mapOf("content" to content))
-                onStatusUpdate("SCRIPT_SENT")
-                showScript = false
             }
         )
     }
@@ -364,11 +318,14 @@ fun ContentUploadDialog(
 fun ActionCard(
     label: String,
     icon: ImageVector,
+    enabled: Boolean = true,
+    isLoading: Boolean = false,
     onClick: () -> Unit
 ) {
+    val alpha = if (enabled) 1f else 0.4f
     Surface(
         modifier = Modifier
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled && !isLoading, onClick = onClick)
             .width(100.dp)
             .defaultMinSize(minHeight = Dimens.minTouchTarget),
         shape = MaterialTheme.shapes.medium,
@@ -383,21 +340,29 @@ fun ActionCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f * alpha)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(Dimens.space8))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
