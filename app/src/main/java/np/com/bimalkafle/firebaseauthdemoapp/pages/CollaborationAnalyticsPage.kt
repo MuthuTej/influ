@@ -232,7 +232,7 @@ fun InstagramPostCard(post: InstagramPostData) {
                         .size(width = 100.dp, height = 100.dp)
                         .clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop,
-                    error = painterResource(id = R.drawable.ic_instagram)
+                    error = painterResource(id = R.drawable.instagram_logo)
                 )
                 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -663,8 +663,15 @@ fun PlatformMetricCard(analytics: CollaborationAnalytics, expandedDefault: Boole
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(12.dp), color = themeColor_campaign.copy(alpha = 0.1f)) {
-                    Icon(imageVector = getPlatformIcon(analytics.platform), contentDescription = null, tint = themeColor_campaign, modifier = Modifier.padding(8.dp))
+                Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(12.dp), color = Color.Transparent) {
+                    val platformType = analytics.platform?.lowercase()
+                    if (platformType == "instagram") {
+                        Image(painter = painterResource(id = R.drawable.instagram_logo), contentDescription = null, modifier = Modifier.padding(8.dp))
+                    } else if (platformType == "youtube") {
+                        Image(painter = painterResource(id = R.drawable.youtube_logo), contentDescription = null, modifier = Modifier.padding(8.dp))
+                    } else {
+                        Icon(imageVector = getPlatformIcon(analytics.platform), contentDescription = null, tint = themeColor_campaign, modifier = Modifier.padding(8.dp))
+                    }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {

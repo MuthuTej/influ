@@ -272,10 +272,10 @@ fun BrandRegistrationScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         val iconRes = when (platform) {
-                            "YouTube" -> R.drawable.ic_youtube
-                            "Instagram" -> R.drawable.ic_instagram
+                            "YouTube" -> R.drawable.youtube_logo
+                            "Instagram" -> R.drawable.instagram_logo
                             "Facebook" -> R.drawable.ic_facebook
-                            else -> R.drawable.ic_youtube
+                            else -> R.drawable.youtube_logo
                         }
                         Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(12.dp))

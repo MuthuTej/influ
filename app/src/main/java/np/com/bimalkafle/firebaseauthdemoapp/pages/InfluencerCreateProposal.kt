@@ -207,10 +207,11 @@ fun InfluencerCreateProposal(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                val icon = when (platformName.lowercase()) {
-                                    "instagram" -> painterResource(id = R.drawable.ic_instagram)
+                                val platformType = platformName.lowercase()
+                                val icon = when (platformType) {
+                                    "instagram" -> painterResource(id = R.drawable.instagram_logo)
                                     "facebook" -> painterResource(id = R.drawable.ic_facebook)
-                                    "youtube" -> painterResource(id = R.drawable.ic_youtube)
+                                    "youtube" -> painterResource(id = R.drawable.youtube_logo)
                                     else -> null
                                 }
                                 if (icon != null) {
@@ -220,9 +221,8 @@ fun InfluencerCreateProposal(
                                 Text(
                                     platformName.uppercase(),
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = when(platformName.lowercase()) {
-                                        "youtube" -> Color(0xFFCC0000)
-                                        "instagram" -> Color(0xFFE4405F)
+                                    color = when(platformType) {
+                                        "youtube", "instagram" -> Color.Black
                                         else -> MaterialTheme.colorScheme.primary
                                     },
                                     fontSize = 14.sp

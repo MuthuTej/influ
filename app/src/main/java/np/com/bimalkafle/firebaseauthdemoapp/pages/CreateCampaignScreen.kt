@@ -372,10 +372,10 @@ fun CreateCampaignScreen(
 
 @Composable
 fun PlatformIcon(name: String) {
-    val icon = when (name) {
-        "Youtube" -> painterResource(id = R.drawable.ic_youtube)
-        "Instagram" -> painterResource(id = R.drawable.ic_instagram)
-        "Facebook" -> painterResource(id = R.drawable.ic_facebook)
+    val icon = when (name.lowercase()) {
+        "youtube" -> painterResource(id = R.drawable.youtube_logo)
+        "instagram" -> painterResource(id = R.drawable.instagram_logo)
+        "facebook" -> painterResource(id = R.drawable.ic_facebook)
         else -> painterResource(id = R.drawable.splash1)
     }
     Image(painter = icon, contentDescription = name, modifier = Modifier.size(24.dp))

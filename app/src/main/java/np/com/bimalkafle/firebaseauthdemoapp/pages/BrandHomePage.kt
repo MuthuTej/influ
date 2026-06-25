@@ -580,8 +580,8 @@ fun TopPicksSectionBrand(
             ) {
                 platforms.forEach { platform ->
                     val iconRes = when (platform) {
-                        "YouTube" -> R.drawable.ic_youtube
-                        "Instagram" -> R.drawable.ic_instagram
+                        "YouTube" -> R.drawable.youtube_logo
+                        "Instagram" -> R.drawable.instagram_logo
                         "Facebook" -> R.drawable.ic_facebook
                         else -> R.drawable.vector 
                     }
@@ -597,6 +597,14 @@ fun TopPicksSectionBrand(
                         icon = { 
                             if (platform == "All") {
                                 Icon(Icons.Default.Groups, contentDescription = "All", modifier = Modifier.size(24.dp), tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f))
+                            } else if (platform == "YouTube" || platform == "Instagram") {
+                                Image(
+                                    painter = painterResource(id = iconRes),
+                                    contentDescription = platform,
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .alpha(if (selectedPlatform == platform) 1f else 0.5f)
+                                )
                             } else {
                                 Icon(
                                     painter = painterResource(id = iconRes), 
@@ -738,28 +746,36 @@ fun BrandCardBrand(
                 val platformToShow = if (selectedPlatform != null) influencer.platforms?.find { it.platform.equals(selectedPlatform, ignoreCase = true) } else influencer.platforms?.firstOrNull()
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     val platformType = platformToShow?.platform?.uppercase()
-                    val platformIcon = when(platformType) {
-                        "YOUTUBE" -> R.drawable.ic_youtube
-                        "INSTAGRAM" -> R.drawable.ic_instagram
-                        "FACEBOOK" -> R.drawable.ic_facebook
-                        else -> R.drawable.ic_instagram 
-                    }
-                    
-                    if (platformType == "INSTAGRAM") {
-                        Box(
-                            modifier = Modifier.size(24.dp).clip(CircleShape).background(instaGradient),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(painter = painterResource(id = platformIcon), contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+
+                    when (platformType) {
+                        "YOUTUBE" -> {
+                            Image(
+                                painter = painterResource(id = R.drawable.youtube_logo),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
-                    } else {
-                        val platformColor = when(platformType) {
-                            "YOUTUBE" -> youtubeColor
-                            "FACEBOOK" -> facebookColor
-                            else -> Color.Gray
+                        "INSTAGRAM" -> {
+                            Image(
+                                painter = painterResource(id = R.drawable.instagram_logo),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
-                        Surface(shape = CircleShape, color = platformColor, modifier = Modifier.size(24.dp)) {
-                            Box(contentAlignment = Alignment.Center) { Icon(painter = painterResource(id = platformIcon), contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp)) }
+                        else -> {
+                            val platformIcon = when(platformType) {
+                                "FACEBOOK" -> R.drawable.ic_facebook
+                                else -> R.drawable.ic_instagram
+                            }
+                            val platformColor = when(platformType) {
+                                "FACEBOOK" -> facebookColor
+                                else -> Color.Gray
+                            }
+                            Surface(shape = CircleShape, color = platformColor, modifier = Modifier.size(24.dp)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(painter = painterResource(id = platformIcon), contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                }
+                            }
                         }
                     }
 
