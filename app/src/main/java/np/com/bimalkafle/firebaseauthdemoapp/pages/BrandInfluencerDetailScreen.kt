@@ -45,8 +45,8 @@ private val influencerDetailThemeColor: Color
 private val detailSoftGray = Color(0xFFF8F9FA)
 private val detailDarkerGray = Color(0xFF6C757D)
 private val platformsColors = mapOf(
-    "INSTAGRAM" to Color(0xFFF8CA43),
-    "YOUTUBE" to Color(0xFFFA4A4A),
+    "INSTAGRAM" to Color(0xFFE1306C),
+    "YOUTUBE" to Color(0xFFFF0000),
     "X" to Color(0xFF000000),
     "TWITTER" to Color(0xFF1DA1F2)
 )
@@ -350,8 +350,10 @@ private fun PlatformsCard(influencer: InfluencerProfile) {
 private fun PlatformProgressItem(
     platform: np.com.bimalkafle.firebaseauthdemoapp.model.Platform
 ) {
-    val primaryColor = platformsColors[platform.platform.uppercase()] ?: Color.Gray
-    val bgColor = primaryColor.copy(alpha = 0.08f)
+    val platformType = platform.platform.uppercase()
+    val isOriginalLogo = platformType == "YOUTUBE" || platformType == "INSTAGRAM"
+    val primaryColor = if (isOriginalLogo) Color.Transparent else (platformsColors[platformType] ?: Color.Gray)
+    val bgColor = if (isOriginalLogo) Color.Black.copy(alpha = 0.05f) else primaryColor.copy(alpha = 0.08f)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -365,7 +367,19 @@ private fun PlatformProgressItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = platform.platform.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = primaryColor)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (platformType == "YOUTUBE") {
+                        Image(painter = painterResource(id = R.drawable.youtube_logo), contentDescription = null, modifier = Modifier.size(20.dp))
+                    } else if (platformType == "INSTAGRAM") {
+                        Image(painter = painterResource(id = R.drawable.instagram_logo), contentDescription = null, modifier = Modifier.size(20.dp))
+                    } else {
+                        Text(text = platform.platform.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = primaryColor)
+                    }
+                    if (isOriginalLogo) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = platform.platform.uppercase(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
+                    }
+                }
                 Text(text = formatInfluencerCount(platform.followers ?: 0) + " Followers", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
             }
 
@@ -421,11 +435,20 @@ private fun PricingTable(influencer: InfluencerProfile) {
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 influencer.pricing?.forEachIndexed { index, pricing ->
-                    val platformColor = platformsColors[pricing.platform.uppercase()] ?: influencerDetailThemeColor
+                    val platformType = pricing.platform.uppercase()
+                    val platformColor = platformsColors[platformType] ?: influencerDetailThemeColor
                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             Surface(color = platformColor.copy(alpha = 0.1f), shape = RoundedCornerShape(12.dp), modifier = Modifier.size(44.dp)) {
-                                Box(contentAlignment = Alignment.Center) { Icon(imageVector = getDeliverableIcon(pricing.deliverable), contentDescription = null, tint = platformColor, modifier = Modifier.size(22.dp)) }
+                                Box(contentAlignment = Alignment.Center) { 
+                                    if (platformType == "YOUTUBE") {
+                                        Image(painter = painterResource(id = R.drawable.youtube_logo), contentDescription = null, modifier = Modifier.size(22.dp))
+                                    } else if (platformType == "INSTAGRAM") {
+                                        Image(painter = painterResource(id = R.drawable.instagram_logo), contentDescription = null, modifier = Modifier.size(22.dp))
+                                    } else {
+                                        Icon(imageVector = getDeliverableIcon(pricing.deliverable), contentDescription = null, tint = platformColor, modifier = Modifier.size(22.dp))
+                                    }
+                                }
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
@@ -507,9 +530,9 @@ private fun YouTubeInsightsSection(insights: np.com.bimalkafle.firebaseauthdemoa
         Text("Channel: ${insights.title ?: "N/A"}", color = detailDarkerGray, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            YouTubeStatCard(label = "Subscribers", value = formatInfluencerCount(insights.subscribers ?: 0), icon = Icons.Default.People, modifier = Modifier.weight(1f))
-            YouTubeStatCard(label = "Total Views", value = formatInfluencerCount(insights.totalViews?.toInt() ?: 0), icon = Icons.Default.Visibility, modifier = Modifier.weight(1f))
-            YouTubeStatCard(label = "Videos", value = (insights.totalVideos ?: 0).toString(), icon = Icons.Default.VideoLibrary, modifier = Modifier.weight(1f))
+            YouTubeStatCard(label = "Subscribers", value = formatInfluencerCount(insights.subscribers ?: 0), icon = null, modifier = Modifier.weight(1f))
+            YouTubeStatCard(label = "Total Views", value = formatInfluencerCount(insights.totalViews?.toInt() ?: 0), icon = null, modifier = Modifier.weight(1f))
+            YouTubeStatCard(label = "Videos", value = (insights.totalVideos ?: 0).toString(), icon = null, modifier = Modifier.weight(1f))
         }
         Spacer(modifier = Modifier.height(24.dp))
         if (!insights.demographics.isNullOrEmpty()) { YouTubeDemographicsCard(insights.demographics!!) }
@@ -521,10 +544,14 @@ private fun YouTubeInsightsSection(insights: np.com.bimalkafle.firebaseauthdemoa
 }
 
 @Composable
-private fun YouTubeStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+private fun YouTubeStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, modifier: Modifier = Modifier) {
     Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, tint = platformsColors["YOUTUBE"] ?: Color.Red, modifier = Modifier.size(24.dp))
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = platformsColors["YOUTUBE"] ?: Color.Red, modifier = Modifier.size(24.dp))
+            } else {
+                Image(painter = painterResource(id = R.drawable.youtube_logo), contentDescription = null, modifier = Modifier.size(24.dp))
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Text(label, fontSize = 11.sp, color = detailDarkerGray)
@@ -543,7 +570,7 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Age Groups", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(12.dp))
-                    val ageData = demographics.groupBy { d -> d.ageGroup ?: "Other" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
+                    val ageData = demographics.groupBy { d -> d.ageGroup ?: \"Other\" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
                     val values = ageData.values.toList()
                     val labels = ageData.keys.toList()
                     val colors = listOf(Color(0xFF6C63FF), MaterialTheme.colorScheme.primary, Color(0xFF4CAF50), Color(0xFFFFC107), Color(0xFF2196F3), Color(0xFF9C27B0)).take(values.size)
@@ -565,7 +592,7 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Gender", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(12.dp))
-                    val genderData = demographics.groupBy { d -> d.gender ?: "Other" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
+                    val genderData = demographics.groupBy { d -> d.gender ?: \"Other\" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
                     val values = genderData.values.toList()
                     val labels = genderData.keys.toList()
                     val colors = listOf(Color(0xFF64B5F6), Color(0xFFF06292), Color(0xFF9E9E9E)).take(values.size)
@@ -636,7 +663,7 @@ private fun InstagramInsightsSection(metrics: np.com.bimalkafle.firebaseauthdemo
                         Text("Average days between posts", color = detailDarkerGray, fontSize = 12.sp)
                     }
                     Text(
-                        text = "${metrics.postingFrequencyDays ?: "N/A"} Days",
+                        text = "${metrics.postingFrequencyDays ?: \"N/A\"} Days",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 20.sp,
                         color = platformsColors["INSTAGRAM"] ?: Color.Red
@@ -677,7 +704,7 @@ private fun InstagramInsightsSection(metrics: np.com.bimalkafle.firebaseauthdemo
 private fun InstagramStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
     Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, tint = platformsColors["INSTAGRAM"] ?: Color.Yellow, modifier = Modifier.size(24.dp))
+            Image(painter = painterResource(id = R.drawable.instagram_logo), contentDescription = null, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.height(8.dp))
             Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Text(label, fontSize = 11.sp, color = detailDarkerGray)

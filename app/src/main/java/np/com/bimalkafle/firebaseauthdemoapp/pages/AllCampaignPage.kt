@@ -273,25 +273,39 @@ fun CampaignDetailCard(campaign: Campaign) {
                         modifier = Modifier.padding(bottom = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val iconRes = when (platform.platform.uppercase()) {
-                            "INSTAGRAM" -> R.drawable.ic_instagram
-                            "YOUTUBE" -> R.drawable.ic_youtube
-                            "FACEBOOK" -> R.drawable.ic_facebook
-                            "TWITTER" -> R.drawable.ic_twitter
-                            else -> R.drawable.ic_instagram
+                        val platformType = platform.platform.uppercase()
+                        if (platformType == "INSTAGRAM") {
+                            Image(
+                                painter = painterResource(id = R.drawable.instagram_logo),
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        } else if (platformType == "YOUTUBE") {
+                            Image(
+                                painter = painterResource(id = R.drawable.youtube_logo),
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        } else {
+                            val iconRes = when (platformType) {
+                                "FACEBOOK" -> R.drawable.ic_facebook
+                                "TWITTER" -> R.drawable.ic_twitter
+                                else -> R.drawable.ic_instagram
+                            }
+                            Icon(
+                                painter = painterResource(id = iconRes),
+                                contentDescription = null,
+                                tint = brandThemeColor,
+                                modifier = Modifier.size(14.dp)
+                            )
                         }
-                        Icon(
-                            painter = painterResource(id = iconRes),
-                            contentDescription = null,
-                            tint = brandThemeColor,
-                            modifier = Modifier.size(14.dp)
-                        )
+                        
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = platform.platform, 
                             fontWeight = FontWeight.Bold, 
                             fontSize = 12.sp, 
-                            color = brandThemeColor
+                            color = if (platformType == "INSTAGRAM" || platformType == "YOUTUBE") Color.Black else brandThemeColor
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         

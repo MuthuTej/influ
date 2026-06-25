@@ -277,16 +277,21 @@ fun InfluencerHomePage(
                                                         modifier = Modifier.size(24.dp),
                                                         tint = if (selectedPlatform == platform) brandThemeColor else Color.Gray
                                                     )
+                                                } else if (platform == "YouTube" || platform == "Instagram") {
+                                                    val iconRes = if (platform == "YouTube") R.drawable.youtube_logo else R.drawable.instagram_logo
+                                                    Image(
+                                                        painter = painterResource(id = iconRes),
+                                                        contentDescription = platform,
+                                                        modifier = Modifier
+                                                            .size(24.dp)
+                                                            .alpha(if (selectedPlatform == platform) 1f else 0.5f)
+                                                    )
                                                 } else {
                                                     val iconRes = when (platform) {
-                                                        "YouTube" -> R.drawable.ic_youtube
-                                                        "Instagram" -> R.drawable.ic_instagram
                                                         "Facebook" -> R.drawable.ic_facebook
                                                         else -> R.drawable.ic_youtube
                                                     }
                                                     val iconColor = when (platform) {
-                                                        "YouTube" -> youtubeColor
-                                                        "Instagram" -> instagramColor
                                                         "Facebook" -> facebookColor
                                                         else -> Color.Gray
                                                     }

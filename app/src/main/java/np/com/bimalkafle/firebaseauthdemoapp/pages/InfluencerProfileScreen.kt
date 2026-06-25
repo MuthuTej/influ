@@ -180,8 +180,8 @@ fun InfluencerProfileContent(
     val detailSoftGray = Color(0xFFF8F9FA)
     val detailDarkerGray = Color(0xFF6C757D)
     val platformsColors = mapOf(
-        "INSTAGRAM" to Color(0xFFF8CA43),
-        "YOUTUBE" to Color(0xFFFA4A4A),
+        "INSTAGRAM" to Color(0xFFE1306C),
+        "YOUTUBE" to Color(0xFFFF0000),
         "X" to Color(0xFF000000),
         "TWITTER" to Color(0xFF1DA1F2)
     )
@@ -496,11 +496,18 @@ fun InfluencerProfileContent(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Surface(
-                                                    color = themeColor.copy(alpha = 0.1f),
-                                                    shape = CircleShape,
-                                                    modifier = Modifier.size(8.dp)
-                                                ) {}
+                                                val platformType = pricing.platform.uppercase()
+                                                if (platformType == "YOUTUBE") {
+                                                    Image(painter = painterResource(id = R.drawable.youtube_logo), contentDescription = null, modifier = Modifier.size(16.dp))
+                                                } else if (platformType == "INSTAGRAM") {
+                                                    Image(painter = painterResource(id = R.drawable.instagram_logo), contentDescription = null, modifier = Modifier.size(16.dp))
+                                                } else {
+                                                    Surface(
+                                                        color = themeColor.copy(alpha = 0.1f),
+                                                        shape = CircleShape,
+                                                        modifier = Modifier.size(8.dp)
+                                                    ) {}
+                                                }
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(text = "${pricing.platform} - ${pricing.deliverable}", color = Color.Black, fontSize = 14.sp)
                                             }
@@ -630,9 +637,9 @@ private fun YouTubeInsightsSection(insights: np.com.bimalkafle.firebaseauthdemoa
         Text("Channel: ${insights.title ?: "N/A"}", color = detailDarkerGray, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            YouTubeStatCard(label = "Subscribers", value = formatCount(insights.subscribers ?: 0), icon = Icons.Default.People, modifier = Modifier.weight(1f), platformsColors = platformsColors, detailDarkerGray = detailDarkerGray)
-            YouTubeStatCard(label = "Total Views", value = formatCount(insights.totalViews?.toInt() ?: 0), icon = Icons.Default.Visibility, modifier = Modifier.weight(1f), platformsColors = platformsColors, detailDarkerGray = detailDarkerGray)
-            YouTubeStatCard(label = "Videos", value = (insights.totalVideos ?: 0).toString(), icon = Icons.Default.VideoLibrary, modifier = Modifier.weight(1f), platformsColors = platformsColors, detailDarkerGray = detailDarkerGray)
+            YouTubeStatCard(label = "Subscribers", value = formatCount(insights.subscribers ?: 0), icon = null, modifier = Modifier.weight(1f), platformsColors = platformsColors, detailDarkerGray = detailDarkerGray)
+            YouTubeStatCard(label = "Total Views", value = formatCount(insights.totalViews?.toInt() ?: 0), icon = null, modifier = Modifier.weight(1f), platformsColors = platformsColors, detailDarkerGray = detailDarkerGray)
+            YouTubeStatCard(label = "Videos", value = (insights.totalVideos ?: 0).toString(), icon = null, modifier = Modifier.weight(1f), platformsColors = platformsColors, detailDarkerGray = detailDarkerGray)
         }
         Spacer(modifier = Modifier.height(24.dp))
         if (!insights.demographics.isNullOrEmpty()) { YouTubeDemographicsCard(insights.demographics!!, detailDarkerGray) }
@@ -644,10 +651,14 @@ private fun YouTubeInsightsSection(insights: np.com.bimalkafle.firebaseauthdemoa
 }
 
 @Composable
-private fun YouTubeStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
+private fun YouTubeStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, modifier: Modifier = Modifier, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
     Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, tint = platformsColors["YOUTUBE"] ?: Color.Red, modifier = Modifier.size(24.dp))
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = platformsColors["YOUTUBE"] ?: Color.Red, modifier = Modifier.size(24.dp))
+            } else {
+                Image(painter = painterResource(id = R.drawable.youtube_logo), contentDescription = null, modifier = Modifier.size(24.dp))
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Text(label, fontSize = 11.sp, color = detailDarkerGray)
@@ -806,7 +817,7 @@ private fun InstagramInsightsSection(metrics: np.com.bimalkafle.firebaseauthdemo
 private fun InstagramStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
     Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, tint = platformsColors["INSTAGRAM"] ?: Color.Yellow, modifier = Modifier.size(24.dp))
+            Image(painter = painterResource(id = R.drawable.instagram_logo), contentDescription = null, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.height(8.dp))
             Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Text(label, fontSize = 11.sp, color = detailDarkerGray)
