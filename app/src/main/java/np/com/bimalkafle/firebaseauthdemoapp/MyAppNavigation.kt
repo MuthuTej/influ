@@ -14,6 +14,7 @@ import android.widget.Toast
 import kotlinx.coroutines.flow.collectLatest
 import np.com.bimalkafle.firebaseauthdemoapp.network.SessionManager
 import np.com.bimalkafle.firebaseauthdemoapp.pages.*
+import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.AiChatScreen
 import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatListScreen
 import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatScreen
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
@@ -318,6 +319,20 @@ fun MyAppNavigation(
         }
         composable("notifications") {
             NotificationPage(navController, notificationViewModel)
+        }
+        composable("ai_chat") {
+            AiChatScreen(navController = navController)
+        }
+        composable(
+            route = "brand_campaign_detail/{campaignId}",
+            arguments = listOf(navArgument("campaignId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val campaignId = backStackEntry.arguments?.getString("campaignId") ?: ""
+            BrandCampaignDetailScreen(
+                campaignId = campaignId,
+                navController = navController,
+                campaignViewModel = campaignViewModel
+            )
         }
     })
 }

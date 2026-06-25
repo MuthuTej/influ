@@ -46,7 +46,34 @@ data class CampaignDetail(
     val targetAudience: CampaignAudienceResponse?,
     val platforms: List<Platform>?,
     val brand: Brand?,
-    val categories: List<BrandCategory>? = null
+    val categories: List<BrandCategory>? = null,
+    val collaborations: List<CampaignCollaborationSummary>? = null,
+    val overallAnalytics: CampaignOverallAnalytics? = null
+)
+
+/** One collaboration as seen from the campaign's combined-analytics view — just
+ * enough to render a status breakdown, total spend, and a tappable list row;
+ * full detail still lives behind collaboration_analytics/{id}. */
+data class CampaignCollaborationSummary(
+    val id: String,
+    val status: String,
+    val influencerName: String?,
+    val influencerHandle: String?,
+    val totalPrice: Int
+)
+
+/** Sum of OverallAnalytics across every collaboration in the campaign — same
+ * shape as a single collaboration's overallAnalytics, just aggregated. */
+data class CampaignOverallAnalytics(
+    val likes: Int?,
+    val comments: Int?,
+    val views: Int?,
+    val shares: Int?,
+    val retweets: Int?,
+    val replies: Int?,
+    val impressions: Int?,
+    val clicks: Int?,
+    val saves: Int?
 )
 
 data class CampaignAudienceResponse(

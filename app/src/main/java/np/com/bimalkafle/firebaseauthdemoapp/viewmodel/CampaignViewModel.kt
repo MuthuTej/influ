@@ -399,6 +399,23 @@ class CampaignViewModel : ViewModel() {
                         locations
                       }
                     }
+                    collaborations {
+                      id
+                      status
+                      influencer { name handle }
+                      pricing { price currency }
+                    }
+                    overallAnalytics {
+                      likes
+                      comments
+                      views
+                      shares
+                      retweets
+                      replies
+                      impressions
+                      clicks
+                      saves
+                    }
                   }
                 }
             """.trimIndent()
@@ -678,6 +695,47 @@ class CampaignViewModel : ViewModel() {
             }
         }
 
+        val collaborationsArray = json.optJSONArray("collaborations")
+        val collaborations = if (collaborationsArray != null) {
+            val list = mutableListOf<CampaignCollaborationSummary>()
+            for (i in 0 until collaborationsArray.length()) {
+                val c = collaborationsArray.getJSONObject(i)
+                val influencerObj = c.optJSONObject("influencer")
+                val pricingArray = c.optJSONArray("pricing")
+                var totalPrice = 0
+                if (pricingArray != null) {
+                    for (j in 0 until pricingArray.length()) {
+                        totalPrice += pricingArray.getJSONObject(j).optInt("price")
+                    }
+                }
+                list.add(
+                    CampaignCollaborationSummary(
+                        id = c.optString("id"),
+                        status = c.optString("status"),
+                        influencerName = influencerObj?.optString("name"),
+                        influencerHandle = influencerObj?.optString("handle"),
+                        totalPrice = totalPrice
+                    )
+                )
+            }
+            list
+        } else null
+
+        val overallAnalyticsObj = json.optJSONObject("overallAnalytics")
+        val overallAnalytics = overallAnalyticsObj?.let {
+            CampaignOverallAnalytics(
+                likes = if (it.isNull("likes")) null else it.optInt("likes"),
+                comments = if (it.isNull("comments")) null else it.optInt("comments"),
+                views = if (it.isNull("views")) null else it.optInt("views"),
+                shares = if (it.isNull("shares")) null else it.optInt("shares"),
+                retweets = if (it.isNull("retweets")) null else it.optInt("retweets"),
+                replies = if (it.isNull("replies")) null else it.optInt("replies"),
+                impressions = if (it.isNull("impressions")) null else it.optInt("impressions"),
+                clicks = if (it.isNull("clicks")) null else it.optInt("clicks"),
+                saves = if (it.isNull("saves")) null else it.optInt("saves")
+            )
+        }
+
         return CampaignDetail(
             json.optString("id"),
             json.optString("title"),
@@ -691,7 +749,9 @@ class CampaignViewModel : ViewModel() {
             audience,
             platforms,
             brand,
-            categories
+            categories,
+            collaborations,
+            overallAnalytics
         )
     }
     

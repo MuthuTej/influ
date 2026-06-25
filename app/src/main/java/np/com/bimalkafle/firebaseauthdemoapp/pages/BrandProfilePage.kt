@@ -37,6 +37,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.Brand
 import np.com.bimalkafle.firebaseauthdemoapp.model.BrandCategory
 import np.com.bimalkafle.firebaseauthdemoapp.model.PreferredPlatform
 import np.com.bimalkafle.firebaseauthdemoapp.model.TargetAudience
+import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 
@@ -102,7 +103,8 @@ fun BrandProfilePage(
                 navController = navController,
                 isBrand = true
             )
-        }
+        },
+        floatingActionButton = { AiChatFab(navController) }
     )
 }
 
@@ -115,7 +117,8 @@ fun BrandProfileContent(
     onSignOut: () -> Unit,
     onNavigateToCreateCampaign: () -> Unit,
     onUpdateProfile: (Brand) -> Unit,
-    bottomBar: @Composable () -> Unit = {}
+    bottomBar: @Composable () -> Unit = {},
+    floatingActionButton: @Composable () -> Unit = {}
 ) {
     var isEditMode by remember { mutableStateOf(false) }
 
@@ -147,7 +150,8 @@ fun BrandProfileContent(
 
     val themeColor = MaterialTheme.colorScheme.primary
     Scaffold(
-        bottomBar = bottomBar
+        bottomBar = bottomBar,
+        floatingActionButton = floatingActionButton
     ) { padding ->
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

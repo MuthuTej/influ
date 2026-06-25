@@ -2,6 +2,7 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -216,7 +217,9 @@ fun AllCampaignPage(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(myCampaigns) { campaign ->
-                                CampaignDetailCard(campaign)
+                                CampaignDetailCard(campaign, onClick = {
+                                    navController.navigate("brand_campaign_detail/${campaign.id}")
+                                })
                             }
                         }
                     }
@@ -228,9 +231,9 @@ fun AllCampaignPage(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun CampaignDetailCard(campaign: Campaign) {
+fun CampaignDetailCard(campaign: Campaign, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),

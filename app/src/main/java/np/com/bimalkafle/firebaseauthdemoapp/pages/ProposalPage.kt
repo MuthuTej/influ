@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.AppPullToRefreshBox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -188,17 +189,20 @@ fun ProposalPage(
             )
         },
         floatingActionButton = {
-            if (isBrand) {
-                FloatingActionButton(
-                    onClick = { navController.navigate("create_campaign") },
-                    containerColor = headerColor,
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Create Campaign",
-                        tint = Color.White
-                    )
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                AiChatFab(navController, size = if (isBrand) 40.dp else 56.dp)
+                if (isBrand) {
+                    FloatingActionButton(
+                        onClick = { navController.navigate("create_campaign") },
+                        containerColor = headerColor,
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Create Campaign",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }
