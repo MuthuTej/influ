@@ -23,6 +23,7 @@ import android.widget.Toast
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatItem
@@ -81,6 +82,9 @@ fun ChatListScreen(
                 navController = navController,
                 isBrand = isBrand
             )
+        },
+        floatingActionButton = {
+            AiChatFab(navController)
         }
     ) { innerPadding ->
         AppPullToRefreshBox(

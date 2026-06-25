@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
+import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
@@ -107,7 +108,8 @@ fun InfluencerSearchPage(
                     )
                 }
             }
-        }
+        },
+        floatingActionButton = { AiChatFab(navController) }
     ) { padding ->
         // ---------------- PAGINATION LOGIC ----------------
         var currentPage by remember { mutableStateOf(1) }

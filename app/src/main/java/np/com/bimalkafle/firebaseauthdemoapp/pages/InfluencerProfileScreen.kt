@@ -44,6 +44,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramMetrics
 import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeInsights
 import np.com.bimalkafle.firebaseauthdemoapp.model.Platform
 import np.com.bimalkafle.firebaseauthdemoapp.model.YoutubeDemographics
+import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import androidx.compose.foundation.Canvas
@@ -122,7 +123,8 @@ fun InfluencerProfileScreen(
                     )
                 }
             }
-        }
+        },
+        floatingActionButton = { AiChatFab(navController) }
     )
 }
 
@@ -134,7 +136,8 @@ fun InfluencerProfileContent(
     isLoading: Boolean,
     onSignOut: () -> Unit,
     onUpdateProfile: (InfluencerProfile) -> Unit,
-    bottomBar: @Composable () -> Unit = {}
+    bottomBar: @Composable () -> Unit = {},
+    floatingActionButton: @Composable () -> Unit = {}
 ) {
     var isEditMode by remember { mutableStateOf(false) }
 
@@ -187,7 +190,8 @@ fun InfluencerProfileContent(
     )
 
     Scaffold(
-        bottomBar = bottomBar
+        bottomBar = bottomBar,
+        floatingActionButton = floatingActionButton
     ) { padding ->
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

@@ -30,6 +30,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.FilterDropdown
@@ -173,12 +174,15 @@ fun BrandSearchPageContent(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onCreateCampaignClick,
-                containerColor = MaterialTheme.colorScheme.primary,
-                shape = CircleShape
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White)
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                AiChatFab(navController, size = 40.dp)
+                FloatingActionButton(
+                    onClick = onCreateCampaignClick,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    shape = CircleShape
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White)
+                }
             }
         }
     ) { padding ->

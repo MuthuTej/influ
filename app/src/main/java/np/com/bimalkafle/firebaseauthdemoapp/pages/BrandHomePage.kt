@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.AppPullToRefreshBox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -124,12 +125,15 @@ fun BrandHomePage(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate("create_campaign") },
-                containerColor = brandThemeColor,
-                shape = CircleShape
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White)
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                AiChatFab(navController, size = 40.dp)
+                FloatingActionButton(
+                    onClick = { navController.navigate("create_campaign") },
+                    containerColor = brandThemeColor,
+                    shape = CircleShape
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White)
+                }
             }
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0)

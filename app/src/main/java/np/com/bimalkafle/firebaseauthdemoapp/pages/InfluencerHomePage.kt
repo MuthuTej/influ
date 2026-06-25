@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.AppPullToRefreshBox
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -169,6 +170,7 @@ fun InfluencerHomePage(
                 }
             }
         },
+        floatingActionButton = { AiChatFab(navController) },
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
 
