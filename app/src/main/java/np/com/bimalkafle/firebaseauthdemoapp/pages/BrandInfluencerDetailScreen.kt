@@ -570,7 +570,7 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Age Groups", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(12.dp))
-                    val ageData = demographics.groupBy { d -> d.ageGroup ?: \"Other\" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
+                    val ageData = demographics.groupBy { d -> d.ageGroup ?: "Other" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
                     val values = ageData.values.toList()
                     val labels = ageData.keys.toList()
                     val colors = listOf(Color(0xFF6C63FF), MaterialTheme.colorScheme.primary, Color(0xFF4CAF50), Color(0xFFFFC107), Color(0xFF2196F3), Color(0xFF9C27B0)).take(values.size)
@@ -592,7 +592,7 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Gender", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(12.dp))
-                    val genderData = demographics.groupBy { d -> d.gender ?: \"Other\" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
+                    val genderData = demographics.groupBy { d -> d.gender ?: "Other" }.mapValues { entry -> entry.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
                     val values = genderData.values.toList()
                     val labels = genderData.keys.toList()
                     val colors = listOf(Color(0xFF64B5F6), Color(0xFFF06292), Color(0xFF9E9E9E)).take(values.size)
@@ -663,7 +663,7 @@ private fun InstagramInsightsSection(metrics: np.com.bimalkafle.firebaseauthdemo
                         Text("Average days between posts", color = detailDarkerGray, fontSize = 12.sp)
                     }
                     Text(
-                        text = "${metrics.postingFrequencyDays ?: \"N/A\"} Days",
+                        text = "${metrics.postingFrequencyDays ?: "N/A"} Days",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 20.sp,
                         color = platformsColors["INSTAGRAM"] ?: Color.Red
