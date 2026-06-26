@@ -5,6 +5,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
@@ -899,9 +900,8 @@ class BrandViewModel : ViewModel() {
             result.onSuccess { jsonObject ->
                 val data = jsonObject.optJSONObject("data")
                 if (data != null && data.optJSONObject("updateCollaboration") != null) {
-                    // force = true: this just changed server state, so the cache
-                    // (still holding pre-mutation data) must not block the refetch.
                     fetchCollaborations(token, force = true)
+                    pushCollaborationStatusUpdate(collaborationId, status)
                     onComplete(true)
                 } else {
                     onComplete(false)
@@ -1213,26 +1213,11 @@ class BrandViewModel : ViewModel() {
             _loading.postValue(false)
         }
     }
-    private var pollingJob: kotlinx.coroutines.Job? = null
-
-    fun startPollingCollaborations(token: String) {
-        if (pollingJob?.isActive == true) return
-        
-        pollingJob = viewModelScope.launch {
-            while (true) {
-                fetchCollaborations(token, force = true)
-                kotlinx.coroutines.delay(5000)
-            }
-        }
-    }
-
-    fun stopPollingCollaborations() {
-        pollingJob?.cancel()
-        pollingJob = null
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        stopPollingCollaborations()
+    private fun pushCollaborationStatusUpdate(collaborationId: String, status: String) {
+        val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+        FirebaseFirestore.getInstance()
+            .collection("collaboration_updates")
+            .document(collaborationId)
+            .set(mapOf("status" to status, "lastUpdated" to System.currentTimeMillis(), "updatedBy" to uid))
     }
 }

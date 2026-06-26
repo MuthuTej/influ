@@ -77,7 +77,7 @@ fun ChatListScreen(
         },
         bottomBar = {
             CmnBottomNavigationBar(
-                selectedItem = "Connect",
+                selectedItem = "Negotiation",
                 onItemSelected = { /* Handled in component */ },
                 navController = navController,
                 isBrand = isBrand
