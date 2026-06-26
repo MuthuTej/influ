@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -37,6 +38,7 @@ import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.components.ErrorState
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
+import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramProfile
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 
@@ -168,7 +170,11 @@ fun BrandInfluencerDetailContent(
                         Spacer(modifier = Modifier.height(32.dp))
                     }
 
-                    influencer.instagramMetrics?.let { instaMetrics ->
+                    val igProfiles = influencer.instagramProfiles
+                    if (!igProfiles.isNullOrEmpty()) {
+                        BrandInstagramProfilesSection(igProfiles)
+                        Spacer(modifier = Modifier.height(32.dp))
+                    } else influencer.instagramMetrics?.let { instaMetrics ->
                         InstagramInsightsSection(instaMetrics)
                         Spacer(modifier = Modifier.height(32.dp))
                     }
@@ -612,6 +618,80 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BrandInstagramProfilesSection(profiles: List<InstagramProfile>) {
+    val instaColor = Color(0xFFE1306C)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("Instagram Profiles", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Text(
+            "${profiles.size} connected profile${if (profiles.size > 1) "s" else ""}",
+            color = detailDarkerGray, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp)
+        )
+        Spacer(Modifier.height(16.dp))
+        profiles.forEach { profile ->
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = if (profile.isDefault) 3.dp else 1.dp),
+                border = if (profile.isDefault) BorderStroke(1.5.dp, instaColor) else null
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(shape = CircleShape, color = instaColor.copy(alpha = 0.12f), modifier = Modifier.size(36.dp)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = instaColor, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("@${profile.username}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    if (profile.isDefault) {
+                                        Spacer(Modifier.width(6.dp))
+                                        Surface(shape = RoundedCornerShape(4.dp), color = instaColor) {
+                                            Text("PRIMARY", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
+                                        }
+                                    }
+                                }
+                                if (profile.followers != null) {
+                                    Text("${formatInfluencerCount(profile.followers)} followers", color = detailDarkerGray, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                    profile.metrics?.let { m ->
+                        Spacer(Modifier.height(10.dp))
+                        HorizontalDivider(color = detailSoftGray)
+                        Spacer(Modifier.height(10.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ProfileStatChip("♥ ${formatInfluencerCount(m.avgLikes?.toInt() ?: 0)}", "Avg Likes", Modifier.weight(1f))
+                            ProfileStatChip("💬 ${formatInfluencerCount(m.avgComments?.toInt() ?: 0)}", "Avg Comments", Modifier.weight(1f))
+                            ProfileStatChip("👁 ${formatInfluencerCount(m.avgViews?.toInt() ?: 0)}", "Avg Views", Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileStatChip(value: String, label: String, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(8.dp), color = detailSoftGray) {
+        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(value, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(label, fontSize = 10.sp, color = detailDarkerGray)
         }
     }
 }

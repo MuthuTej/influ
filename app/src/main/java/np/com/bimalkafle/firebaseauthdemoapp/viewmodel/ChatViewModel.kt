@@ -21,6 +21,7 @@ import java.util.UUID
 
 data class ChatListEntry(
     val user: ChatUser,
+    val collaborationId: String,
     val unreadCount: Int,
     val lastMessage: String
 )
@@ -49,11 +50,8 @@ class ChatViewModel : ViewModel() {
     private val _contactInfoWarning = MutableStateFlow<String?>(null)
     val contactInfoWarning: StateFlow<String?> = _contactInfoWarning
 
-    // WebSocket clients — no addSnapshotListener anywhere in this file.
     private var conversationWsClient: ChatWebSocketClient? = null
     private var chatListWsClient: ChatWebSocketClient? = null
-
-    private var cachedUsers: List<ChatUser> = emptyList()
 
     init {
         repository.ensureUserExistsInFirestore()
@@ -65,20 +63,33 @@ class ChatViewModel : ViewModel() {
     // ── Chat list ─────────────────────────────────────────────────────────────
 
     fun loadChatList(currentUserRole: String) {
-        val currentUserId = getCurrentUserId()
-
-        // One-time snapshot from Firestore (get, not listener)
-        repository.getUsersOnce(currentUserRole, onError = { _error.value = it }) { users ->
-            cachedUsers = users
-            repository.getAllMessagesOnce(onError = { _error.value = it }) { messages ->
-                _chatList.value = buildChatList(users, messages, currentUserId)
-            }
-        }
-
-        // WebSocket for live updates (anyMessageAdded subscription)
-        chatListWsClient?.disconnect()
         viewModelScope.launch {
-            val token = getToken() ?: return@launch
+            val token = getToken() ?: run { _error.value = "Authentication error"; return@launch }
+
+            val result = BackendRepository.getChatList(token)
+            result.onSuccess { jsonList ->
+                _chatList.value = jsonList.map { json ->
+                    ChatListEntry(
+                        user = ChatUser(
+                            uid = json.optString("otherUserId"),
+                            name = json.optString("otherUserName", "Unknown"),
+                            email = "",
+                            profileImageUrl = json.optString("otherUserImageUrl")
+                                .takeIf { it.isNotBlank() }
+                        ),
+                        collaborationId = json.optString("collaborationId"),
+                        unreadCount = json.optInt("unreadCount", 0),
+                        lastMessage = json.optString("lastMessage", "")
+                    )
+                }
+            }.onFailure { err ->
+                Log.e("ChatViewModel", "loadChatList failed: ${err.message}")
+                _error.value = err.message ?: "Failed to load chats"
+            }
+
+            // WebSocket for live chat-list updates (anyMessageAdded subscription)
+            val currentUserId = getCurrentUserId()
+            chatListWsClient?.disconnect()
             chatListWsClient = ChatWebSocketClient(
                 token = token,
                 currentUserId = currentUserId,
@@ -88,50 +99,26 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    private fun buildChatList(
-        users: List<ChatUser>,
-        messages: List<ChatMessage>,
-        currentUserId: String
-    ): List<ChatListEntry> {
-        val interactedIds = messages
-            .flatMap { listOf(it.senderId, it.receiverId) }
-            .filter { it != currentUserId }
-            .toSet()
-
-        return users
-            .filter { it.uid in interactedIds }
-            .map { user ->
-                val conv = messages.filter {
-                    (it.senderId == user.uid && it.receiverId == currentUserId) ||
-                    (it.senderId == currentUserId && it.receiverId == user.uid)
-                }
-                ChatListEntry(
-                    user = user,
-                    unreadCount = conv.count { it.senderId == user.uid && !it.isRead },
-                    lastMessage = conv.maxByOrNull { it.timestamp }?.text ?: ""
-                )
-            }
-    }
-
     private fun updateChatListWithMessage(msg: ChatMessage, currentUserId: String) {
-        val otherUserId = if (msg.senderId == currentUserId) msg.receiverId else msg.senderId
         val current = _chatList.value.toMutableList()
-        val idx = current.indexOfFirst { it.user.uid == otherUserId }
+
+        // Match by collaborationId when available, otherwise by otherUserId
+        val idx = if (msg.collaborationId != null) {
+            current.indexOfFirst { it.collaborationId == msg.collaborationId }
+        } else {
+            val otherUserId = if (msg.senderId == currentUserId) msg.receiverId else msg.senderId
+            current.indexOfFirst { it.user.uid == otherUserId }
+        }
+
         if (idx >= 0) {
             val entry = current.removeAt(idx)
             current.add(0, entry.copy(
                 lastMessage = msg.text,
                 unreadCount = if (msg.senderId != currentUserId) entry.unreadCount + 1 else entry.unreadCount
             ))
-        } else {
-            val user = cachedUsers.find { it.uid == otherUserId } ?: return
-            current.add(0, ChatListEntry(
-                user = user,
-                lastMessage = msg.text,
-                unreadCount = if (msg.senderId != currentUserId) 1 else 0
-            ))
+            _chatList.value = current
         }
-        _chatList.value = current
+        // If not found (new collaboration), reload the full list next tick
     }
 
     // ── Conversation ──────────────────────────────────────────────────────────
@@ -150,12 +137,10 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             val token = getToken() ?: run { _error.value = "Authentication error"; return@launch }
 
-            // History via backend getChatMessages (or Firestore get() fallback)
             val history = repository.getMessageHistory(otherUserId, collaborationId, token)
             _messages.value = history.map { it.copy(isMe = it.senderId == currentUserId) }
             repository.markMessagesAsRead(otherUserId, collaborationId)
 
-            // WebSocket for real-time new messages (messageAdded subscription)
             conversationWsClient?.disconnect()
             conversationWsClient = ChatWebSocketClient(
                 token = token,
@@ -206,9 +191,6 @@ class ChatViewModel : ViewModel() {
         val replyId = _replyingTo.value?.id
         _replyingTo.value = null
 
-        // Optimistic insert — sender sees the message immediately.
-        // We use a temp UUID; when the backend responds with the real message
-        // (which has the backend-assigned ID), we swap the temp entry out.
         val tempId = "tmp_${UUID.randomUUID()}"
         val optimistic = ChatMessage(
             id              = tempId,
@@ -227,7 +209,6 @@ class ChatViewModel : ViewModel() {
 
         viewModelScope.launch {
             val token = getToken() ?: run {
-                // Remove the optimistic message — we have no auth
                 _messages.value = _messages.value.filter { it.id != tempId }
                 _error.value = "Authentication error"
                 return@launch
@@ -244,7 +225,6 @@ class ChatViewModel : ViewModel() {
             )
 
             result.onSuccess { confirmed ->
-                // Replace the temp entry with the backend-confirmed message
                 val real = confirmed.copy(isMe = true)
                 val updated = _messages.value.toMutableList()
                 val idx = updated.indexOfFirst { it.id == tempId }
@@ -253,12 +233,9 @@ class ChatViewModel : ViewModel() {
                     updated.none { it.id == real.id } -> updated.add(real)
                 }
                 _messages.value = updated.sortedBy { it.timestamp }
-
-                // Also update chat list (sender side — receiver gets it via WebSocket)
                 updateChatListWithMessage(real, currentUserId)
             }.onFailure {
                 Log.e("ChatViewModel", "sendMessage failed: ${it.message}")
-                // Remove optimistic message so the user knows to retry
                 _messages.value = _messages.value.filter { msg -> msg.id != tempId }
                 _error.value = "Failed to send: ${it.message}"
             }

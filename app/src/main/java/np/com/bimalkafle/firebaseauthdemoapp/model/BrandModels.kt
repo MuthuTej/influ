@@ -96,7 +96,8 @@ data class Collaboration(
     // daily content-performance cron job and Collaboration.totalViewsDelivered
     // / viewsGrowthSincePosting resolvers on the backend).
     val totalViewsDelivered: Int? = null,
-    val viewsGrowthSincePosting: Int? = null
+    val viewsGrowthSincePosting: Int? = null,
+    val selectedInstagramProfileId: String? = null
 )
 
 data class Campaign(

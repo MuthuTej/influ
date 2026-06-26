@@ -138,6 +138,9 @@ fun ChatScreen(
     val localContext = LocalContext.current
     val activity = localContext as? Activity
 
+    val brandError by brandViewModel.error.observeAsState()
+    val influencerError by influencerViewModel.error.observeAsState()
+
     LaunchedEffect(chatError) {
         chatError?.let {
             android.widget.Toast.makeText(localContext, it, android.widget.Toast.LENGTH_SHORT).show()
@@ -148,6 +151,18 @@ fun ChatScreen(
         contactInfoWarning?.let {
             android.widget.Toast.makeText(localContext, it, android.widget.Toast.LENGTH_LONG).show()
             viewModel.clearContactInfoWarning()
+        }
+    }
+    LaunchedEffect(brandError) {
+        brandError?.let {
+            android.widget.Toast.makeText(localContext, it, android.widget.Toast.LENGTH_LONG).show()
+            brandViewModel.clearError()
+        }
+    }
+    LaunchedEffect(influencerError) {
+        influencerError?.let {
+            android.widget.Toast.makeText(localContext, it, android.widget.Toast.LENGTH_LONG).show()
+            influencerViewModel.clearError()
         }
     }
 
@@ -406,6 +421,7 @@ fun CollaborationTimeline(
 
     val briefMessage = remember(messages) { messages.firstOrNull { it.type == "BRIEF" } }
     val scriptMessage = remember(messages) { messages.firstOrNull { it.type == "SCRIPT" } }
+    val negotiationMessages = remember(messages) { messages.filter { it.type == "NEGOTIATION" }.sortedBy { it.timestamp } }
 
     var showBriefDialog by remember { mutableStateOf(false) }
     var showScriptDialog by remember { mutableStateOf(false) }
@@ -415,10 +431,10 @@ fun CollaborationTimeline(
 
     // Step state flags
     val briefStepShown  = statusIndex >= STATUS_ORDER.indexOf("ACCEPTED")
-    val briefContentAvail = statusIndex >= STATUS_ORDER.indexOf("BRIEF_SENT")
+    val briefContentAvail = briefMessage != null || statusIndex >= STATUS_ORDER.indexOf("BRIEF_SENT")
     val briefDone        = statusIndex >= STATUS_ORDER.indexOf("BRIEF_FINALIZED")
     val scriptStepShown  = statusIndex >= STATUS_ORDER.indexOf("BRIEF_FINALIZED")
-    val scriptContentAvail = statusIndex >= STATUS_ORDER.indexOf("SCRIPT_SENT")
+    val scriptContentAvail = scriptMessage != null || statusIndex >= STATUS_ORDER.indexOf("SCRIPT_SENT")
     val scriptDone       = statusIndex >= STATUS_ORDER.indexOf("WAITING_FOR_PAYMENT")
     val paymentActive    = status == "WAITING_FOR_PAYMENT"
     val paymentDone      = statusIndex >= STATUS_ORDER.indexOf("IN_PROGRESS")
@@ -448,18 +464,198 @@ fun CollaborationTimeline(
                 color = Color(0xFF555555),
                 lineHeight = 20.sp
             )
-            if (status == "PENDING" || status == "NEGOTIATION") {
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = { showNegotiationDialog = true },
-                    enabled = !isActionLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = TlRed),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.AttachMoney, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Negotiate", fontWeight = FontWeight.Bold)
+
+            // Negotiation history — rendered for every type:NEGOTIATION message
+            if (negotiationMessages.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "NEGOTIATIONS",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray,
+                    letterSpacing = 1.sp
+                )
+                Spacer(Modifier.height(4.dp))
+                negotiationMessages.forEach { msg ->
+                    val amount   = msg.metadata["amount"]?.toString() ?: ""
+                    val platform = msg.metadata["platform"]?.toString() ?: ""
+                    Surface(
+                        color = if (msg.isMe) Color(0xFFFFEBEB) else Color(0xFFEBF5FF),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    if (msg.isMe) "You proposed" else "They proposed",
+                                    fontSize = 11.sp, color = Color.Gray
+                                )
+                                if (amount.isNotBlank()) {
+                                    Text(
+                                        "₹$amount${if (platform.isNotBlank()) " · $platform" else ""}",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        color = Color.Black
+                                    )
+                                }
+                            }
+                            Text(msg.timeFormatted, fontSize = 10.sp, color = Color.Gray)
+                        }
+                    }
+                }
+            }
+
+            // Action buttons — depend on status, role, and who made the last proposal
+            val myRole = if (isBrand) "BRAND" else "INFLUENCER"
+            // isMyTurn = true when the OTHER party sent the last proposal (I need to respond)
+            val isMyTurn = collaboration.initiatedBy != myRole
+
+            when {
+                status == "PENDING" -> {
+                    Spacer(Modifier.height(12.dp))
+                    if (isMyTurn) {
+                        // It's my turn to respond to the other party's proposal
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { onStatusUpdate("ACCEPTED") },
+                                enabled = !isActionLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                if (isActionLoading) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Accept", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            if (!isBrand) {
+                                Button(
+                                    onClick = { showNegotiationDialog = true },
+                                    enabled = !isActionLoading,
+                                    colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                                    shape = RoundedCornerShape(20.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.AttachMoney, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Negotiate", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Button(
+                            onClick = { onStatusUpdate("REJECTED") },
+                            enabled = !isActionLoading,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFFFF0F0),
+                                contentColor = Color(0xFFFF5252)
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(if (isBrand) "Reject" else "Decline", fontWeight = FontWeight.Medium)
+                        }
+                    } else {
+                        // Waiting for the other party to respond to my proposal
+                        Surface(color = Color(0xFFF5F5F5), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Waiting for the other party to respond…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { onStatusUpdate("REVOKED") },
+                            enabled = !isActionLoading,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFFFF0F0),
+                                contentColor = Color(0xFFFF5252)
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Withdraw Proposal", fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+                status == "NEGOTIATION" -> {
+                    Spacer(Modifier.height(12.dp))
+                    if (isMyTurn) {
+                        // Other party counter-proposed — I can accept or counter
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { onStatusUpdate("ACCEPTED") },
+                                enabled = !isActionLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                if (isActionLoading) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Accept", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Button(
+                                onClick = { showNegotiationDialog = true },
+                                enabled = !isActionLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.AttachMoney, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Counter", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        // I sent the last counter-proposal — waiting for their response
+                        Surface(color = Color(0xFFF5F5F5), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Waiting for the other party to accept or counter your proposal…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { showNegotiationDialog = true },
+                            enabled = !isActionLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.AttachMoney, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Revise Offer", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }

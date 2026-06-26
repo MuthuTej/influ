@@ -80,7 +80,8 @@ data class Proposal(
     val logoUrl: String?,
     val date: String,
     val totalAmount: String,
-    val paymentStatus: String
+    val paymentStatus: String,
+    val selectedInstagramProfileId: String? = null
 )
 
 fun Collaboration.toProposal(isBrand: Boolean): Proposal {
@@ -114,7 +115,8 @@ fun Collaboration.toProposal(isBrand: Boolean): Proposal {
         logoUrl = if (isBrand) this.influencer.logoUrl else this.brand?.logoUrl,
         date = this.createdAt.take(10),
         totalAmount = if (totalSum > 0) "₹$totalSum" else "N/A",
-        paymentStatus = this.paymentStatus ?: "pending"
+        paymentStatus = this.paymentStatus ?: "pending",
+        selectedInstagramProfileId = this.selectedInstagramProfileId
     )
 }
 
@@ -136,7 +138,7 @@ fun ProposalPage(
     // collaborations — previously this always read brandViewModel, so influencers
     // saw a permanently empty History tab regardless of their real data.
     val brandCollaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
-    val influencerCollaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
+    val influencerCollaborations by influencerViewModel.filteredCollaborations.observeAsState(initial = emptyList())
     val collaborations = if (isBrand) brandCollaborations else influencerCollaborations
 
     val brandLoading by brandViewModel.loading.observeAsState(initial = false)
@@ -347,6 +349,7 @@ fun ProposalPage(
                                         proposal = proposal,
                                         isBrand = isBrand,
                                         brandViewModel = brandViewModel,
+                                        influencerViewModel = if (!isBrand) influencerViewModel else null,
                                         onClick = {
                                             navController.navigate("collaboration_analytics/${proposal.id}")
                                         },
@@ -446,16 +449,23 @@ fun StatusFilterRow(selectedStatus: ProposalStatus?, onStatusSelected: (Proposal
 
 @Composable
 fun PremiumProposalCard(
-    proposal: Proposal, 
+    proposal: Proposal,
     isBrand: Boolean,
     brandViewModel: BrandViewModel,
     onClick: () -> Unit,
     onChat: () -> Unit,
-    onAction: (String) -> Unit
+    onAction: (String) -> Unit,
+    influencerViewModel: InfluencerViewModel? = null
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
-    
+
+    val igProfileUsername = remember(proposal.selectedInstagramProfileId) {
+        if (proposal.selectedInstagramProfileId == null) null
+        else influencerViewModel?.influencerProfile?.value?.instagramProfiles
+            ?.find { it.id == proposal.selectedInstagramProfileId }?.username
+    }
+
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -502,6 +512,32 @@ fun PremiumProposalCard(
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
+                    if (!isBrand && igProfileUsername != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFFE1306C).copy(alpha = 0.10f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.AccountCircle,
+                                    contentDescription = null,
+                                    tint = Color(0xFFE1306C),
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Spacer(Modifier.width(3.dp))
+                                Text(
+                                    "@$igProfileUsername",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFE1306C),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
                 }
                 PremiumStatusBadge(status = proposal.status)
             }

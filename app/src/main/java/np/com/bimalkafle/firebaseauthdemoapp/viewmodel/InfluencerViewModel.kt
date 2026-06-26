@@ -1,14 +1,18 @@
 package np.com.bimalkafle.firebaseauthdemoapp.viewmodel
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
+import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
+import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -22,6 +26,115 @@ class InfluencerViewModel : ViewModel() {
 
     private val _error = MutableLiveData<String?>()
     val error: LiveData<String?> = _error
+
+    fun clearError() { _error.value = null }
+
+    // ── Active Instagram Profile (account switcher) ───────────────────────────
+
+    private val _activeInstagramProfileId = MutableLiveData<String?>(null)
+    val activeInstagramProfileId: LiveData<String?> = _activeInstagramProfileId
+
+    val activeInstagramProfile: LiveData<InstagramProfile?> = MediatorLiveData<InstagramProfile?>().also { med ->
+        fun update() {
+            val profiles = _influencerProfile.value?.instagramProfiles ?: emptyList()
+            val activeId = _activeInstagramProfileId.value
+            med.value = if (activeId != null) profiles.find { it.id == activeId }
+                        else profiles.firstOrNull { it.isDefault } ?: profiles.firstOrNull()
+        }
+        med.addSource(_influencerProfile) { update() }
+        med.addSource(_activeInstagramProfileId) { update() }
+    }
+
+    fun loadActiveProfile(context: Context, uid: String) {
+        val saved = PrefsManager(context).getActiveInstagramProfileId(uid)
+        _activeInstagramProfileId.value = saved
+    }
+
+    fun switchProfile(context: Context, uid: String, profileId: String?) {
+        PrefsManager(context).saveActiveInstagramProfileId(uid, profileId)
+        _activeInstagramProfileId.value = profileId
+    }
+
+    // ── Instagram Profile Management ──────────────────────────────────────────
+
+    fun addInstagramProfile(token: String, profileUrl: String, onComplete: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = BackendRepository.addInstagramProfile(profileUrl, token)
+            result.onSuccess { profileJson ->
+                val current = _influencerProfile.value ?: run { onComplete(false, null); return@launch }
+                val newProfile = jsonToInstagramProfile(profileJson)
+                val updated = (current.instagramProfiles ?: emptyList()) + newProfile
+                _influencerProfile.postValue(current.copy(instagramProfiles = updated))
+                onComplete(true, null)
+            }.onFailure {
+                onComplete(false, it.message)
+            }
+        }
+    }
+
+    fun removeInstagramProfile(token: String, profileId: String, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val result = BackendRepository.removeInstagramProfile(profileId, token)
+            result.onSuccess {
+                val current = _influencerProfile.value ?: run { onComplete(false); return@launch }
+                val updated = current.instagramProfiles?.filter { it.id != profileId }
+                // If we removed the default, mark the first remaining as default
+                val reIndexed = if (updated != null && updated.isNotEmpty() && updated.none { it.isDefault }) {
+                    listOf(updated[0].copy(isDefault = true)) + updated.drop(1)
+                } else updated
+                _influencerProfile.postValue(current.copy(instagramProfiles = reIndexed))
+                onComplete(true)
+            }.onFailure { onComplete(false) }
+        }
+    }
+
+    fun setDefaultInstagramProfile(token: String, profileId: String, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val result = BackendRepository.setDefaultInstagramProfile(profileId, token)
+            result.onSuccess {
+                val current = _influencerProfile.value ?: run { onComplete(false); return@launch }
+                val updated = current.instagramProfiles?.map { it.copy(isDefault = it.id == profileId) }
+                _influencerProfile.postValue(current.copy(instagramProfiles = updated))
+                onComplete(true)
+            }.onFailure { onComplete(false) }
+        }
+    }
+
+    fun refreshInstagramProfileMetrics(token: String, profileId: String, onComplete: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = BackendRepository.refreshInstagramProfileMetrics(profileId, token)
+            result.onSuccess { profileJson ->
+                val current = _influencerProfile.value ?: run { onComplete(false, null); return@launch }
+                val refreshed = jsonToInstagramProfile(profileJson)
+                val updated = current.instagramProfiles?.map { if (it.id == profileId) refreshed else it }
+                _influencerProfile.postValue(current.copy(instagramProfiles = updated))
+                onComplete(true, null)
+            }.onFailure {
+                onComplete(false, it.message)
+            }
+        }
+    }
+
+    private fun jsonToInstagramProfile(json: org.json.JSONObject): InstagramProfile {
+        val mObj = json.optJSONObject("metrics")
+        val metrics = if (mObj != null) InstagramMetrics(
+            avgComments = if (mObj.has("avgComments")) mObj.optDouble("avgComments").toFloat() else null,
+            avgLikes = if (mObj.has("avgLikes")) mObj.optDouble("avgLikes").toFloat() else null,
+            avgViews = if (mObj.has("avgViews")) mObj.optDouble("avgViews").toFloat() else null,
+            postingFrequencyDays = if (mObj.has("postingFrequencyDays")) mObj.optDouble("postingFrequencyDays").toFloat() else null,
+            totalPostsAnalyzed = if (mObj.has("totalPostsAnalyzed")) mObj.optInt("totalPostsAnalyzed") else null,
+            updatedAt = mObj.optString("updatedAt")
+        ) else null
+        return InstagramProfile(
+            id = json.optString("id"),
+            profileUrl = json.optString("profileUrl"),
+            username = json.optString("username"),
+            followers = if (json.has("followers") && !json.isNull("followers")) json.optInt("followers") else null,
+            isDefault = json.optBoolean("isDefault", false),
+            connectedAt = json.optString("connectedAt"),
+            metrics = metrics
+        )
+    }
 
     private val _brands = MutableLiveData<List<Brand>>()
     val brands: LiveData<List<Brand>> = _brands
@@ -157,6 +270,22 @@ class InfluencerViewModel : ViewModel() {
                         totalPostsAnalyzed
                         updatedAt
                       }
+                      instagramProfiles {
+                        id
+                        profileUrl
+                        username
+                        followers
+                        isDefault
+                        connectedAt
+                        metrics {
+                          avgLikes
+                          avgComments
+                          avgViews
+                          postingFrequencyDays
+                          totalPostsAnalyzed
+                          updatedAt
+                        }
+                      }
                     }
                   }
                 }
@@ -243,6 +372,22 @@ class InfluencerViewModel : ViewModel() {
                       postingFrequencyDays
                       totalPostsAnalyzed
                       updatedAt
+                    }
+                    instagramProfiles {
+                      id
+                      profileUrl
+                      username
+                      followers
+                      isDefault
+                      connectedAt
+                      metrics {
+                        avgLikes
+                        avgComments
+                        avgViews
+                        postingFrequencyDays
+                        totalPostsAnalyzed
+                        updatedAt
+                      }
                     }
                   }
                 }
@@ -449,6 +594,32 @@ class InfluencerViewModel : ViewModel() {
             )
         } else null
 
+        val igProfilesList = mutableListOf<InstagramProfile>()
+        val igProfilesArray = obj.optJSONArray("instagramProfiles")
+        if (igProfilesArray != null) {
+            for (i in 0 until igProfilesArray.length()) {
+                val p = igProfilesArray.optJSONObject(i) ?: continue
+                val mObj = p.optJSONObject("metrics")
+                val metrics = if (mObj != null) InstagramMetrics(
+                    avgComments = if (mObj.has("avgComments")) mObj.optDouble("avgComments").toFloat() else null,
+                    avgLikes = if (mObj.has("avgLikes")) mObj.optDouble("avgLikes").toFloat() else null,
+                    avgViews = if (mObj.has("avgViews")) mObj.optDouble("avgViews").toFloat() else null,
+                    postingFrequencyDays = if (mObj.has("postingFrequencyDays")) mObj.optDouble("postingFrequencyDays").toFloat() else null,
+                    totalPostsAnalyzed = if (mObj.has("totalPostsAnalyzed")) mObj.optInt("totalPostsAnalyzed") else null,
+                    updatedAt = mObj.optString("updatedAt")
+                ) else null
+                igProfilesList.add(InstagramProfile(
+                    id = p.optString("id"),
+                    profileUrl = p.optString("profileUrl"),
+                    username = p.optString("username"),
+                    followers = if (p.has("followers")) p.optInt("followers") else null,
+                    isDefault = p.optBoolean("isDefault", false),
+                    connectedAt = p.optString("connectedAt"),
+                    metrics = metrics
+                ))
+            }
+        }
+
         return InfluencerProfile(
             id = obj.optString("id"),
             email = obj.optString("email"),
@@ -468,12 +639,26 @@ class InfluencerViewModel : ViewModel() {
             isVerified = if (obj.has("isVerified")) obj.optBoolean("isVerified") else null,
             averageRating = if (obj.has("averageRating")) obj.optDouble("averageRating").toFloat() else null,
             youtubeInsights = youtubeInsights,
-            instagramMetrics = instagramMetrics
+            instagramMetrics = instagramMetrics,
+            instagramProfiles = igProfilesList.ifEmpty { null }
         )
     }
 
     private val _collaborations = MutableLiveData<List<Collaboration>>()
     val collaborations: LiveData<List<Collaboration>> = _collaborations
+
+    // Shows only collaborations belonging to the active Instagram profile.
+    // Collaborations with no selectedInstagramProfileId are always visible (non-Instagram / legacy).
+    val filteredCollaborations: LiveData<List<Collaboration>> = MediatorLiveData<List<Collaboration>>().also { med ->
+        fun update() {
+            val all = _collaborations.value ?: emptyList()
+            val activeId = _activeInstagramProfileId.value
+            med.value = if (activeId == null) all
+                        else all.filter { it.selectedInstagramProfileId == null || it.selectedInstagramProfileId == activeId }
+        }
+        med.addSource(_collaborations) { update() }
+        med.addSource(_activeInstagramProfileId) { update() }
+    }
 
     fun fetchCollaborations(token: String, force: Boolean = false) {
         if (!fetchThrottle.shouldFetch("collaborations", force)) return
@@ -500,6 +685,7 @@ class InfluencerViewModel : ViewModel() {
                     influencer { name bio logoUrl updatedAt }
                     totalViewsDelivered
                     viewsGrowthSincePosting
+                    selectedInstagramProfileId
                   }
                 }
             """.trimIndent()
@@ -613,7 +799,8 @@ class InfluencerViewModel : ViewModel() {
                     finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
                     totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount"),
                     totalViewsDelivered = if (obj.isNull("totalViewsDelivered")) null else obj.optInt("totalViewsDelivered"),
-                    viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting")
+                    viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting"),
+                    selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() }
                 )
             )
         }
@@ -625,6 +812,7 @@ class InfluencerViewModel : ViewModel() {
         campaignId: String,
         message: String,
         pricing: List<Map<String, Any>>,
+        selectedInstagramProfileId: String? = null,
         onComplete: (Boolean) -> Unit
     ) {
         _loading.value = true
@@ -639,13 +827,14 @@ class InfluencerViewModel : ViewModel() {
                 }
             """.trimIndent()
 
-            val variables = mapOf(
-                "input" to mapOf(
-                    "campaignId" to campaignId,
-                    "message" to message,
-                    "pricing" to pricing
-                )
+            val inputMap = mutableMapOf<String, Any>(
+                "campaignId" to campaignId,
+                "message" to message,
+                "pricing" to pricing
             )
+            if (selectedInstagramProfileId != null) inputMap["selectedInstagramProfileId"] = selectedInstagramProfileId
+
+            val variables = mapOf("input" to inputMap)
 
             val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
             result.onSuccess { jsonObject ->
@@ -758,12 +947,25 @@ class InfluencerViewModel : ViewModel() {
             )
 
             val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
-            result.onSuccess {
-                fetchCollaborations(token, force = true)
-                pushCollaborationStatusUpdate(collaborationId, status)
-                onComplete(true)
+            result.onSuccess { jsonObject ->
+                val errors = jsonObject.optJSONArray("errors")
+                if (errors != null && errors.length() > 0) {
+                    val msg = errors.optJSONObject(0)?.optString("message") ?: "Action failed"
+                    _error.postValue(msg)
+                    onComplete(false)
+                    return@launch
+                }
+                val data = jsonObject.optJSONObject("data")
+                if (data != null && data.optJSONObject("updateCollaboration") != null) {
+                    fetchCollaborations(token, force = true)
+                    pushCollaborationStatusUpdate(collaborationId, status)
+                    onComplete(true)
+                } else {
+                    _error.postValue("Action failed. Please try again.")
+                    onComplete(false)
+                }
             }.onFailure {
-                _error.postValue(it.message)
+                _error.postValue(it.message ?: "Action failed")
                 onComplete(false)
             }
             _loading.postValue(false)

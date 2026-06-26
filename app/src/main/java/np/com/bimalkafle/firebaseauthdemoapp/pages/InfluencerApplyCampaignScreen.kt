@@ -1,6 +1,7 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -10,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -47,10 +50,12 @@ fun InfluencerApplyCampaignScreen(
     val campaignDetail by campaignViewModel.campaign.observeAsState()
     val isLoading by influencerViewModel.loading.observeAsState(false)
     val error by influencerViewModel.error.observeAsState()
+    val activeInstagramProfile by influencerViewModel.activeInstagramProfile.observeAsState()
     val context = LocalContext.current
 
     var message by remember { mutableStateOf("") }
-    
+    var showProfileSwitcher by remember { mutableStateOf(false) }
+
     // Structure: mapOf(platform to mapOf(deliverable to quantity))
     var platformDeliverableQuantities by remember { mutableStateOf(emptyMap<String, Map<String, String>>()) }
     var pricingMap by remember { mutableStateOf(mapOf<String, Map<String, String>>()) }
@@ -71,6 +76,20 @@ fun InfluencerApplyCampaignScreen(
     val headerHeight = if (screenHeight < 600.dp) 220.dp else screenHeight * 0.32f
     val overlapHeight = 40.dp
     val formPaddingTop = headerHeight - overlapHeight
+
+    if (showProfileSwitcher) {
+        val allProfiles = influencerViewModel.influencerProfile.value?.instagramProfiles ?: emptyList()
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+        InstagramProfileSwitcherSheet(
+            profiles = allProfiles,
+            activeProfileId = activeInstagramProfile?.id,
+            onSelect = { profileId ->
+                influencerViewModel.switchProfile(context, uid, profileId)
+                showProfileSwitcher = false
+            },
+            onDismiss = { showProfileSwitcher = false }
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
         // Header
@@ -156,6 +175,36 @@ fun InfluencerApplyCampaignScreen(
                     .fillMaxWidth()
                     .padding(bottom = 20.dp)
             )
+
+            // Active Instagram profile banner (shown when campaign includes Instagram)
+            val isInstagramCampaign = campaignDetail?.platforms?.any { it.platform.equals("INSTAGRAM", true) } == true
+            if (isInstagramCampaign) {
+                val instaColor = Color(0xFFE1306C)
+                Surface(
+                    onClick = { showProfileSwitcher = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = instaColor.copy(alpha = 0.07f),
+                    border = BorderStroke(1.dp, instaColor.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = null, tint = instaColor, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Applying with Instagram profile", fontSize = 11.sp, color = instaColor, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (activeInstagramProfile != null) "@${activeInstagramProfile!!.username}" else "No profile selected — tap to choose",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Icon(Icons.Default.SwapHoriz, contentDescription = "Switch", tint = instaColor, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
 
             // Campaign Name (Read Only)
             Text("Campaign", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.padding(bottom = 6.dp))
@@ -309,12 +358,10 @@ fun InfluencerApplyCampaignScreen(
                                 campaignId = campaignId,
                                 message = message,
                                 pricing = finalPricing,
+                                selectedInstagramProfileId = activeInstagramProfile?.id,
                                 onComplete = { success ->
                                     if (success) {
                                         Toast.makeText(context, "Application submitted successfully!", Toast.LENGTH_LONG).show()
-                                        // Force-refresh so History/Home reflect this new
-                                        // collaboration immediately instead of waiting out
-                                        // the stale-while-revalidate cache window.
                                         influencerViewModel.fetchCollaborations(token, force = true)
                                         onApplySuccess()
                                     }

@@ -13,42 +13,9 @@ class ChatRepository {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    // ── Users ─────────────────────────────────────────────────────────────────
-
-    fun getUsersOnce(
-        currentUserRole: String,
-        onError: (String) -> Unit = {},
-        callback: (List<ChatUser>) -> Unit
-    ) {
-        val currentUserId = auth.currentUser?.uid
-        val collection = if (currentUserRole.equals("BRAND", ignoreCase = true)) "influencers" else "brands"
-
-        db.collection(collection).get()
-            .addOnSuccessListener { snapshot ->
-                val users = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val uid = doc.getString("id") ?: doc.id
-                        if (uid == currentUserId) return@mapNotNull null
-                        ChatUser(
-                            uid = uid,
-                            name = doc.getString("name") ?: "Unknown",
-                            email = doc.getString("email") ?: "",
-                            profileImageUrl = doc.getString("logoUrl")
-                        )
-                    } catch (e: Exception) { null }
-                }
-                callback(users)
-            }
-            .addOnFailureListener {
-                onError(it.message ?: "Failed to load contacts")
-                callback(emptyList())
-            }
-    }
-
     // ── Message history ───────────────────────────────────────────────────────
     // Primary: backend GraphQL query (getChatMessages).
-    // Fallback: Firestore one-time get() — used if the backend query fails or
-    // the endpoint is not yet deployed. Neither path uses addSnapshotListener.
+    // Fallback: Firestore one-time get() from the collaboration subcollection.
 
     suspend fun getMessageHistory(
         otherUserId: String,
@@ -57,7 +24,6 @@ class ChatRepository {
     ): List<ChatMessage> {
         val currentUserId = auth.currentUser?.uid ?: return emptyList()
 
-        // Try backend query first
         val backendResult = BackendRepository.getChatMessages(otherUserId, collaborationId, token)
         if (backendResult.isSuccess) {
             return backendResult.getOrDefault(emptyList()).map { jsonToMessage(it, currentUserId) }
@@ -65,19 +31,37 @@ class ChatRepository {
 
         Log.w("ChatRepository", "Backend getChatMessages failed — falling back to Firestore get()")
 
-        // Firestore one-time get() fallback (no listener)
+        if (collaborationId == null) return emptyList()
+
         return try {
-            val snap = db.collection("messages")
-                .orderBy("timestamp", Query.Direction.ASCENDING)
+            val snap = db.collection("collaborations")
+                .document(collaborationId)
+                .collection("messages")
+                .orderBy("createdAt", Query.Direction.ASCENDING)
                 .get()
                 .await()
-            snap.documents
-                .mapNotNull { it.toObject(ChatMessage::class.java) }
-                .filter {
-                    val between = (it.senderId == currentUserId && it.receiverId == otherUserId) ||
-                                  (it.senderId == otherUserId && it.receiverId == currentUserId)
-                    between && it.collaborationId == collaborationId
-                }
+            snap.documents.mapNotNull { doc ->
+                try {
+                    val data = doc.data ?: return@mapNotNull null
+                    val senderId = data["senderId"] as? String ?: return@mapNotNull null
+                    val receiverId = data["receiverId"] as? String ?: ""
+                    val text = (data["text"] as? String) ?: (data["content"] as? String) ?: ""
+                    ChatMessage(
+                        id              = doc.id,
+                        text            = text,
+                        senderId        = senderId,
+                        receiverId      = receiverId,
+                        timestamp       = (data["timestamp"] as? Long) ?: 0L,
+                        timeFormatted   = (data["timeFormatted"] as? String) ?: "",
+                        type            = (data["type"] as? String) ?: "TEXT",
+                        metadata        = (data["metadata"] as? Map<String, Any>) ?: emptyMap(),
+                        collaborationId = collaborationId,
+                        replyToId       = data["replyToId"] as? String,
+                        isRead          = (data["isRead"] as? Boolean) ?: false,
+                        isMe            = senderId == currentUserId
+                    )
+                } catch (e: Exception) { null }
+            }
         } catch (e: Exception) {
             Log.e("ChatRepository", "Firestore fallback failed: ${e.message}")
             emptyList()
@@ -85,10 +69,6 @@ class ChatRepository {
     }
 
     // ── Send message ──────────────────────────────────────────────────────────
-    // Routes through the backend mutation so the backend can broadcast the
-    // message to the receiver's WebSocket subscription immediately.
-    // Returns the confirmed message (with its backend-assigned ID) so the
-    // caller can do an accurate optimistic insert.
 
     suspend fun sendMessage(
         receiverId: String,
@@ -112,44 +92,19 @@ class ChatRepository {
         return result.map { jsonToMessage(it, currentUserId) }
     }
 
-    // ── Chat list (one-time) ──────────────────────────────────────────────────
-    // No listener — initial snapshot only. Real-time updates come from the
-    // WebSocket subscription managed by ChatViewModel.
-
-    fun getAllMessagesOnce(
-        onError: (String) -> Unit = {},
-        callback: (List<ChatMessage>) -> Unit
-    ) {
-        val currentUserId = auth.currentUser?.uid ?: run { callback(emptyList()); return }
-
-        db.collection("messages").whereEqualTo("senderId", currentUserId).get()
-            .addOnSuccessListener { sentSnap ->
-                val sent = sentSnap.documents.mapNotNull { it.toObject(ChatMessage::class.java) }
-                db.collection("messages").whereEqualTo("receiverId", currentUserId).get()
-                    .addOnSuccessListener { receivedSnap ->
-                        val received = receivedSnap.documents.mapNotNull { it.toObject(ChatMessage::class.java) }
-                        callback((sent + received).sortedByDescending { it.timestamp })
-                    }
-                    .addOnFailureListener {
-                        onError(it.message ?: "Failed to load received messages")
-                        callback(sent.sortedByDescending { it.timestamp })
-                    }
-            }
-            .addOnFailureListener {
-                onError(it.message ?: "Failed to load messages")
-                callback(emptyList())
-            }
-    }
-
     // ── Mark as read ──────────────────────────────────────────────────────────
+    // Messages are in collaborations/{collabId}/messages/ — not a root collection.
 
     fun markMessagesAsRead(senderId: String, collaborationId: String? = null) {
+        if (collaborationId == null) return
         val currentUserId = auth.currentUser?.uid ?: return
-        db.collection("messages")
+
+        db.collection("collaborations")
+            .document(collaborationId)
+            .collection("messages")
             .whereEqualTo("senderId", senderId)
             .whereEqualTo("receiverId", currentUserId)
             .whereEqualTo("isRead", false)
-            .whereEqualTo("collaborationId", collaborationId)
             .get()
             .addOnSuccessListener { snapshot ->
                 for (doc in snapshot.documents) doc.reference.update("isRead", true)
@@ -197,8 +152,6 @@ class ChatRepository {
     }
 }
 
-// Firestore Task<QuerySnapshot>.await() — inline coroutine bridge without
-// requiring the full kotlinx-coroutines-play-services artifact.
 private suspend fun <T> com.google.android.gms.tasks.Task<T>.await(): T =
     kotlinx.coroutines.suspendCancellableCoroutine { cont ->
         addOnSuccessListener { cont.resumeWith(Result.success(it)) }

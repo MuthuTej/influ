@@ -11,6 +11,7 @@ class PrefsManager(context: Context) {
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_PROFILE_COMPLETED_PREFIX = "profile_completed_"
         private const val KEY_AI_CHAT_HISTORY_PREFIX = "ai_chat_history_"
+        private const val KEY_ACTIVE_IG_PROFILE_PREFIX = "active_ig_profile_"
     }
 
     fun saveOnboardingCompleted(completed: Boolean) {
@@ -46,5 +47,15 @@ class PrefsManager(context: Context) {
 
     fun clearAiChatHistory(uid: String) {
         prefs.edit().remove("$KEY_AI_CHAT_HISTORY_PREFIX$uid").apply()
+    }
+
+    fun saveActiveInstagramProfileId(uid: String, profileId: String?) {
+        val key = "$KEY_ACTIVE_IG_PROFILE_PREFIX$uid"
+        if (profileId == null) prefs.edit().remove(key).apply()
+        else prefs.edit().putString(key, profileId).apply()
+    }
+
+    fun getActiveInstagramProfileId(uid: String): String? {
+        return prefs.getString("$KEY_ACTIVE_IG_PROFILE_PREFIX$uid", null)
     }
 }

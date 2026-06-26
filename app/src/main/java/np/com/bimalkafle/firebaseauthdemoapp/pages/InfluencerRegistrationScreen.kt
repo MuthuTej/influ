@@ -12,7 +12,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -89,10 +91,10 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     var isYouTubeConnected by remember { mutableStateOf(false) }
     var youtubeAuthCode by remember { mutableStateOf<String?>(null) }
     
-    // --- Instagram Connection State ---
-    var instagramUrl by remember { mutableStateOf("") }
-    var isInstagramConnecting by remember { mutableStateOf(false) }
-    var isInstagramConnected by remember { mutableStateOf(false) }
+    // --- Instagram Connection State (supports multiple profiles) ---
+    // Each entry: Pair(url, isConnected)
+    val instagramEntries = remember { mutableStateListOf(Pair("", false)) }
+    var connectingIndex by remember { mutableStateOf<Int?>(null) }
 
     // --- Facebook Connection State (Dummy) ---
     var isFacebookConnecting by remember { mutableStateOf(false) }
@@ -414,39 +416,83 @@ fun InfluencerRegistrationScreen(navController: NavController) {
             }
 
             if (selectedPlatforms.contains("Instagram")) {
-                OutlinedTextField(
-                    value = instagramUrl,
-                    onValueChange = { instagramUrl = it },
-                    label = { Text("Instagram Profile URL") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
-                    enabled = !isInstagramConnected && !isInstagramConnecting
-                )
+                Text("Instagram Profiles", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFFE1306C))
                 Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        if (instagramUrl.isEmpty()) return@Button
-                        isInstagramConnecting = true
-                        auth.currentUser?.getIdToken(false)?.addOnSuccessListener { res ->
-                            res.token?.let { token ->
-                                coroutineScope.launch {
-                                    BackendRepository.scrapeInstagramProfile(instagramUrl, auth.currentUser!!.uid, token)
-                                        .onSuccess { isInstagramConnected = it }
-                                    isInstagramConnecting = false
+                instagramEntries.forEachIndexed { index, (url, connected) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = url,
+                            onValueChange = { instagramEntries[index] = Pair(it, false) },
+                            label = { Text("Profile URL ${index + 1}") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFE1306C),
+                                unfocusedBorderColor = if (connected) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline
+                            ),
+                            enabled = !connected && connectingIndex != index,
+                            singleLine = true,
+                            trailingIcon = {
+                                if (connected) Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color(0xFF4CAF50)
+                                )
+                            }
+                        )
+                        if (!connected) {
+                            Button(
+                                onClick = {
+                                    if (url.isBlank()) return@Button
+                                    connectingIndex = index
+                                    auth.currentUser?.getIdToken(false)?.addOnSuccessListener { res ->
+                                        res.token?.let { token ->
+                                            coroutineScope.launch {
+                                                BackendRepository.scrapeInstagramProfile(url.trim(), auth.currentUser!!.uid, token)
+                                                    .onSuccess { ok -> if (ok) instagramEntries[index] = Pair(url, true) }
+                                                connectingIndex = null
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = connectingIndex == null,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)
+                            ) {
+                                if (connectingIndex == index) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Text("Link", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                             }
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    enabled = !isInstagramConnected && !isInstagramConnecting,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (isInstagramConnected) Color(0xFF4CAF50) else Color(0xFFE1306C))
-                ) {
-                    if (isInstagramConnecting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    else Text(if (isInstagramConnected) "Instagram Connected ✓" else "Connect Instagram", color = Color.White, fontWeight = FontWeight.Bold)
+                        if (instagramEntries.size > 1) {
+                            IconButton(
+                                onClick = { instagramEntries.removeAt(index) },
+                                enabled = connectingIndex == null
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.Gray)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                if (instagramEntries.size < 5) {
+                    TextButton(
+                        onClick = { instagramEntries.add(Pair("", false)) },
+                        enabled = connectingIndex == null
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFFE1306C))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add another Instagram profile", color = Color(0xFFE1306C), fontSize = 13.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             if (selectedPlatforms.contains("Facebook")) {
@@ -514,11 +560,18 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                         }
                                         put("categories", categoriesJson)
 
+                                        val primaryInstagramUrl = instagramEntries.firstOrNull { it.second }?.first
+                                            ?: instagramEntries.firstOrNull()?.first ?: ""
+
                                         val platformsJson = JSONArray()
                                         selectedPlatforms.forEach { plat ->
                                             platformsJson.put(JSONObject().apply {
                                                 put("platform", plat)
-                                                put("profileUrl", if (plat == "Instagram") instagramUrl else if (plat == "Facebook") facebookUrl else "")
+                                                put("profileUrl", when (plat) {
+                                                    "Instagram" -> primaryInstagramUrl
+                                                    "Facebook" -> facebookUrl
+                                                    else -> ""
+                                                })
                                                 put("followers", 0)
                                                 put("avgViews", 0)
                                                 put("engagement", 0.0)

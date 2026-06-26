@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import np.com.bimalkafle.firebaseauthdemoapp.model.Category
+import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramProfile
 import np.com.bimalkafle.firebaseauthdemoapp.model.PricingInfo
 
 @Composable
@@ -109,6 +110,30 @@ fun InfluencerProfileScreen(
                 }
             }
         },
+        onAddInstagramProfile = { profileUrl, onResult ->
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { r ->
+                r.token?.let { token ->
+                    influencerViewModel.addInstagramProfile(token, profileUrl) { ok, err -> onResult(ok, err) }
+                }
+            }
+        },
+        onRemoveInstagramProfile = { profileId ->
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { r ->
+                r.token?.let { token -> influencerViewModel.removeInstagramProfile(token, profileId) {} }
+            }
+        },
+        onSetDefaultInstagramProfile = { profileId ->
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { r ->
+                r.token?.let { token -> influencerViewModel.setDefaultInstagramProfile(token, profileId) {} }
+            }
+        },
+        onRefreshInstagramProfile = { profileId, onResult ->
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { r ->
+                r.token?.let { token ->
+                    influencerViewModel.refreshInstagramProfileMetrics(token, profileId) { ok, err -> onResult(ok, err) }
+                }
+            }
+        },
         bottomBar = {
             Surface(
                 color = Color.White,
@@ -136,6 +161,10 @@ fun InfluencerProfileContent(
     isLoading: Boolean,
     onSignOut: () -> Unit,
     onUpdateProfile: (InfluencerProfile) -> Unit,
+    onAddInstagramProfile: (profileUrl: String, onResult: (Boolean, String?) -> Unit) -> Unit = { _, _ -> },
+    onRemoveInstagramProfile: (profileId: String) -> Unit = {},
+    onSetDefaultInstagramProfile: (profileId: String) -> Unit = {},
+    onRefreshInstagramProfile: (profileId: String, onResult: (Boolean, String?) -> Unit) -> Unit = { _, _ -> },
     bottomBar: @Composable () -> Unit = {},
     floatingActionButton: @Composable () -> Unit = {}
 ) {
@@ -457,10 +486,18 @@ fun InfluencerProfileContent(
                         Spacer(modifier = Modifier.height(20.dp))
                     }
 
-                    influencerProfile?.instagramMetrics?.let { instaMetrics ->
-                        InstagramInsightsSection(instaMetrics, platformsColors, detailDarkerGray, detailSoftGray)
-                        Spacer(modifier = Modifier.height(20.dp))
-                    }
+                    InstagramProfilesSection(
+                        profiles = influencerProfile?.instagramProfiles ?: emptyList(),
+                        legacyMetrics = influencerProfile?.instagramMetrics,
+                        platformsColors = platformsColors,
+                        detailDarkerGray = detailDarkerGray,
+                        detailSoftGray = detailSoftGray,
+                        onAddProfile = onAddInstagramProfile,
+                        onRemoveProfile = onRemoveInstagramProfile,
+                        onSetDefault = onSetDefaultInstagramProfile,
+                        onRefresh = onRefreshInstagramProfile
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     InfluencerDetailSection(icon = Icons.Default.Payments, title = "Services & Pricing") {
                         if (isEditMode) {
@@ -723,6 +760,297 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InstagramProfilesSection(
+    profiles: List<InstagramProfile>,
+    legacyMetrics: InstagramMetrics?,
+    platformsColors: Map<String, Color>,
+    detailDarkerGray: Color,
+    detailSoftGray: Color,
+    onAddProfile: (String, (Boolean, String?) -> Unit) -> Unit,
+    onRemoveProfile: (String) -> Unit,
+    onSetDefault: (String) -> Unit,
+    onRefresh: (String, (Boolean, String?) -> Unit) -> Unit
+) {
+    val instaColor = platformsColors["INSTAGRAM"] ?: Color(0xFFE1306C)
+    var showAddDialog by remember { mutableStateOf(false) }
+    var addUrl by remember { mutableStateOf("") }
+    var addLoading by remember { mutableStateOf(false) }
+    var addError by remember { mutableStateOf<String?>(null) }
+    var refreshingProfileId by remember { mutableStateOf<String?>(null) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("Instagram Profiles", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text(
+                    if (profiles.isEmpty()) "No profiles connected yet"
+                    else "${profiles.size} profile${if (profiles.size > 1) "s" else ""} connected",
+                    color = detailDarkerGray, fontSize = 14.sp
+                )
+            }
+            OutlinedButton(
+                onClick = { showAddDialog = true; addUrl = ""; addError = null },
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, instaColor),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = instaColor, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Add", color = instaColor, fontSize = 13.sp)
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        if (profiles.isEmpty() && legacyMetrics != null) {
+            // Fallback: show legacy aggregated metrics if no profiles are set up yet
+            InstagramInsightsSection(legacyMetrics, platformsColors, detailDarkerGray, detailSoftGray)
+        } else {
+            profiles.forEach { profile ->
+                InstagramProfileCard(
+                    profile = profile,
+                    instaColor = instaColor,
+                    detailDarkerGray = detailDarkerGray,
+                    detailSoftGray = detailSoftGray,
+                    isRefreshing = refreshingProfileId == profile.id,
+                    onSetDefault = { onSetDefault(profile.id) },
+                    onRemove = { onRemoveProfile(profile.id) },
+                    onRefresh = {
+                        refreshingProfileId = profile.id
+                        onRefresh(profile.id) { _, _ -> refreshingProfileId = null }
+                    }
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!addLoading) { showAddDialog = false } },
+            title = { Text("Add Instagram Profile", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Enter the full URL of your Instagram profile.", color = detailDarkerGray, fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = addUrl,
+                        onValueChange = { addUrl = it; addError = null },
+                        label = { Text("Instagram URL") },
+                        placeholder = { Text("https://instagram.com/your_handle") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        isError = addError != null,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    if (addError != null) {
+                        Text(addError!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (addUrl.isBlank()) { addError = "Please enter a URL"; return@Button }
+                        addLoading = true
+                        onAddProfile(addUrl.trim()) { ok, err ->
+                            addLoading = false
+                            if (ok) {
+                                showAddDialog = false
+                            } else {
+                                addError = err ?: "Failed to add profile"
+                            }
+                        }
+                    },
+                    enabled = !addLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = instaColor)
+                ) {
+                    if (addLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Connect")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { if (!addLoading) showAddDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun InstagramProfileCard(
+    profile: InstagramProfile,
+    instaColor: Color,
+    detailDarkerGray: Color,
+    detailSoftGray: Color,
+    isRefreshing: Boolean,
+    onSetDefault: () -> Unit,
+    onRemove: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(profile.isDefault) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (profile.isDefault) 4.dp else 2.dp),
+        border = if (profile.isDefault) BorderStroke(1.5.dp, instaColor) else null
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Surface(
+                        shape = CircleShape,
+                        color = instaColor.copy(alpha = 0.12f),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = instaColor, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("@${profile.username}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            if (profile.isDefault) {
+                                Spacer(Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = instaColor
+                                ) {
+                                    Text(
+                                        "DEFAULT",
+                                        color = Color.White,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        if (profile.followers != null) {
+                            Text(
+                                "${formatCount(profile.followers)} followers",
+                                color = detailDarkerGray,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = detailDarkerGray
+                    )
+                }
+            }
+
+            if (expanded) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = detailSoftGray)
+                Spacer(Modifier.height(12.dp))
+
+                profile.metrics?.let { m ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MetricChip("♥ ${formatCount(m.avgLikes?.toInt() ?: 0)}", "Avg Likes", modifier = Modifier.weight(1f))
+                        MetricChip("💬 ${formatCount(m.avgComments?.toInt() ?: 0)}", "Avg Comments", modifier = Modifier.weight(1f))
+                        MetricChip("👁 ${formatCount(m.avgViews?.toInt() ?: 0)}", "Avg Views", modifier = Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MetricChip("📅 ${String.format("%.1f", m.postingFrequencyDays ?: 0f)}d", "Post Freq.", modifier = Modifier.weight(1f))
+                        MetricChip("📊 ${m.totalPostsAnalyzed ?: 0}", "Posts Analyzed", modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                } ?: run {
+                    Text("No analytics yet — tap Refresh to fetch metrics", color = detailDarkerGray, fontSize = 13.sp)
+                }
+
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = detailSoftGray)
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (!profile.isDefault) {
+                        OutlinedButton(
+                            onClick = onSetDefault,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Set Default", fontSize = 12.sp)
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = onRefresh,
+                        enabled = !isRefreshing,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Refresh", fontSize = 12.sp)
+                        }
+                    }
+                    if (!profile.isDefault) {
+                        OutlinedButton(
+                            onClick = onRemove,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(20.dp),
+                            border = BorderStroke(1.dp, Color(0xFFFF5252)),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF5252), modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Remove", fontSize = 12.sp, color = Color(0xFFFF5252))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricChip(value: String, label: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFFF8F9FA)
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(value, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(label, fontSize = 10.sp, color = Color.Gray)
         }
     }
 }

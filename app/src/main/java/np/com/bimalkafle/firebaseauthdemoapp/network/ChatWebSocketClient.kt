@@ -1,6 +1,12 @@
 package np.com.bimalkafle.firebaseauthdemoapp.network
 
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.BuildConfig
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatMessage
 import okhttp3.OkHttpClient
@@ -11,21 +17,16 @@ import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * OkHttp WebSocket for real-time chat using graphql-transport-ws protocol.
  *
- * The backend identifies the subscriber from the JWT passed in connection_init,
- * so subscriptions do not need explicit senderId / receiverId arguments.
- *
  * Two modes:
- *   connectForConversation(collaborationId)
- *       Subscribes to `messageAdded(collaborationId)` — all messages in one
- *       collaboration addressed to the current user.
+ *   connectForConversation(collaborationId) — subscribes to messageAdded
+ *   connectForChatList()                    — subscribes to anyMessageAdded
  *
- *   connectForChatList()
- *       Subscribes to `anyMessageAdded` — any message addressed to the current
- *       user, across all conversations. Used to update the chat list live.
+ * Automatically reconnects on unexpected disconnects using exponential backoff.
  */
 class ChatWebSocketClient(
     private val token: String,
@@ -42,11 +43,18 @@ class ChatWebSocketClient(
 
     private val httpClient = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
-        .pingInterval(30, TimeUnit.SECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
         .build()
+
+    private val scope = CoroutineScope(Dispatchers.IO)
+    private var reconnectJob: Job? = null
 
     private var webSocket: WebSocket? = null
     private val connected = AtomicBoolean(false)
+    private val generation = AtomicInteger(0)  // incremented every openSocket(); stale callbacks are ignored
+    private var shouldReconnect = true
+    private var reconnectAttempts = 0
 
     private var isConversationMode = false
     private var collaborationId: String? = null
@@ -56,15 +64,23 @@ class ChatWebSocketClient(
     fun connectForConversation(collaborationId: String?) {
         this.isConversationMode = true
         this.collaborationId = collaborationId
+        shouldReconnect = true
+        reconnectAttempts = 0
         openSocket()
     }
 
     fun connectForChatList() {
         this.isConversationMode = false
+        shouldReconnect = true
+        reconnectAttempts = 0
         openSocket()
     }
 
     fun disconnect() {
+        shouldReconnect = false
+        reconnectJob?.cancel()
+        reconnectJob = null
+        generation.incrementAndGet()   // invalidate in-flight listener
         webSocket?.send(JSONObject().apply {
             put("type", "complete")
             put("id", SUB_ID)
@@ -78,12 +94,28 @@ class ChatWebSocketClient(
 
     private fun openSocket() {
         if (connected.getAndSet(true)) return
+        val gen = generation.incrementAndGet()
         val request = Request.Builder()
             .url(WS_URL)
             .addHeader("Sec-WebSocket-Protocol", "graphql-transport-ws")
             .build()
-        webSocket = httpClient.newWebSocket(request, Listener())
-        Log.d(TAG, "Connecting [${if (isConversationMode) "conversation collab=$collaborationId" else "chatList"}]")
+        webSocket = httpClient.newWebSocket(request, Listener(gen))
+        Log.d(TAG, "Connecting gen=$gen [${if (isConversationMode) "conversation collab=$collaborationId" else "chatList"}]")
+    }
+
+    private fun scheduleReconnect(gen: Int) {
+        if (!shouldReconnect) return
+        if (gen != generation.get()) return  // already superseded
+        reconnectJob?.cancel()
+        val delayMs = minOf(1500L * (1L shl reconnectAttempts), 30_000L)
+        reconnectAttempts = minOf(reconnectAttempts + 1, 6)
+        Log.d(TAG, "Reconnecting in ${delayMs}ms (attempt $reconnectAttempts)")
+        reconnectJob = scope.launch {
+            delay(delayMs)
+            if (shouldReconnect && !connected.get()) {
+                openSocket()
+            }
+        }
     }
 
     private fun buildSubscribePayload(): String {
@@ -91,7 +123,6 @@ class ChatWebSocketClient(
         val variables: JSONObject
 
         if (isConversationMode) {
-            // Backend uses JWT to know the receiver; collaborationId scopes the conversation.
             query = """
                 subscription OnMessageAdded(${'$'}collaborationId: String) {
                     messageAdded(collaborationId: ${'$'}collaborationId) {
@@ -104,12 +135,11 @@ class ChatWebSocketClient(
                 put("collaborationId", collaborationId ?: JSONObject.NULL)
             }
         } else {
-            // No args — backend delivers any message addressed to the auth user.
             query = """
                 subscription {
                     anyMessageAdded {
                         id text senderId receiverId timestamp timeFormatted
-                        type collaborationId isRead
+                        type collaborationId isRead metadata
                     }
                 }
             """.trimIndent()
@@ -151,9 +181,13 @@ class ChatWebSocketClient(
         )
     }
 
-    private inner class Listener : WebSocketListener() {
+    private inner class Listener(private val gen: Int) : WebSocketListener() {
+
+        private fun isStale() = gen != generation.get()
 
         override fun onOpen(ws: WebSocket, response: Response) {
+            if (isStale()) return
+            reconnectAttempts = 0
             ws.send(JSONObject().apply {
                 put("type", "connection_init")
                 put("payload", JSONObject().apply {
@@ -163,10 +197,11 @@ class ChatWebSocketClient(
         }
 
         override fun onMessage(ws: WebSocket, text: String) {
+            if (isStale()) return
             val json = runCatching { JSONObject(text) }.getOrNull() ?: return
             when (json.optString("type")) {
                 "connection_ack" -> {
-                    Log.d(TAG, "ACK — subscribing")
+                    Log.d(TAG, "ACK gen=$gen — subscribing")
                     ws.send(buildSubscribePayload())
                 }
                 "next" -> {
@@ -175,18 +210,31 @@ class ChatWebSocketClient(
                     }
                 }
                 "ping" -> ws.send(JSONObject().apply { put("type", "pong") }.toString())
-                "error" -> Log.w(TAG, "Server error: $text")
-                "complete" -> { connected.set(false); Log.d(TAG, "Subscription completed") }
+                "error" -> Log.w(TAG, "Server error gen=$gen: $text")
+                "complete" -> {
+                    if (!isStale()) {
+                        connected.set(false)
+                        Log.d(TAG, "Subscription completed gen=$gen")
+                        scheduleReconnect(gen)
+                    }
+                }
             }
         }
 
         override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
-            Log.w(TAG, "WS failure: ${t.message}")
+            if (isStale()) return
+            Log.w(TAG, "WS failure gen=$gen: ${t.message}")
             connected.set(false)
+            scheduleReconnect(gen)
         }
 
         override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+            if (isStale()) return
             connected.set(false)
+            if (code != 1000) {
+                Log.w(TAG, "WS closed unexpectedly gen=$gen code=$code reason=$reason")
+                scheduleReconnect(gen)
+            }
         }
     }
 }

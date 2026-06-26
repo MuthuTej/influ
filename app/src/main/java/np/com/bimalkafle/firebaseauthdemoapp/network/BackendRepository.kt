@@ -754,6 +754,172 @@ object BackendRepository {
         }
     }
 
+    private val INSTAGRAM_PROFILE_FIELDS = """
+        id
+        profileUrl
+        username
+        followers
+        isDefault
+        connectedAt
+        metrics {
+          avgLikes
+          avgComments
+          avgViews
+          postingFrequencyDays
+          totalPostsAnalyzed
+          updatedAt
+        }
+    """.trimIndent()
+
+    suspend fun addInstagramProfile(profileUrl: String, token: String): Result<JSONObject> =
+        withContext(Dispatchers.IO) {
+            try {
+                val mutation = """
+                    mutation AddInstagramProfile(${'$'}profileUrl: String!) {
+                        addInstagramProfile(profileUrl: ${'$'}profileUrl) {
+                            $INSTAGRAM_PROFILE_FIELDS
+                        }
+                    }
+                """.trimIndent()
+                val variables = JSONObject().apply { put("profileUrl", profileUrl) }
+                val requestBody = JSONObject().apply {
+                    put("query", mutation)
+                    put("variables", variables)
+                }.toString()
+                executeGraphQL(requestBody, token) { json ->
+                    val errs = json.optJSONArray("errors")
+                    if (errs != null && errs.length() > 0) {
+                        Result.failure(Exception(errs.getJSONObject(0).getString("message")))
+                    } else {
+                        val profile = json.optJSONObject("data")?.optJSONObject("addInstagramProfile")
+                            ?: return@executeGraphQL Result.failure(Exception("No profile returned"))
+                        Result.success(profile)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("BackendRepository", "addInstagramProfile: ${e.message}", e)
+                Result.failure(e)
+            }
+        }
+
+    suspend fun removeInstagramProfile(profileId: String, token: String): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            try {
+                val mutation = """
+                    mutation RemoveInstagramProfile(${'$'}profileId: ID!) {
+                        removeInstagramProfile(profileId: ${'$'}profileId)
+                    }
+                """.trimIndent()
+                val variables = JSONObject().apply { put("profileId", profileId) }
+                val requestBody = JSONObject().apply {
+                    put("query", mutation)
+                    put("variables", variables)
+                }.toString()
+                executeGraphQL(requestBody, token) { json ->
+                    val errs = json.optJSONArray("errors")
+                    if (errs != null && errs.length() > 0) {
+                        Result.failure(Exception(errs.getJSONObject(0).getString("message")))
+                    } else {
+                        Result.success(json.optJSONObject("data")?.optBoolean("removeInstagramProfile", false) ?: false)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("BackendRepository", "removeInstagramProfile: ${e.message}", e)
+                Result.failure(e)
+            }
+        }
+
+    suspend fun setDefaultInstagramProfile(profileId: String, token: String): Result<JSONObject> =
+        withContext(Dispatchers.IO) {
+            try {
+                val mutation = """
+                    mutation SetDefaultInstagramProfile(${'$'}profileId: ID!) {
+                        setDefaultInstagramProfile(profileId: ${'$'}profileId) {
+                            $INSTAGRAM_PROFILE_FIELDS
+                        }
+                    }
+                """.trimIndent()
+                val variables = JSONObject().apply { put("profileId", profileId) }
+                val requestBody = JSONObject().apply {
+                    put("query", mutation)
+                    put("variables", variables)
+                }.toString()
+                executeGraphQL(requestBody, token) { json ->
+                    val errs = json.optJSONArray("errors")
+                    if (errs != null && errs.length() > 0) {
+                        Result.failure(Exception(errs.getJSONObject(0).getString("message")))
+                    } else {
+                        val profile = json.optJSONObject("data")?.optJSONObject("setDefaultInstagramProfile")
+                            ?: return@executeGraphQL Result.failure(Exception("No profile returned"))
+                        Result.success(profile)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("BackendRepository", "setDefaultInstagramProfile: ${e.message}", e)
+                Result.failure(e)
+            }
+        }
+
+    suspend fun refreshInstagramProfileMetrics(profileId: String, token: String): Result<JSONObject> =
+        withContext(Dispatchers.IO) {
+            try {
+                val mutation = """
+                    mutation RefreshInstagramProfileMetrics(${'$'}profileId: ID!) {
+                        refreshInstagramProfileMetrics(profileId: ${'$'}profileId) {
+                            $INSTAGRAM_PROFILE_FIELDS
+                        }
+                    }
+                """.trimIndent()
+                val variables = JSONObject().apply { put("profileId", profileId) }
+                val requestBody = JSONObject().apply {
+                    put("query", mutation)
+                    put("variables", variables)
+                }.toString()
+                executeGraphQL(requestBody, token) { json ->
+                    val errs = json.optJSONArray("errors")
+                    if (errs != null && errs.length() > 0) {
+                        Result.failure(Exception(errs.getJSONObject(0).getString("message")))
+                    } else {
+                        val profile = json.optJSONObject("data")?.optJSONObject("refreshInstagramProfileMetrics")
+                            ?: return@executeGraphQL Result.failure(Exception("No profile returned"))
+                        Result.success(profile)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("BackendRepository", "refreshInstagramProfileMetrics: ${e.message}", e)
+                Result.failure(e)
+            }
+        }
+
+    private fun <T> executeGraphQL(requestBody: String, token: String, parse: (JSONObject) -> Result<T>): Result<T> {
+        val url = URL(BACKEND_URL)
+        val connection = url.openConnection() as HttpURLConnection
+        return try {
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+            connection.connectTimeout = 30000
+            connection.readTimeout = 30000
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+            val code = connection.responseCode
+            if (code == HttpURLConnection.HTTP_UNAUTHORIZED || code == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                Result.failure(UnauthorizedException())
+            } else if (code == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                parse(JSONObject(response))
+            } else {
+                val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown"
+                Result.failure(Exception("HTTP $code: $err"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     suspend fun createCollaborationPaymentOrder(
         collaborationId: String,
         paymentType: String,
@@ -892,6 +1058,59 @@ object BackendRepository {
 
     // ── Chat ──────────────────────────────────────────────────────────────────
 
+    suspend fun getChatList(token: String): Result<List<JSONObject>> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                query {
+                    getChatList {
+                        collaborationId
+                        otherUserId
+                        otherUserName
+                        otherUserImageUrl
+                        lastMessage
+                        lastMessageTime
+                        unreadCount
+                        status
+                    }
+                }
+            """.trimIndent()
+
+            val requestBody = JSONObject().apply { put("query", query) }.toString()
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                if (jsonResponse.has("errors")) {
+                    val message = jsonResponse.getJSONArray("errors").getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    val arr = jsonResponse.getJSONObject("data").getJSONArray("getChatList")
+                    val list = (0 until arr.length()).map { arr.getJSONObject(it) }
+                    Result.success(list)
+                }
+            } else {
+                val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Result.failure(Exception("Server returned $responseCode: $err"))
+            }
+        } catch (e: Exception) {
+            Log.e("BackendRepository", "getChatList: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
     suspend fun sendChatMessage(
         receiverId: String,
         text: String,
@@ -922,6 +1141,7 @@ object BackendRepository {
                         collaborationId
                         replyToId
                         isRead
+                        metadata
                     }
                 }
             """.trimIndent()

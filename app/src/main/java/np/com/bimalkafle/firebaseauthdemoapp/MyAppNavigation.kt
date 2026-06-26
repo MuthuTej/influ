@@ -197,8 +197,8 @@ fun MyAppNavigation(
 
         composable("chatList") {
             ChatListScreen(
-                onChatClick = { chatId, chatName ->
-                    navController.navigate("chat/$chatId/$chatName")
+                onChatClick = { chatId, chatName, collaborationId ->
+                    navController.navigate("chat/$chatId/$chatName?collaborationId=$collaborationId")
                 },
                 navController = navController
             )

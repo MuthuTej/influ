@@ -32,7 +32,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.ChatViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
-    onChatClick: (String, String) -> Unit,
+    onChatClick: (chatId: String, chatName: String, collaborationId: String) -> Unit,
     navController: NavController,
     viewModel: ChatViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
@@ -133,7 +133,7 @@ fun ChatListScreen(
                         
                         ChatListItem(
                             chat = chatItem,
-                            onClick = { onChatClick(entry.user.uid, entry.user.name) }
+                            onClick = { onChatClick(entry.user.uid, entry.user.name, entry.collaborationId) }
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     }

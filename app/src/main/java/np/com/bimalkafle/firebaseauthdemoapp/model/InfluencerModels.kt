@@ -19,7 +19,18 @@ data class InfluencerProfile(
     val averageRating: Float? = null,
     val isVerified: Boolean? = false,
     val youtubeInsights: YouTubeInsights? = null,
-    val instagramMetrics: InstagramMetrics? = null
+    val instagramMetrics: InstagramMetrics? = null,
+    val instagramProfiles: List<InstagramProfile>? = null
+)
+
+data class InstagramProfile(
+    val id: String,
+    val profileUrl: String,
+    val username: String,
+    val followers: Int?,
+    val isDefault: Boolean,
+    val connectedAt: String,
+    val metrics: InstagramMetrics?
 )
 
 data class InstagramMetrics(

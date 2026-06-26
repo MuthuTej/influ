@@ -42,6 +42,8 @@ class BrandViewModel : ViewModel() {
     private val _error = MutableLiveData<String?>()
     val error: LiveData<String?> = _error
 
+    fun clearError() { _error.value = null }
+
     private val _wishlistedInfluencers = MutableLiveData<List<InfluencerProfile>>(emptyList())
     val wishlistedInfluencers: LiveData<List<InfluencerProfile>> = _wishlistedInfluencers
 
@@ -587,6 +589,7 @@ class BrandViewModel : ViewModel() {
                     }
                     totalViewsDelivered
                     viewsGrowthSincePosting
+                    selectedInstagramProfileId
                   }
                 }
             """.trimIndent()
@@ -801,7 +804,8 @@ class BrandViewModel : ViewModel() {
                     yt = if (ytList.isEmpty()) null else ytList,
                     ig = if (igList.isEmpty()) null else igList,
                     totalViewsDelivered = if (obj.isNull("totalViewsDelivered")) null else obj.optInt("totalViewsDelivered"),
-                    viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting")
+                    viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting"),
+                    selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() }
                 )
             )
         }
@@ -898,15 +902,24 @@ class BrandViewModel : ViewModel() {
 
             val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
             result.onSuccess { jsonObject ->
+                val errors = jsonObject.optJSONArray("errors")
+                if (errors != null && errors.length() > 0) {
+                    val msg = errors.optJSONObject(0)?.optString("message") ?: "Action failed"
+                    _error.postValue(msg)
+                    onComplete(false)
+                    return@launch
+                }
                 val data = jsonObject.optJSONObject("data")
                 if (data != null && data.optJSONObject("updateCollaboration") != null) {
                     fetchCollaborations(token, force = true)
                     pushCollaborationStatusUpdate(collaborationId, status)
                     onComplete(true)
                 } else {
+                    _error.postValue("Action failed. Please try again.")
                     onComplete(false)
                 }
             }.onFailure {
+                _error.postValue(it.message ?: "Action failed")
                 onComplete(false)
             }
             _loading.postValue(false)
