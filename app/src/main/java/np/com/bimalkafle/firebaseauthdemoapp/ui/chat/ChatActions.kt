@@ -24,10 +24,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.platform.LocalContext
-import android.app.Activity
-import com.google.firebase.auth.FirebaseAuth
-import np.com.bimalkafle.firebaseauthdemoapp.utils.RazorpayService
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.components.StatusBadge
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.Dimens
@@ -47,12 +43,8 @@ fun RestrictedActionPanel(
     isActionLoading: Boolean = false
 ) {
     var showNegotiation by remember { mutableStateOf(false) }
-    var showFeedback by remember { mutableStateOf(false) }
     var showUpload by remember { mutableStateOf(false) }
-    
-    val context = LocalContext.current
-    val activity = context as? Activity
-    
+
     if (status == null) return
 
     val statusMessage = when (status) {
@@ -118,41 +110,11 @@ fun RestrictedActionPanel(
                     item { ActionCard("Negotiate", Icons.Default.AttachMoney, enabled = !isActionLoading) { showNegotiation = true } }
                 }
 
-                // Payment — status banner is now info-only; this is the single Pay interaction point
-                if (status == "WAITING_FOR_PAYMENT" && isBrand) {
-                    item {
-                        ActionCard("Pay Now", Icons.Default.Payments, isLoading = isActionLoading) {
-                            val collabId = collaborationId
-                            if (collabId != null && activity != null && brandViewModel != null && !isActionLoading) {
-                                FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-                                    val token = result.token
-                                    if (token != null) {
-                                        brandViewModel.createCollaborationPaymentOrder(token, collabId, "FULL") { orderData ->
-                                            if (orderData != null) {
-                                                RazorpayService.startPayment(
-                                                    activity = activity,
-                                                    orderData = orderData,
-                                                    userEmail = FirebaseAuth.getInstance().currentUser?.email,
-                                                    userContact = null
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // Content upload — not in timeline
                 if (status == "IN_PROGRESS" && !isBrand) {
                     item { ActionCard("Complete Work", Icons.Default.CloudUpload, enabled = !isActionLoading) { showUpload = true } }
                 }
 
-                // Always available (except terminal states)
-                if (status != "COMPLETED" && status != "REJECTED" && status != "REVOKED") {
-                    item { ActionCard("Feedback", Icons.Default.Feedback) { showFeedback = true } }
-                }
             }
         }
     }
@@ -167,19 +129,6 @@ fun RestrictedActionPanel(
                 onSend("Negotiated Proposal: ₹$amount on $platform - $delStr", "NEGOTIATION", mapOf("amount" to amount, "platform" to platform, "items" to deliverables))
                 onStatusUpdate("NEGOTIATION")
                 showNegotiation = false
-            }
-        )
-    }
-
-    if (showFeedback) {
-        TextInputDialog(
-            title = "Feedback",
-            label = "Enter your feedback",
-            multiline = true,
-            onDismiss = { showFeedback = false },
-            onSend = { feedback ->
-                onSend("Feedback Provided", "FEEDBACK", mapOf("feedback" to feedback))
-                showFeedback = false
             }
         )
     }

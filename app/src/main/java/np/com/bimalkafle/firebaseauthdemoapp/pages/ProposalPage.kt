@@ -161,6 +161,40 @@ fun ProposalPage(
         }
     }
 
+    // Real-time: WebSocket subscription anyCollaborationUpdated fires whenever any
+    // collaboration for this user is updated by the other party.
+    DisposableEffect(authState.value) {
+        if (authState.value !is np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated) {
+            return@DisposableEffect onDispose {}
+        }
+        val isBrandRole = (authState.value as np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated)
+            .role.equals("BRAND", ignoreCase = true)
+
+        fun refresh() {
+            FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { r ->
+                r.token?.let { token ->
+                    if (isBrandRole) brandViewModel.fetchCollaborations(token, force = true)
+                    else influencerViewModel.fetchCollaborations(token, force = true)
+                }
+            }
+        }
+
+        var wsClient: np.com.bimalkafle.firebaseauthdemoapp.network.CollaborationWebSocketClient? = null
+        FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { r ->
+            r.token?.let { token ->
+                // collaborationId = null → subscribes to anyCollaborationUpdated (all collabs)
+                wsClient = np.com.bimalkafle.firebaseauthdemoapp.network.CollaborationWebSocketClient(
+                    token = token,
+                    collaborationId = null,
+                    onUpdate = ::refresh
+                )
+                wsClient?.connect()
+            }
+        }
+
+        onDispose { wsClient?.disconnect() }
+    }
+
     val snackbarHostState = remember { SnackbarHostState() }
 
     error?.let {

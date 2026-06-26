@@ -4,136 +4,144 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatMessage
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatUser
+import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
+import org.json.JSONObject
 
 class ChatRepository {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    fun getUsers(currentUserRole: String, onError: (String) -> Unit = {}): Flow<List<ChatUser>> = callbackFlow {
-        val currentUserId = auth.currentUser?.uid
-        
-        val targetCollection = if (currentUserRole.equals("BRAND", ignoreCase = true)) {
-            "influencers"
-        } else {
-            "brands"
-        }
+    // ── Users ─────────────────────────────────────────────────────────────────
 
-        val subscription = db.collection(targetCollection)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("ChatRepository", "Error fetching users from $targetCollection: ${error.message}")
-                    onError(error.message ?: "Failed to load contacts")
-                    trySend(emptyList())
-                    return@addSnapshotListener
-                }
-                
-                val users = snapshot?.documents?.mapNotNull { doc ->
+    fun getUsersOnce(
+        currentUserRole: String,
+        onError: (String) -> Unit = {},
+        callback: (List<ChatUser>) -> Unit
+    ) {
+        val currentUserId = auth.currentUser?.uid
+        val collection = if (currentUserRole.equals("BRAND", ignoreCase = true)) "influencers" else "brands"
+
+        db.collection(collection).get()
+            .addOnSuccessListener { snapshot ->
+                val users = snapshot.documents.mapNotNull { doc ->
                     try {
                         val uid = doc.getString("id") ?: doc.id
-                        val name = doc.getString("name") ?: "Unknown"
-                        val email = doc.getString("email") ?: ""
-                        val photoUrl = doc.getString("logoUrl")
-                        
-                        if (uid != currentUserId) {
-                            ChatUser(
-                                uid = uid,
-                                name = name,
-                                email = email,
-                                profileImageUrl = photoUrl
-                            )
-                        } else {
-                            null
-                        }
-                    } catch (e: Exception) {
-                        Log.e("ChatRepository", "Error mapping document to ChatUser", e)
-                        null
+                        if (uid == currentUserId) return@mapNotNull null
+                        ChatUser(
+                            uid = uid,
+                            name = doc.getString("name") ?: "Unknown",
+                            email = doc.getString("email") ?: "",
+                            profileImageUrl = doc.getString("logoUrl")
+                        )
+                    } catch (e: Exception) { null }
+                }
+                callback(users)
+            }
+            .addOnFailureListener {
+                onError(it.message ?: "Failed to load contacts")
+                callback(emptyList())
+            }
+    }
+
+    // ── Message history ───────────────────────────────────────────────────────
+    // Primary: backend GraphQL query (getChatMessages).
+    // Fallback: Firestore one-time get() — used if the backend query fails or
+    // the endpoint is not yet deployed. Neither path uses addSnapshotListener.
+
+    suspend fun getMessageHistory(
+        otherUserId: String,
+        collaborationId: String?,
+        token: String
+    ): List<ChatMessage> {
+        val currentUserId = auth.currentUser?.uid ?: return emptyList()
+
+        // Try backend query first
+        val backendResult = BackendRepository.getChatMessages(otherUserId, collaborationId, token)
+        if (backendResult.isSuccess) {
+            return backendResult.getOrDefault(emptyList()).map { jsonToMessage(it, currentUserId) }
+        }
+
+        Log.w("ChatRepository", "Backend getChatMessages failed — falling back to Firestore get()")
+
+        // Firestore one-time get() fallback (no listener)
+        return try {
+            val snap = db.collection("messages")
+                .orderBy("timestamp", Query.Direction.ASCENDING)
+                .get()
+                .await()
+            snap.documents
+                .mapNotNull { it.toObject(ChatMessage::class.java) }
+                .filter {
+                    val between = (it.senderId == currentUserId && it.receiverId == otherUserId) ||
+                                  (it.senderId == otherUserId && it.receiverId == currentUserId)
+                    between && it.collaborationId == collaborationId
+                }
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "Firestore fallback failed: ${e.message}")
+            emptyList()
+        }
+    }
+
+    // ── Send message ──────────────────────────────────────────────────────────
+    // Routes through the backend mutation so the backend can broadcast the
+    // message to the receiver's WebSocket subscription immediately.
+    // Returns the confirmed message (with its backend-assigned ID) so the
+    // caller can do an accurate optimistic insert.
+
+    suspend fun sendMessage(
+        receiverId: String,
+        text: String,
+        replyToId: String? = null,
+        type: String = "TEXT",
+        metadata: Map<String, Any> = emptyMap(),
+        collaborationId: String? = null,
+        token: String
+    ): Result<ChatMessage> {
+        val currentUserId = auth.currentUser?.uid ?: return Result.failure(Exception("Not authenticated"))
+        val result = BackendRepository.sendChatMessage(
+            receiverId = receiverId,
+            text = text,
+            type = type,
+            metadata = metadata,
+            collaborationId = collaborationId,
+            replyToId = replyToId,
+            token = token
+        )
+        return result.map { jsonToMessage(it, currentUserId) }
+    }
+
+    // ── Chat list (one-time) ──────────────────────────────────────────────────
+    // No listener — initial snapshot only. Real-time updates come from the
+    // WebSocket subscription managed by ChatViewModel.
+
+    fun getAllMessagesOnce(
+        onError: (String) -> Unit = {},
+        callback: (List<ChatMessage>) -> Unit
+    ) {
+        val currentUserId = auth.currentUser?.uid ?: run { callback(emptyList()); return }
+
+        db.collection("messages").whereEqualTo("senderId", currentUserId).get()
+            .addOnSuccessListener { sentSnap ->
+                val sent = sentSnap.documents.mapNotNull { it.toObject(ChatMessage::class.java) }
+                db.collection("messages").whereEqualTo("receiverId", currentUserId).get()
+                    .addOnSuccessListener { receivedSnap ->
+                        val received = receivedSnap.documents.mapNotNull { it.toObject(ChatMessage::class.java) }
+                        callback((sent + received).sortedByDescending { it.timestamp })
                     }
-                } ?: emptyList()
-                
-                trySend(users)
+                    .addOnFailureListener {
+                        onError(it.message ?: "Failed to load received messages")
+                        callback(sent.sortedByDescending { it.timestamp })
+                    }
             }
-        awaitClose { subscription.remove() }
+            .addOnFailureListener {
+                onError(it.message ?: "Failed to load messages")
+                callback(emptyList())
+            }
     }
 
-    fun getMessages(otherUserId: String, collaborationId: String? = null, onError: (String) -> Unit = {}): Flow<List<ChatMessage>> = callbackFlow {
-        val currentUserId = auth.currentUser?.uid ?: run {
-            trySend(emptyList())
-            return@callbackFlow
-        }
-
-        val subscription = db.collection("messages")
-            .orderBy("timestamp", Query.Direction.ASCENDING)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("ChatRepository", "Error fetching messages: ${error.message}")
-                    onError(error.message ?: "Failed to load messages")
-                    trySend(emptyList())
-                    return@addSnapshotListener
-                }
-                
-                val messages = snapshot?.documents?.mapNotNull { it.toObject(ChatMessage::class.java) }
-                    ?.filter {
-                        val isBetweenUsers = (it.senderId == currentUserId && it.receiverId == otherUserId) ||
-                                           (it.senderId == otherUserId && it.receiverId == currentUserId)
-                        
-                        val isSameCollaboration = it.collaborationId == collaborationId
-                        
-                        isBetweenUsers && isSameCollaboration
-                    } ?: emptyList()
-                
-                trySend(messages)
-            }
-        awaitClose { subscription.remove() }
-    }
-
-    fun getAllMyMessages(onError: (String) -> Unit = {}): Flow<List<ChatMessage>> = callbackFlow {
-        val currentUserId = auth.currentUser?.uid ?: run {
-            trySend(emptyList())
-            return@callbackFlow
-        }
-
-        var sentMessages: List<ChatMessage> = emptyList()
-        var receivedMessages: List<ChatMessage> = emptyList()
-
-        fun emitCombined() {
-            val allMessages = (sentMessages + receivedMessages).sortedByDescending { it.timestamp }
-            trySend(allMessages)
-        }
-
-        val sentRegistration = db.collection("messages")
-            .whereEqualTo("senderId", currentUserId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("ChatRepository", "Error fetching sent messages: ${error.message}")
-                    onError(error.message ?: "Failed to load conversations")
-                    return@addSnapshotListener
-                }
-                sentMessages = snapshot?.documents?.mapNotNull { it.toObject(ChatMessage::class.java) } ?: emptyList()
-                emitCombined()
-            }
-
-        val receivedRegistration = db.collection("messages")
-            .whereEqualTo("receiverId", currentUserId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("ChatRepository", "Error fetching received messages: ${error.message}")
-                    onError(error.message ?: "Failed to load conversations")
-                    return@addSnapshotListener
-                }
-                receivedMessages = snapshot?.documents?.mapNotNull { it.toObject(ChatMessage::class.java) } ?: emptyList()
-                emitCombined()
-            }
-
-        awaitClose {
-            sentRegistration.remove()
-            receivedRegistration.remove()
-        }
-    }
+    // ── Mark as read ──────────────────────────────────────────────────────────
 
     fun markMessagesAsRead(senderId: String, collaborationId: String? = null) {
         val currentUserId = auth.currentUser?.uid ?: return
@@ -144,60 +152,55 @@ class ChatRepository {
             .whereEqualTo("collaborationId", collaborationId)
             .get()
             .addOnSuccessListener { snapshot ->
-                for (doc in snapshot.documents) {
-                    doc.reference.update("isRead", true)
-                }
+                for (doc in snapshot.documents) doc.reference.update("isRead", true)
             }
     }
 
-    fun sendMessage(
-        receiverId: String, 
-        text: String, 
-        replyToId: String? = null,
-        type: String = "TEXT",
-        metadata: Map<String, Any> = emptyMap(),
-        collaborationId: String? = null
-    ) {
-        val currentUserId = auth.currentUser?.uid ?: return
-        val messageId = db.collection("messages").document().id
-        val timestamp = System.currentTimeMillis()
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-        val message = ChatMessage(
-            id = messageId,
-            text = text,
-            senderId = currentUserId,
-            receiverId = receiverId,
-            timestamp = timestamp,
-            timeFormatted = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(timestamp)),
-            replyToId = replyToId,
-            isRead = false,
-            type = type,
-            metadata = metadata,
-            collaborationId = collaborationId
+    private fun jsonToMessage(json: JSONObject, currentUserId: String): ChatMessage {
+        val meta = mutableMapOf<String, Any>()
+        json.optJSONObject("metadata")?.let { m -> m.keys().forEach { k -> meta[k] = m.get(k) } }
+        return ChatMessage(
+            id              = json.optString("id"),
+            text            = json.optString("text"),
+            senderId        = json.optString("senderId"),
+            receiverId      = json.optString("receiverId"),
+            timestamp       = json.optLong("timestamp"),
+            timeFormatted   = json.optString("timeFormatted"),
+            type            = json.optString("type", "TEXT"),
+            metadata        = meta,
+            collaborationId = json.optString("collaborationId").takeIf { it.isNotBlank() },
+            replyToId       = json.optString("replyToId").takeIf { it.isNotBlank() },
+            isRead          = json.optBoolean("isRead", false),
+            isMe            = json.optString("senderId") == currentUserId
         )
-
-        db.collection("messages").document(messageId).set(message)
     }
 
     fun ensureUserExistsInFirestore() {
         val currentUser = auth.currentUser ?: return
         val uid = currentUser.uid
-        val email = currentUser.email ?: ""
-        val name = currentUser.displayName ?: currentUser.email?.substringBefore("@") ?: "User"
-        val photoUrl = currentUser.photoUrl?.toString()
-
         val userRef = db.collection("users").document(uid)
         userRef.get().addOnSuccessListener { document ->
             if (!document.exists()) {
-                val chatUser = ChatUser(
-                    uid = uid,
-                    email = email,
-                    name = name,
-                    profileImageUrl = photoUrl
+                userRef.set(
+                    ChatUser(
+                        uid = uid,
+                        email = currentUser.email ?: "",
+                        name = currentUser.displayName
+                            ?: currentUser.email?.substringBefore("@") ?: "User",
+                        profileImageUrl = currentUser.photoUrl?.toString()
+                    )
                 )
-                userRef.set(chatUser)
             }
         }
     }
-
 }
+
+// Firestore Task<QuerySnapshot>.await() — inline coroutine bridge without
+// requiring the full kotlinx-coroutines-play-services artifact.
+private suspend fun <T> com.google.android.gms.tasks.Task<T>.await(): T =
+    kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+        addOnSuccessListener { cont.resumeWith(Result.success(it)) }
+        addOnFailureListener { cont.resumeWith(Result.failure(it)) }
+    }

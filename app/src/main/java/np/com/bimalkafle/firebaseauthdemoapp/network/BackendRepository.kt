@@ -889,4 +889,147 @@ object BackendRepository {
             Result.failure(e)
         }
     }
+
+    // ── Chat ──────────────────────────────────────────────────────────────────
+
+    suspend fun sendChatMessage(
+        receiverId: String,
+        text: String,
+        type: String = "TEXT",
+        metadata: Map<String, Any> = emptyMap(),
+        collaborationId: String? = null,
+        replyToId: String? = null,
+        token: String
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                mutation SendChatMessage(${'$'}input: SendMessageInput!) {
+                    sendChatMessage(input: ${'$'}input) {
+                        id
+                        text
+                        senderId
+                        receiverId
+                        timestamp
+                        timeFormatted
+                        type
+                        collaborationId
+                        replyToId
+                        isRead
+                    }
+                }
+            """.trimIndent()
+
+            val inputObj = JSONObject().apply {
+                put("receiverId", receiverId)
+                put("text", text)
+                put("type", type)
+                put("collaborationId", collaborationId ?: JSONObject.NULL)
+                put("replyToId", replyToId ?: JSONObject.NULL)
+                if (metadata.isNotEmpty()) put("metadata", JSONObject(metadata as Map<*, *>))
+            }
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+                put("variables", JSONObject().apply { put("input", inputObj) })
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                if (jsonResponse.has("errors")) {
+                    val message = jsonResponse.getJSONArray("errors").getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    Result.success(jsonResponse.getJSONObject("data").getJSONObject("sendChatMessage"))
+                }
+            } else {
+                val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Result.failure(Exception("Server returned $responseCode: $err"))
+            }
+        } catch (e: Exception) {
+            Log.e("BackendRepository", "sendChatMessage: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getChatMessages(
+        otherUserId: String,
+        collaborationId: String?,
+        token: String
+    ): Result<List<JSONObject>> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                query GetChatMessages(${'$'}otherUserId: String!, ${'$'}collaborationId: String) {
+                    getChatMessages(otherUserId: ${'$'}otherUserId, collaborationId: ${'$'}collaborationId) {
+                        id
+                        text
+                        senderId
+                        receiverId
+                        timestamp
+                        timeFormatted
+                        type
+                        collaborationId
+                        replyToId
+                        isRead
+                        metadata
+                    }
+                }
+            """.trimIndent()
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+                put("variables", JSONObject().apply {
+                    put("otherUserId", otherUserId)
+                    put("collaborationId", collaborationId ?: JSONObject.NULL)
+                })
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                if (jsonResponse.has("errors")) {
+                    val message = jsonResponse.getJSONArray("errors").getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    val arr = jsonResponse.getJSONObject("data").getJSONArray("getChatMessages")
+                    val list = (0 until arr.length()).map { arr.getJSONObject(it) }
+                    Result.success(list)
+                }
+            } else {
+                val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Result.failure(Exception("Server returned $responseCode: $err"))
+            }
+        } catch (e: Exception) {
+            Log.e("BackendRepository", "getChatMessages: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }

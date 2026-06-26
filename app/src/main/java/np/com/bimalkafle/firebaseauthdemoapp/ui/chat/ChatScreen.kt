@@ -28,8 +28,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import np.com.bimalkafle.firebaseauthdemoapp.utils.RazorpayService
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
+import np.com.bimalkafle.firebaseauthdemoapp.network.CollaborationWebSocketClient
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatMessage
@@ -96,26 +97,38 @@ fun ChatScreen(
             return@DisposableEffect onDispose {}
         }
         val isBrandUser = (authState.value as AuthState.Authenticated).role.equals("BRAND", ignoreCase = true)
-        var isFirstSnapshot = true
-        val listener = FirebaseFirestore.getInstance()
-            .collection("collaboration_updates")
-            .document(collaborationId)
-            .addSnapshotListener { snapshot, _ ->
-                if (isFirstSnapshot) { isFirstSnapshot = false; return@addSnapshotListener }
-                if (snapshot != null && snapshot.exists()) {
-                    FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { r ->
-                        r.token?.let { token ->
-                            if (isBrandUser) brandViewModel.fetchCollaborations(token, force = true)
-                            else influencerViewModel.fetchCollaborations(token, force = true)
-                        }
-                    }
+
+        fun refresh() {
+            FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { r ->
+                r.token?.let { token ->
+                    if (isBrandUser) brandViewModel.fetchCollaborations(token, force = true)
+                    else influencerViewModel.fetchCollaborations(token, force = true)
                 }
             }
-        onDispose { listener.remove() }
+        }
+
+        // WebSocket for real-time collaboration status updates.
+        var wsClient: CollaborationWebSocketClient? = null
+        FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { r ->
+            r.token?.let { token ->
+                wsClient = CollaborationWebSocketClient(
+                    token = token,
+                    collaborationId = collaborationId,
+                    onUpdate = ::refresh
+                )
+                wsClient?.connect()
+            }
+        }
+
+        onDispose { wsClient?.disconnect() }
     }
 
     LaunchedEffect(chatId, collaborationId) {
         chatId?.let { viewModel.initChat(it, chatNameParam ?: "Chat", collaborationId) }
+    }
+
+    DisposableEffect(chatId) {
+        onDispose { viewModel.stopConversationWebSocket() }
     }
 
     val messages by viewModel.messages.collectAsState()
@@ -268,23 +281,11 @@ fun ChatScreen(
                     isBrand = isBrand,
                     onStatusUpdate = onStatusUpdate,
                     onSend = { text, type, metadata -> viewModel.sendMessage(text, type, metadata) },
+                    onSendUpload = { link, platform -> viewModel.sendUpload(link, platform) },
                     isActionLoading = isActionLoading,
-                    modifier = Modifier.weight(1f)
-                )
-
-                // ── Actions Panel ────────────────────────────────────────────
-                RestrictedActionPanel(
-                    status = currentCollaboration.status,
-                    collaborationId = collaborationId,
-                    isBrand = isBrand,
-                    onSend = { text, type, metadata -> viewModel.sendMessage(text, type, metadata) },
-                    onSendUpload = { link, platform ->
-                        viewModel.sendMessage(link, "CONTENT_UPLOAD", mapOf("platform" to platform, "url" to link))
-                    },
-                    onStatusUpdate = onStatusUpdate,
-                    collaboration = currentCollaboration,
                     brandViewModel = if (isBrand) brandViewModel else null,
-                    isActionLoading = isActionLoading
+                    activity = activity,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -394,7 +395,10 @@ fun CollaborationTimeline(
     isBrand: Boolean,
     onStatusUpdate: (String) -> Unit,
     onSend: (String, String, Map<String, Any>) -> Unit,
+    onSendUpload: (String, String) -> Unit = { _, _ -> },
     isActionLoading: Boolean = false,
+    brandViewModel: BrandViewModel? = null,
+    activity: Activity? = null,
     modifier: Modifier = Modifier
 ) {
     val status = collaboration.status
@@ -405,6 +409,9 @@ fun CollaborationTimeline(
 
     var showBriefDialog by remember { mutableStateOf(false) }
     var showScriptDialog by remember { mutableStateOf(false) }
+    var showFeedbackDialog by remember { mutableStateOf(false) }
+    var showNegotiationDialog by remember { mutableStateOf(false) }
+    var showUploadDialog by remember { mutableStateOf(false) }
 
     // Step state flags
     val briefStepShown  = statusIndex >= STATUS_ORDER.indexOf("ACCEPTED")
@@ -415,6 +422,8 @@ fun CollaborationTimeline(
     val scriptDone       = statusIndex >= STATUS_ORDER.indexOf("WAITING_FOR_PAYMENT")
     val paymentActive    = status == "WAITING_FOR_PAYMENT"
     val paymentDone      = statusIndex >= STATUS_ORDER.indexOf("IN_PROGRESS")
+    val contentDeliveryActive = status == "IN_PROGRESS"
+    val contentDeliveryDone   = status == "COMPLETED"
 
     Column(
         modifier = modifier
@@ -439,6 +448,20 @@ fun CollaborationTimeline(
                 color = Color(0xFF555555),
                 lineHeight = 20.sp
             )
+            if (status == "PENDING" || status == "NEGOTIATION") {
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { showNegotiationDialog = true },
+                    enabled = !isActionLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.AttachMoney, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Negotiate", fontWeight = FontWeight.Bold)
+                }
+            }
         }
 
         // ── Step 2: Campaign Brief ───────────────────────────────────────
@@ -605,7 +628,7 @@ fun CollaborationTimeline(
             isActive = paymentActive,
             isDone = paymentDone,
             isLocked = !paymentActive && !paymentDone,
-            isLast = true,
+            isLast = false,
             badge = if (paymentDone) "PAID" else null
         ) {
             when {
@@ -614,16 +637,130 @@ fun CollaborationTimeline(
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFF555555)
                 )
-                paymentActive -> Text(
-                    "Awaiting brand payment to begin work.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF555555)
-                )
+                paymentActive -> {
+                    Text(
+                        "Script approved. Complete the payment to start work.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF555555)
+                    )
+                    if (isBrand && brandViewModel != null && activity != null) {
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                if (!isActionLoading) {
+                                    FirebaseAuth.getInstance().currentUser?.getIdToken(true)
+                                        ?.addOnSuccessListener { result ->
+                                            val token = result.token ?: return@addOnSuccessListener
+                                            brandViewModel.createCollaborationPaymentOrder(
+                                                token, collaboration.id, "FULL"
+                                            ) { orderData ->
+                                                if (orderData != null) {
+                                                    RazorpayService.startPayment(
+                                                        activity = activity,
+                                                        orderData = orderData,
+                                                        userEmail = FirebaseAuth.getInstance().currentUser?.email,
+                                                        userContact = null
+                                                    )
+                                                }
+                                            }
+                                        }
+                                }
+                            },
+                            enabled = !isActionLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isActionLoading) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Payments,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("Pay Now", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else if (!isBrand) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Awaiting brand payment to begin work.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                    }
+                }
                 else -> Text(
                     "Available after script approval",
                     style = MaterialTheme.typography.bodySmall,
                     color = TlGray
                 )
+            }
+        }
+
+        // ── Step 5: Content Delivery ─────────────────────────────────────────
+        TimelineStepCard(
+            title = "Content Delivery",
+            time = "",
+            isActive = contentDeliveryActive,
+            isDone = contentDeliveryDone,
+            isLocked = !contentDeliveryActive && !contentDeliveryDone,
+            isLast = true,
+            badge = if (contentDeliveryDone) "DONE" else null
+        ) {
+            when {
+                contentDeliveryDone -> Text(
+                    "Content delivered. Collaboration completed.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF555555)
+                )
+                contentDeliveryActive -> {
+                    if (!isBrand) {
+                        Button(
+                            onClick = { showUploadDialog = true },
+                            enabled = !isActionLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isActionLoading) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Submit Content", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Text("Waiting for influencer to deliver content.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                }
+                else -> Text("Available after payment", style = MaterialTheme.typography.bodySmall, color = TlGray)
+            }
+        }
+
+        // ── Feedback ─────────────────────────────────────────────────────────
+        if (status != "COMPLETED" && status != "REJECTED" && status != "REVOKED") {
+            Spacer(Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(
+                    onClick = { showFeedbackDialog = true },
+                    colors = ButtonDefaults.textButtonColors(contentColor = TlRed)
+                ) {
+                    Icon(
+                        Icons.Default.Feedback,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Give Feedback", fontSize = 13.sp)
+                }
             }
         }
     }
@@ -651,6 +788,44 @@ fun CollaborationTimeline(
                 onSend("Script Submitted", "SCRIPT", mapOf("content" to content))
                 onStatusUpdate("SCRIPT_SENT")
                 showScriptDialog = false
+            }
+        )
+    }
+    if (showFeedbackDialog) {
+        TextInputDialog(
+            title = "Feedback",
+            label = "Enter your feedback",
+            multiline = true,
+            onDismiss = { showFeedbackDialog = false },
+            onSend = { feedback ->
+                onSend("Feedback Provided", "FEEDBACK", mapOf("feedback" to feedback))
+                showFeedbackDialog = false
+            }
+        )
+    }
+    if (showNegotiationDialog) {
+        NegotiationDialog(
+            onDismiss = { showNegotiationDialog = false },
+            collaboration = collaboration,
+            onSend = { amount, platform, deliverables ->
+                val delStr = deliverables.entries.joinToString { "${it.key} (x${it.value})" }
+                onSend(
+                    "Negotiated Proposal: ₹$amount on $platform - $delStr",
+                    "NEGOTIATION",
+                    mapOf("amount" to amount, "platform" to platform, "items" to deliverables)
+                )
+                onStatusUpdate("NEGOTIATION")
+                showNegotiationDialog = false
+            }
+        )
+    }
+    if (showUploadDialog) {
+        ContentUploadDialog(
+            onDismiss = { showUploadDialog = false },
+            onSend = { links, platform ->
+                links.forEach { link -> onSendUpload(link, platform) }
+                onStatusUpdate("COMPLETED")
+                showUploadDialog = false
             }
         )
     }

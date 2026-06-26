@@ -1216,9 +1216,10 @@ class BrandViewModel : ViewModel() {
         }
     }
     private fun pushCollaborationStatusUpdate(collaborationId: String, status: String) {
+        val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
         FirebaseFirestore.getInstance()
             .collection("collaboration_updates")
             .document(collaborationId)
-            .set(mapOf("status" to status, "lastUpdated" to System.currentTimeMillis()))
+            .set(mapOf("status" to status, "lastUpdated" to System.currentTimeMillis(), "updatedBy" to uid))
     }
 }
