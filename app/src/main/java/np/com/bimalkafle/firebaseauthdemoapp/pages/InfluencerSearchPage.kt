@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,8 +22,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -50,6 +54,7 @@ fun InfluencerSearchPage(
     val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
     val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(Unit) {
         val currentUser = FirebaseAuth.getInstance().currentUser
@@ -65,7 +70,6 @@ fun InfluencerSearchPage(
 
     var selectedPlatform by remember { mutableStateOf("All") }
     var selectedCategory by remember { mutableStateOf("All") }
-    var selectedBudgetRange by remember { mutableStateOf("All") }
 
     // Filter campaigns based on search query and selected filters
     val filteredCampaigns = campaigns.filter { campaign ->
@@ -79,16 +83,7 @@ fun InfluencerSearchPage(
         val matchesCategory = selectedCategory == "All" ||
                 campaign.brand?.brandCategories?.any { it.category.equals(selectedCategory, ignoreCase = true) } == true
 
-        val matchesBudget = when (selectedBudgetRange) {
-            "All" -> true
-            "1k to 10k" -> (campaign.budgetMin ?: 0) >= 1000 && (campaign.budgetMax ?: 0) <= 10000
-            "10k to 50k" -> (campaign.budgetMin ?: 0) >= 10000 && (campaign.budgetMax ?: 0) <= 50000
-            "50k to 100k" -> (campaign.budgetMin ?: 0) >= 50000 && (campaign.budgetMax ?: 0) <= 100000
-            "100k+" -> (campaign.budgetMin ?: 0) >= 100000
-            else -> true
-        }
-
-        matchesSearch && matchesPlatform && matchesCategory && matchesBudget
+        matchesSearch && matchesPlatform && matchesCategory
     }
     
     var selectedBottomNavItem by remember { mutableStateOf("Search") }
@@ -233,6 +228,9 @@ fun InfluencerSearchPage(
                             placeholder = { Text("Search Campaigns", color = Color.Gray) },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
                             shape = RoundedCornerShape(28.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.White,
                                 unfocusedContainerColor = Color.White,
@@ -279,20 +277,6 @@ fun InfluencerSearchPage(
                         }
                         platform to count
                     }
-                    
-                    // Calculate counts for Budget
-                    val budgetRanges = listOf("All", "1k to 10k", "10k to 50k", "50k to 100k", "100k+")
-                    val budgetOptions = budgetRanges.map { range ->
-                        val count = when (range) {
-                            "All" -> campaigns.size
-                            "1k to 10k" -> campaigns.count { (it.budgetMin ?: 0) >= 1000 && (it.budgetMax ?: 0) <= 10000 }
-                            "10k to 50k" -> campaigns.count { (it.budgetMin ?: 0) >= 10000 && (it.budgetMax ?: 0) <= 50000 }
-                            "50k to 100k" -> campaigns.count { (it.budgetMin ?: 0) >= 50000 && (it.budgetMax ?: 0) <= 100000 }
-                            "100k+" -> campaigns.count { (it.budgetMin ?: 0) >= 100000 }
-                            else -> 0
-                        }
-                        range to count
-                    }
 
                     FilterDropdown(
                         label = "Platform",
@@ -311,17 +295,6 @@ fun InfluencerSearchPage(
                         options = categoryOptions,
                         onOptionSelected = { 
                             selectedCategory = it 
-                            currentPage = 1
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    FilterDropdown(
-                        label = "Budget",
-                        selectedOption = selectedBudgetRange,
-                        options = budgetOptions,
-                        onOptionSelected = { 
-                            selectedBudgetRange = it 
                             currentPage = 1
                         },
                         modifier = Modifier.weight(1f)
@@ -346,7 +319,7 @@ fun InfluencerSearchPage(
                     )
 
                     // Clear Filters Button
-                    if (selectedPlatform != "All" || selectedCategory != "All" || selectedBudgetRange != "All" || searchQuery.isNotEmpty()) {
+                    if (selectedPlatform != "All" || selectedCategory != "All" || searchQuery.isNotEmpty()) {
                         Text(
                             text = "Clear All",
                             color = MaterialTheme.colorScheme.primary,
@@ -355,7 +328,6 @@ fun InfluencerSearchPage(
                             modifier = Modifier.clickable {
                                 selectedPlatform = "All"
                                 selectedCategory = "All"
-                                selectedBudgetRange = "All"
                                 searchQuery = ""
                                 currentPage = 1
                             }
