@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -70,20 +71,27 @@ fun InfluencerSearchPage(
 
     var selectedPlatform by remember { mutableStateOf("All") }
     var selectedCategory by remember { mutableStateOf("All") }
+    var currentPage by remember { mutableIntStateOf(1) }
 
     // Filter campaigns based on search query and selected filters
-    val filteredCampaigns = campaigns.filter { campaign ->
-        val matchesSearch = campaign.title.contains(searchQuery, ignoreCase = true) ||
-                campaign.description.contains(searchQuery, ignoreCase = true) ||
-                (campaign.brand?.name?.contains(searchQuery, ignoreCase = true) == true)
+    val filteredCampaigns = remember(searchQuery, selectedPlatform, selectedCategory, campaigns) {
+        campaigns.filter { campaign ->
+            val campaignCategories = campaign.categories?.map { it.category } ?: emptyList()
+            val campaignPlatforms = campaign.platforms?.map { it.platform } ?: emptyList()
 
-        val matchesPlatform = selectedPlatform == "All" ||
-                campaign.brand?.preferredPlatforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
+            val matchesSearch = campaign.title.contains(searchQuery, ignoreCase = true) ||
+                    campaign.description.contains(searchQuery, ignoreCase = true) ||
+                    (campaign.brand?.name?.contains(searchQuery, ignoreCase = true) == true) ||
+                    campaignCategories.any { it.contains(searchQuery, ignoreCase = true) }
 
-        val matchesCategory = selectedCategory == "All" ||
-                campaign.brand?.brandCategories?.any { it.category.equals(selectedCategory, ignoreCase = true) } == true
+            val matchesPlatform = selectedPlatform == "All" ||
+                    campaignPlatforms.any { it.equals(selectedPlatform, ignoreCase = true) }
 
-        matchesSearch && matchesPlatform && matchesCategory
+            val matchesCategory = selectedCategory == "All" ||
+                    campaignCategories.any { it.equals(selectedCategory, ignoreCase = true) }
+
+            matchesSearch && matchesPlatform && matchesCategory
+        }
     }
     
     var selectedBottomNavItem by remember { mutableStateOf("Search") }
@@ -107,9 +115,8 @@ fun InfluencerSearchPage(
         floatingActionButton = { AiChatFab(navController) }
     ) { padding ->
         // ---------------- PAGINATION LOGIC ----------------
-        var currentPage by remember { mutableStateOf(1) }
         val itemsPerPage = 5
-        val totalPages = (filteredCampaigns.size + itemsPerPage - 1).coerceAtLeast(1) / itemsPerPage.coerceAtLeast(1)
+        val totalPages = ((filteredCampaigns.size + itemsPerPage - 1) / itemsPerPage).coerceAtLeast(1)
         
         LaunchedEffect(filteredCampaigns) {
             currentPage = 1
@@ -165,7 +172,7 @@ fun InfluencerSearchPage(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        Icons.Default.KeyboardArrowLeft,
+                                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                                         contentDescription = "Back",
                                         tint = Color.Black
                                     )
@@ -220,7 +227,10 @@ fun InfluencerSearchPage(
                         // Search Bar
                         TextField(
                             value = searchQuery,
-                            onValueChange = { searchQuery = it },
+                            onValueChange = { 
+                                searchQuery = it 
+                                currentPage = 1
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp)
@@ -255,24 +265,26 @@ fun InfluencerSearchPage(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Calculate counts for Categories
-                    val categories = listOf("All", "Tech", "Fashion", "Food", "Lifestyle", "Beauty", "Sports")
-                    val categoryOptions = categories.map { category ->
+                    val categoriesList = listOf("All", "Tech", "Fashion", "Food", "Lifestyle", "Beauty", "Sports")
+                    val categoryOptions = categoriesList.map { category ->
                         val count = if (category == "All") {
                             campaigns.size
                         } else {
-                            campaigns.count { it.brand?.brandCategories?.any { it.category.equals(category, ignoreCase = true) } == true }
+                            campaigns.count { camp -> 
+                                camp.categories?.any { it.category.equals(category, ignoreCase = true) } == true 
+                            }
                         }
                         category to count
                     }
 
                     // Calculate counts for Platforms
-                    val platforms = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK")
-                    val platformOptions = platforms.map { platform ->
+                    val platformsList = listOf("All", "Instagram", "YouTube", "Facebook", "TikTok")
+                    val platformOptions = platformsList.map { platform ->
                         val count = if (platform == "All") {
                              campaigns.size
                         } else {
-                            campaigns.count { campaign -> 
-                                 campaign.brand?.preferredPlatforms?.any { it.platform.equals(platform, ignoreCase = true) } == true
+                            campaigns.count { camp -> 
+                                 camp.platforms?.any { it.platform.equals(platform, ignoreCase = true) } == true
                             }
                         }
                         platform to count
