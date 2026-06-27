@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,8 +22,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -120,7 +124,6 @@ fun BrandSearchPage(
         isLoading = isLoading,
         onBackClick = { navController.popBackStack() },
         onInfluencerClick = { id -> navController.navigate("brand_influencer_detail/$id") },
-        onCreateCampaignClick = { navController.navigate("create_campaign") },
         navController = navController,
         wishlistedInfluencers = wishlistedInfluencers,
         unreadCount = unreadCount,
@@ -150,7 +153,6 @@ fun BrandSearchPageContent(
     isLoading: Boolean,
     onBackClick: () -> Unit,
     onInfluencerClick: (String) -> Unit,
-    onCreateCampaignClick: () -> Unit,
     navController: NavController,
     unreadCount: Int,
     currentPage: Int,
@@ -163,6 +165,7 @@ fun BrandSearchPageContent(
     val paginatedInfluencers = filteredInfluencers
         .drop((currentPage - 1) * itemsPerPage)
         .take(itemsPerPage)
+    val focusManager = LocalFocusManager.current
 
     Scaffold(
         bottomBar = {
@@ -173,18 +176,7 @@ fun BrandSearchPageContent(
                 isBrand = true
             )
         },
-        floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                AiChatFab(navController, size = 40.dp)
-                FloatingActionButton(
-                    onClick = onCreateCampaignClick,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    shape = CircleShape
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Create Campaign", tint = Color.White)
-                }
-            }
-        }
+        floatingActionButton = { AiChatFab(navController) }
     ) { padding ->
         LazyColumn(
             modifier = modifier
@@ -255,6 +247,9 @@ fun BrandSearchPageContent(
                             placeholder = { Text("Search influencers...", color = Color.Gray) },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
                             shape = RoundedCornerShape(28.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.White,
                                 unfocusedContainerColor = Color.White,
