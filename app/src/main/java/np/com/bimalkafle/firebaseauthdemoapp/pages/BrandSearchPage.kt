@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
@@ -44,6 +45,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.FilterDropdown
 import np.com.bimalkafle.firebaseauthdemoapp.components.IconBubbleSearch
+import np.com.bimalkafle.firebaseauthdemoapp.components.SearchSuggestionsPopup
 import np.com.bimalkafle.firebaseauthdemoapp.components.SkeletonCard
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 
@@ -198,6 +200,18 @@ fun BrandSearchPageContent(
         .drop((currentPage - 1) * itemsPerPage)
         .take(itemsPerPage)
     val focusManager = LocalFocusManager.current
+    var isSearchFocused by remember { mutableStateOf(false) }
+
+    val suggestions = remember(searchQuery, allInfluencers) {
+        if (searchQuery.length < 2) emptyList()
+        else {
+            val names = allInfluencers.map { it.name }.filter { it.contains(searchQuery, ignoreCase = true) }
+            val cats = allInfluencers.flatMap { it.categories?.map { c -> c.category } ?: emptyList() }
+                .distinct()
+                .filter { it.contains(searchQuery, ignoreCase = true) }
+            (names + cats).distinct().take(5)
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -277,36 +291,49 @@ fun BrandSearchPageContent(
                         Text("Find influencers for your campaign", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        BasicTextField(
-                            value = searchQuery,
-                            onValueChange = onSearchQueryChange,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp)
-                                .shadow(4.dp, RoundedCornerShape(22.dp))
-                                .background(Color.White, RoundedCornerShape(22.dp)),
-                            singleLine = true,
-                            textStyle = TextStyle(fontSize = 14.sp, color = Color.Black),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                            decorationBox = { innerTextField ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(horizontal = 16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                                        if (searchQuery.isEmpty()) {
-                                            Text("Search influencers...", color = Color.Gray, fontSize = 14.sp)
+                        Box {
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = onSearchQueryChange,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .shadow(4.dp, RoundedCornerShape(22.dp))
+                                    .background(Color.White, RoundedCornerShape(22.dp))
+                                    .onFocusChanged { isSearchFocused = it.isFocused },
+                                singleLine = true,
+                                textStyle = TextStyle(fontSize = 14.sp, color = Color.Black),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                                decorationBox = { innerTextField ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                            if (searchQuery.isEmpty()) {
+                                                Text("Search influencers...", color = Color.Gray, fontSize = 14.sp)
+                                            }
+                                            innerTextField()
                                         }
-                                        innerTextField()
                                     }
                                 }
-                            }
-                        )
+                            )
+
+                            SearchSuggestionsPopup(
+                                suggestions = suggestions,
+                                onSuggestionClick = { 
+                                    onSearchQueryChange(it)
+                                    focusManager.clearFocus()
+                                },
+                                isVisible = isSearchFocused && suggestions.isNotEmpty(),
+                                modifier = Modifier.padding(top = 48.dp)
+                            )
+                        }
                     }
                 }
             }

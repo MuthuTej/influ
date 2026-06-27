@@ -3,11 +3,14 @@ package np.com.bimalkafle.firebaseauthdemoapp.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +20,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 
 @Composable
 fun IconBubbleSearch(
@@ -117,10 +122,78 @@ fun FilterDropdown(
                     },
                     onClick = {
                         onOptionToggle(option)
-                        // If "All" is clicked, we might want to close, but usually for multi-select we keep it open
-                        // unless we want to toggle many. Let's keep it simple.
                     }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun SearchSuggestionsPopup(
+    suggestions: List<String>,
+    onSuggestionClick: (String) -> Unit,
+    isVisible: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (isVisible && suggestions.isNotEmpty()) {
+        Popup(
+            alignment = Alignment.TopCenter,
+            onDismissRequest = { },
+            properties = PopupProperties(focusable = false)
+        ) {
+            Card(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .heightIn(max = 250.dp),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Text(
+                        text = "Suggestions",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                    
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(suggestions) { suggestion ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSuggestionClick(suggestion) }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = suggestion,
+                                    fontSize = 14.sp,
+                                    color = Color.Black,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                            if (suggestion != suggestions.last()) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    thickness = 0.5.dp,
+                                    color = Color.LightGray.copy(alpha = 0.5f)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

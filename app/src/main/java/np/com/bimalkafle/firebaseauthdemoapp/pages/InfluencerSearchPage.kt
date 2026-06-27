@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
@@ -44,6 +45,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.FilterDropdown
 import np.com.bimalkafle.firebaseauthdemoapp.components.IconBubbleSearch
+import np.com.bimalkafle.firebaseauthdemoapp.components.SearchSuggestionsPopup
 import np.com.bimalkafle.firebaseauthdemoapp.components.SkeletonCard
 import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignDetail
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
@@ -67,6 +69,19 @@ fun InfluencerSearchPage(
     var firebaseToken by remember { mutableStateOf<String?>(null) }
     val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
     val focusManager = LocalFocusManager.current
+    var isSearchFocused by remember { mutableStateOf(false) }
+
+    val suggestions = remember(searchQuery, campaigns) {
+        if (searchQuery.length < 2) emptyList()
+        else {
+            val titles = campaigns.map { it.title }.filter { it.contains(searchQuery, ignoreCase = true) }
+            val brands = campaigns.mapNotNull { it.brand?.name }.filter { it.contains(searchQuery, ignoreCase = true) }
+            val cats = campaigns.flatMap { it.categories?.map { c -> c.category } ?: emptyList() }
+                .distinct()
+                .filter { it.contains(searchQuery, ignoreCase = true) }
+            (titles + brands + cats).distinct().take(5)
+        }
+    }
 
     LaunchedEffect(Unit) {
         val currentUser = FirebaseAuth.getInstance().currentUser
@@ -210,39 +225,52 @@ fun InfluencerSearchPage(
                         Text("Find active campaigns to collaborate with", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        BasicTextField(
-                            value = searchQuery,
-                            onValueChange = { 
-                                searchQuery = it 
-                                currentPage = 1
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp)
-                                .shadow(4.dp, RoundedCornerShape(22.dp))
-                                .background(Color.White, RoundedCornerShape(22.dp)),
-                            singleLine = true,
-                            textStyle = TextStyle(fontSize = 14.sp, color = Color.Black),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                            decorationBox = { innerTextField ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(horizontal = 16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                                        if (searchQuery.isEmpty()) {
-                                            Text("Search campaigns...", color = Color.Gray, fontSize = 14.sp)
+                        Box {
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = { 
+                                    searchQuery = it 
+                                    currentPage = 1
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .shadow(4.dp, RoundedCornerShape(22.dp))
+                                    .background(Color.White, RoundedCornerShape(22.dp))
+                                    .onFocusChanged { isSearchFocused = it.isFocused },
+                                singleLine = true,
+                                textStyle = TextStyle(fontSize = 14.sp, color = Color.Black),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                                decorationBox = { innerTextField ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                            if (searchQuery.isEmpty()) {
+                                                Text("Search campaigns...", color = Color.Gray, fontSize = 14.sp)
+                                            }
+                                            innerTextField()
                                         }
-                                        innerTextField()
                                     }
                                 }
-                            }
-                        )
+                            )
+
+                            SearchSuggestionsPopup(
+                                suggestions = suggestions,
+                                onSuggestionClick = { 
+                                    searchQuery = it
+                                    focusManager.clearFocus()
+                                },
+                                isVisible = isSearchFocused && suggestions.isNotEmpty(),
+                                modifier = Modifier.padding(top = 48.dp)
+                            )
+                        }
                     }
                 }
             }
