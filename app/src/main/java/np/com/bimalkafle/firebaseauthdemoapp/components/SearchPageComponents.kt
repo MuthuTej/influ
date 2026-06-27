@@ -27,7 +27,7 @@ fun IconBubbleSearch(
 ) {
     Surface(
         shape = CircleShape,
-        color = Color.White.copy(alpha = 0.9f),
+        color = Color.White.copy(alpha = 0.2f),
         modifier = Modifier
             .size(42.dp)
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)

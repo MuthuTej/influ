@@ -246,11 +246,11 @@ fun BrandSearchPageContent(
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = Color.White,
+                                color = Color.White.copy(alpha = 0.2f),
                                 modifier = Modifier.size(40.dp).clickable { onBackClick() }
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Back", tint = Color.Black, modifier = Modifier.size(24.dp))
+                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(24.dp))
                                 }
                             }
 

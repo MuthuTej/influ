@@ -578,7 +578,7 @@ fun InfluencerHeaderAndReachSection(
 private fun IconBubbleInfluencer(icon: ImageVector, tint: Color, contentDescription: String? = null, onClick: () -> Unit = {}) {
     Surface(
         shape = CircleShape,
-        color = Color(0xFFF5F5F5),
+        color = Color.White.copy(alpha = 0.2f),
         modifier = Modifier
             .size(42.dp)
             .clickable { onClick() }

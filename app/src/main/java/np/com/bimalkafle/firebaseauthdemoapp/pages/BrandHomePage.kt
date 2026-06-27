@@ -366,7 +366,7 @@ fun BrandHeaderAndReachSection(
 fun IconBubble(icon: ImageVector, tint: Color, contentDescription: String? = null, onClick: () -> Unit = {}) {
     Surface(
         shape = CircleShape,
-        color = Color(0xFFF5F5F5),
+        color = Color.White.copy(alpha = 0.2f),
         modifier = Modifier.size(42.dp).clickable { onClick() }
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -444,6 +444,7 @@ fun ActiveCampaignSection(
                         return try {
                             val instant = Instant.parse(updatedAt)
                             val updatedDate = instant.atZone(ZoneId.systemDefault()).toLocalDate()
+                            val today = LocalDateTime.now().toLocalDate()
                             val days = ChronoUnit.DAYS.between(updatedDate, LocalDateTime.now().toLocalDate())
                             when {
                                 days == 0L -> "Today"
