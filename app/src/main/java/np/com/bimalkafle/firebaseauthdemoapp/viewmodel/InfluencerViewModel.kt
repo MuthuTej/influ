@@ -683,6 +683,21 @@ class InfluencerViewModel : ViewModel() {
                     brand { id email name role about profileUrl logoUrl }
                     campaign { id brandId title description budgetMin budgetMax startDate endDate status createdAt updatedAt }
                     influencer { name bio logoUrl updatedAt }
+                    overallAnalytics {
+                      impressions clicks likes comments shares saves views retweets
+                    }
+                    platformAnalytics {
+                      platform duration cost impressions clicks likes comments shares saves views retweets
+                    }
+                    yt {
+                      videoId title viewCount likeCount thumbnail videoUrl fetchedAt
+                      analytics {
+                        views likes comments shares watchTimeMinutes subscribersGained engagementRate
+                      }
+                    }
+                    ig {
+                      postId caption likeCount commentCount viewCount mediaUrl timestamp fetchedAt
+                    }
                     totalViewsDelivered
                     viewsGrowthSincePosting
                     selectedInstagramProfileId
@@ -752,9 +767,9 @@ class InfluencerViewModel : ViewModel() {
                     profileCompleted = null,
                     updatedAt = null,
                     brandCategories = null,
-                    about = brandObj.optString("about", null),
-                    profileUrl = brandObj.optString("profileUrl", null),
-                    logoUrl = brandObj.optString("logoUrl", null),
+                    about = if (brandObj.isNull("about")) null else brandObj.optString("about"),
+                    profileUrl = if (brandObj.isNull("profileUrl")) null else brandObj.optString("profileUrl"),
+                    logoUrl = if (brandObj.isNull("logoUrl")) null else brandObj.optString("logoUrl"),
                     preferredPlatforms = null,
                     targetAudience = null
                 )
@@ -778,6 +793,96 @@ class InfluencerViewModel : ViewModel() {
                 }
             }
 
+            val overallObj = obj.optJSONObject("overallAnalytics")
+            val overallAnalytics = if (overallObj != null) {
+                OverallAnalytics(
+                    impressions = if (overallObj.isNull("impressions")) null else overallObj.optInt("impressions"),
+                    clicks = if (overallObj.isNull("clicks")) null else overallObj.optInt("clicks"),
+                    likes = if (overallObj.isNull("likes")) null else overallObj.optInt("likes"),
+                    comments = if (overallObj.isNull("comments")) null else overallObj.optInt("comments"),
+                    shares = if (overallObj.isNull("shares")) null else overallObj.optInt("shares"),
+                    saves = if (overallObj.isNull("saves")) null else overallObj.optInt("saves"),
+                    views = if (overallObj.isNull("views")) null else overallObj.optInt("views"),
+                    retweets = if (overallObj.isNull("retweets")) null else overallObj.optInt("retweets")
+                )
+            } else null
+
+            val platformAnalyticsList = mutableListOf<CollaborationAnalytics>()
+            val platformAnalyticsArray = obj.optJSONArray("platformAnalytics")
+            if (platformAnalyticsArray != null) {
+                for (j in 0 until platformAnalyticsArray.length()) {
+                    val paObj = platformAnalyticsArray.optJSONObject(j) ?: continue
+                    platformAnalyticsList.add(
+                        CollaborationAnalytics(
+                            platform = paObj.optString("platform"),
+                            duration = if (paObj.isNull("duration")) null else paObj.optInt("duration"),
+                            cost = if (paObj.isNull("cost")) null else paObj.optDouble("cost").toFloat(),
+                            impressions = if (paObj.isNull("impressions")) null else paObj.optInt("impressions"),
+                            clicks = if (paObj.isNull("clicks")) null else paObj.optInt("clicks"),
+                            likes = if (paObj.isNull("likes")) null else paObj.optInt("likes"),
+                            comments = if (paObj.isNull("comments")) null else paObj.optInt("comments"),
+                            shares = if (paObj.isNull("shares")) null else paObj.optInt("shares"),
+                            saves = if (paObj.isNull("saves")) null else paObj.optInt("saves"),
+                            views = if (paObj.isNull("views")) null else paObj.optInt("views"),
+                            retweets = if (paObj.isNull("retweets")) null else paObj.optInt("retweets")
+                        )
+                    )
+                }
+            }
+
+            val ytList = mutableListOf<YouTubeVideoData>()
+            val ytArray = obj.optJSONArray("yt")
+            if (ytArray != null) {
+                for (j in 0 until ytArray.length()) {
+                    val ytObj = ytArray.optJSONObject(j) ?: continue
+                    val analyticsObj = ytObj.optJSONObject("analytics")
+                    val ytAnalytics = if (analyticsObj != null) {
+                        YouTubeVideoSummary(
+                            views = if (analyticsObj.isNull("views")) null else analyticsObj.optInt("views"),
+                            likes = if (analyticsObj.isNull("likes")) null else analyticsObj.optInt("likes"),
+                            comments = if (analyticsObj.isNull("comments")) null else analyticsObj.optInt("comments"),
+                            shares = if (analyticsObj.isNull("shares")) null else analyticsObj.optInt("shares"),
+                            watchTimeMinutes = if (analyticsObj.isNull("watchTimeMinutes")) null else analyticsObj.optDouble("watchTimeMinutes"),
+                            subscribersGained = if (analyticsObj.isNull("subscribersGained")) null else analyticsObj.optInt("subscribersGained"),
+                            averageViewDurationSeconds = null,
+                            engagementRate = if (analyticsObj.isNull("engagementRate")) null else analyticsObj.optString("engagementRate")
+                        )
+                    } else null
+                    ytList.add(
+                        YouTubeVideoData(
+                            videoId = ytObj.optString("videoId"),
+                            title = ytObj.optString("title"),
+                            viewCount = if (ytObj.isNull("viewCount")) null else ytObj.optString("viewCount"),
+                            likeCount = if (ytObj.isNull("likeCount")) null else ytObj.optString("likeCount"),
+                            thumbnail = if (ytObj.isNull("thumbnail")) null else ytObj.optString("thumbnail"),
+                            analytics = ytAnalytics,
+                            videoUrl = if (ytObj.isNull("videoUrl")) null else ytObj.optString("videoUrl"),
+                            fetchedAt = if (ytObj.isNull("fetchedAt")) null else ytObj.optString("fetchedAt")
+                        )
+                    )
+                }
+            }
+
+            val igList = mutableListOf<InstagramPostData>()
+            val igArray = obj.optJSONArray("ig")
+            if (igArray != null) {
+                for (j in 0 until igArray.length()) {
+                    val igObj = igArray.optJSONObject(j) ?: continue
+                    igList.add(
+                        InstagramPostData(
+                            postId = if (igObj.isNull("postId")) null else igObj.optString("postId"),
+                            caption = if (igObj.isNull("caption")) null else igObj.optString("caption"),
+                            likeCount = if (igObj.isNull("likeCount")) null else igObj.optInt("likeCount"),
+                            commentCount = if (igObj.isNull("commentCount")) null else igObj.optInt("commentCount"),
+                            viewCount = if (igObj.isNull("viewCount")) null else igObj.optInt("viewCount"),
+                            mediaUrl = if (igObj.isNull("mediaUrl")) null else igObj.optString("mediaUrl"),
+                            timestamp = if (igObj.isNull("timestamp")) null else igObj.optString("timestamp"),
+                            fetchedAt = if (igObj.isNull("fetchedAt")) null else igObj.optString("fetchedAt")
+                        )
+                    )
+                }
+            }
+
             list.add(
                 Collaboration(
                     id = obj.optString("id"),
@@ -798,6 +903,10 @@ class InfluencerViewModel : ViewModel() {
                     advancePaid = if (obj.isNull("advancePaid")) null else obj.optBoolean("advancePaid"),
                     finalPaid = if (obj.isNull("finalPaid")) null else obj.optBoolean("finalPaid"),
                     totalAmount = if (obj.isNull("totalAmount")) null else obj.optDouble("totalAmount"),
+                    overallAnalytics = overallAnalytics,
+                    platformAnalytics = if (platformAnalyticsList.isEmpty()) null else platformAnalyticsList,
+                    yt = if (ytList.isEmpty()) null else ytList,
+                    ig = if (igList.isEmpty()) null else igList,
                     totalViewsDelivered = if (obj.isNull("totalViewsDelivered")) null else obj.optInt("totalViewsDelivered"),
                     viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting"),
                     selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() }

@@ -634,6 +634,29 @@ object BackendRepository {
         }
     }
 
+    suspend fun refreshCollaborationAnalytics(
+        collaborationId: String,
+        token: String
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val mutation = """
+                mutation RefreshCollaborationAnalytics(${'$'}collaborationId: ID!) {
+                    refreshCollaborationAnalytics(collaborationId: ${'$'}collaborationId)
+                }
+            """.trimIndent()
+            val result = GraphQLClient.query(
+                query = mutation,
+                variables = mapOf("collaborationId" to collaborationId),
+                token = token
+            )
+            result.map { json ->
+                json.optJSONObject("data")?.optBoolean("refreshCollaborationAnalytics", false) ?: false
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun scrapeInstagramProfile(
         profileUrl: String,
         influencerId: String,

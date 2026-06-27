@@ -314,7 +314,8 @@ fun MyAppNavigation(
             CollaborationAnalyticsPage(
                 navController = navController,
                 collaborationId = collaborationId,
-                brandViewModel = brandViewModel
+                brandViewModel = brandViewModel,
+                influencerViewModel = influencerViewModel
             )
         }
         composable("notifications") {

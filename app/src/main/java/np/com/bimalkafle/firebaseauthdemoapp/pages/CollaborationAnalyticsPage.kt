@@ -1,9 +1,12 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +18,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -40,6 +44,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.CollaborationAnalytics
 import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramPostData
 import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeVideoData
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 
 // App theme colors
 private val themeColor_campaign: Color
@@ -51,16 +56,77 @@ private val softGray = Color(0xFFF8F9FA)
 fun CollaborationAnalyticsPage(
     navController: NavController,
     collaborationId: String,
-    brandViewModel: BrandViewModel
+    brandViewModel: BrandViewModel,
+    influencerViewModel: InfluencerViewModel? = null
 ) {
-    val collaborations by brandViewModel.collaborations.observeAsState(emptyList())
+    val brandCollaborations by brandViewModel.collaborations.observeAsState(emptyList())
+    val influencerCollaborations by (influencerViewModel?.collaborations?.observeAsState(emptyList()) ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) })
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
-    val collaboration = collaborations.find { it.id == collaborationId }
 
-    LaunchedEffect(Unit) {
+    // Prefer the collaboration from whichever ViewModel already has analytics data.
+    // The influencer VM may already have it loaded (from ProposalPage) with yt/ig
+    // fields populated. Brand VM is the authoritative fallback fetched on open.
+    val collaboration = run {
+        val fromBrand = brandCollaborations.find { it.id == collaborationId }
+        val fromInfluencer = influencerCollaborations.find { it.id == collaborationId }
+        when {
+            fromBrand != null && (!fromBrand.yt.isNullOrEmpty() || fromBrand.overallAnalytics != null) -> fromBrand
+            fromInfluencer != null && (!fromInfluencer.yt.isNullOrEmpty() || fromInfluencer.overallAnalytics != null) -> fromInfluencer
+            fromBrand != null -> fromBrand
+            else -> fromInfluencer
+        }
+    }
+
+    val hasAnalyticsData = collaboration != null &&
+        (collaboration.overallAnalytics != null ||
+         !collaboration.yt.isNullOrEmpty() ||
+         !collaboration.ig.isNullOrEmpty() ||
+         !collaboration.platformAnalytics.isNullOrEmpty())
+
+    // Tracks how many auto-retries have fired; capped at 3 before giving up.
+    var syncRetries by remember(collaborationId) { androidx.compose.runtime.mutableStateOf(0) }
+    var syncTimedOut by remember(collaborationId) { androidx.compose.runtime.mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+    fun fetchLatest() {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-            result.token?.let { token ->
-                brandViewModel.fetchCollaborations(token)
+            result.token?.let { token -> brandViewModel.fetchCollaborations(token, force = true) }
+        }
+    }
+
+    // Calls the backend to read UPLOAD chat messages and retroactively populate yt
+    fun refreshAnalytics() {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+            val token = result.token ?: return@addOnSuccessListener
+            scope.launch {
+                np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
+                    .refreshCollaborationAnalytics(collaborationId, token)
+                kotlinx.coroutines.delay(2000)
+                brandViewModel.fetchCollaborations(token, force = true)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { fetchLatest() }
+
+    // If COMPLETED but no analytics data yet, retry twice (every 3 s), then on the
+    // third attempt call refreshCollaborationAnalytics which retroactively reads the
+    // UPLOAD chat messages and populates yt — handles existing collaborations where
+    // the influencer didn't have YouTube OAuth when they originally uploaded.
+    LaunchedEffect(collaboration?.status, hasAnalyticsData, syncRetries) {
+        if (collaboration?.status == "COMPLETED" && !hasAnalyticsData && !syncTimedOut) {
+            when {
+                syncRetries < 2 -> {
+                    kotlinx.coroutines.delay(3000)
+                    fetchLatest()
+                    syncRetries++
+                }
+                syncRetries == 2 -> {
+                    kotlinx.coroutines.delay(2000)
+                    refreshAnalytics()
+                    syncRetries++
+                }
+                else -> syncTimedOut = true
             }
         }
     }
@@ -119,6 +185,68 @@ fun CollaborationAnalyticsPage(
                         else -> Icons.Default.Info
                     }
                     item { StatusPlaceholder(statusMessage, statusIcon) }
+                } else if (!hasAnalyticsData) {
+                    // COMPLETED but analytics data not ready yet (or unavailable)
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            if (!syncTimedOut) {
+                                CircularProgressIndicator(color = themeColor_campaign)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "Syncing analytics…",
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.Gray,
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 16.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "Video data is being saved. This usually takes a few seconds.",
+                                    color = Color.Gray,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.BarChart,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = Color.LightGray
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "No analytics data available",
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.Gray,
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 16.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "Analytics are collected after the content is verified. Try refreshing after a few minutes.",
+                                    color = Color.Gray,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = {
+                                    syncRetries = 0
+                                    syncTimedOut = false
+                                    refreshAnalytics()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColor_campaign)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Refresh")
+                            }
+                        }
+                    }
                 } else {
                     // Overall Performance Header
                     if (collaboration.overallAnalytics != null) {
@@ -271,47 +399,83 @@ fun InstagramPostCard(post: InstagramPostData) {
 
 @Composable
 fun YouTubeVideoCard(video: YouTubeVideoData) {
+    val context = LocalContext.current
+    val videoUrl = video.videoUrl?.takeIf { it.isNotBlank() }
+        ?: video.videoId?.let { "https://www.youtube.com/watch?v=$it" }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (videoUrl != null) Modifier.clickable {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl)))
+                } else Modifier
+            ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.Top) {
-                // Video Thumbnail
-                AsyncImage(
-                    model = video.thumbnail,
-                    contentDescription = video.title,
-                    modifier = Modifier
-                        .size(width = 120.dp, height = 68.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-                
+                // Video Thumbnail — play icon overlay signals it's tappable
+                Box {
+                    AsyncImage(
+                        model = video.thumbnail,
+                        contentDescription = video.title,
+                        modifier = Modifier
+                            .size(width = 120.dp, height = 68.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    if (videoUrl != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 120.dp, height = 68.dp)
+                                .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayCircle,
+                                contentDescription = "Play",
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.width(12.dp))
-                
-                Column {
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = video.title,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         color = Color.Black
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Views: ${video.viewCount ?: video.analytics?.views ?: "0"}",
+                        text = "Views: ${video.viewCount ?: video.analytics?.views?.toString() ?: "—"}",
                         fontSize = 12.sp,
                         color = textGray
                     )
+                    if (videoUrl != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tap to watch",
+                            fontSize = 11.sp,
+                            color = Color(0xFFFF0000)
+                        )
+                    }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider(color = softGray)
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             // Detailed Analytics
             val analytics = video.analytics
             if (analytics != null) {

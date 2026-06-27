@@ -259,16 +259,17 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    fun sendUpload(link: String, platform: String = "YouTube") {
+    fun sendUpload(link: String, platform: String = "YouTube", onDone: (() -> Unit)? = null) {
         val otherUserId = currentOtherUserId ?: return
         val collaborationId = currentCollaborationId ?: run {
             sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link, "platform" to platform))
+            onDone?.invoke()
             return
         }
         val currentUserId = getCurrentUserId()
 
         viewModelScope.launch {
-            val token = getToken() ?: return@launch
+            val token = getToken() ?: run { onDone?.invoke(); return@launch }
 
             if (platform.equals("Instagram", ignoreCase = true)) {
                 val scrapeResult = BackendRepository.scrapeInstagramPost(
@@ -305,6 +306,7 @@ class ChatViewModel : ViewModel() {
                     sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link, "platform" to "YouTube"))
                 }
             }
+            onDone?.invoke()
         }
     }
 

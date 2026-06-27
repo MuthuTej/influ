@@ -308,7 +308,7 @@ fun ChatScreen(
                     isBrand = isBrand,
                     onStatusUpdate = onStatusUpdate,
                     onSend = { text, type, metadata -> viewModel.sendMessage(text, type, metadata) },
-                    onSendUpload = { link, platform -> viewModel.sendUpload(link, platform) },
+                    onSendUpload = { link, platform, onDone -> viewModel.sendUpload(link, platform, onDone) },
                     isActionLoading = isActionLoading,
                     brandViewModel = if (isBrand) brandViewModel else null,
                     activity = activity,
@@ -422,7 +422,7 @@ fun CollaborationTimeline(
     isBrand: Boolean,
     onStatusUpdate: (String) -> Unit,
     onSend: (String, String, Map<String, Any>) -> Unit,
-    onSendUpload: (String, String) -> Unit = { _, _ -> },
+    onSendUpload: (String, String, () -> Unit) -> Unit = { _, _, done -> done() },
     isActionLoading: Boolean = false,
     brandViewModel: BrandViewModel? = null,
     activity: Activity? = null,
@@ -1039,9 +1039,15 @@ fun CollaborationTimeline(
         ContentUploadDialog(
             onDismiss = { showUploadDialog = false },
             onSend = { links, platform ->
-                links.forEach { link -> onSendUpload(link, platform) }
-                onStatusUpdate("COMPLETED")
                 showUploadDialog = false
+                // Only mark COMPLETED once every link has been saved to the backend,
+                // so the analytics page always sees the video/post data when it loads.
+                val pending = java.util.concurrent.atomic.AtomicInteger(links.size)
+                links.forEach { link ->
+                    onSendUpload(link, platform) {
+                        if (pending.decrementAndGet() == 0) onStatusUpdate("COMPLETED")
+                    }
+                }
             }
         )
     }
