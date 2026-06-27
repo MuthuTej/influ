@@ -127,6 +127,18 @@ fun ChatScreen(
         chatId?.let { viewModel.initChat(it, chatNameParam ?: "Chat", collaborationId) }
     }
 
+    // When the other party sends a brief or script the collaboration-status WebSocket fires first.
+    // Re-fetch messages so the BRIEF/SCRIPT message is guaranteed to be in the list even if
+    // the chat-message WebSocket missed it.  A short delay lets any concurrent Firestore write
+    // propagate before we query.
+    LaunchedEffect(currentCollaboration?.status) {
+        val s = currentCollaboration?.status
+        if (s == "BRIEF_SENT" || s == "SCRIPT_SENT") {
+            kotlinx.coroutines.delay(500)
+            viewModel.refreshMessages()
+        }
+    }
+
     DisposableEffect(chatId) {
         onDispose { viewModel.stopConversationWebSocket() }
     }
@@ -674,7 +686,10 @@ fun CollaborationTimeline(
                 val briefContent = briefMessage?.metadata?.get("link")?.toString()
                     ?: briefMessage?.text
                     ?: ""
-                if (briefContent.isNotBlank()) {
+                if (briefMessage == null) {
+                    // Status is already BRIEF_SENT but message hasn't arrived yet — refreshing
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = TlRed)
+                } else if (briefContent.isNotBlank()) {
                     Surface(
                         color = Color(0xFFF5F5F5),
                         shape = RoundedCornerShape(8.dp),
@@ -689,7 +704,7 @@ fun CollaborationTimeline(
                     }
                 }
                 // Influencer can approve the brief
-                if (status == "BRIEF_SENT" && !isBrand) {
+                if (status == "BRIEF_SENT" && !isBrand && briefMessage != null) {
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = { onStatusUpdate("BRIEF_FINALIZED") },
@@ -744,23 +759,28 @@ fun CollaborationTimeline(
                 val scriptContent = scriptMessage?.metadata?.get("content")?.toString()
                     ?: scriptMessage?.text
                     ?: ""
-                Text(
-                    text = "SCRIPT CONTENT",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Gray,
-                    letterSpacing = 1.sp
-                )
-                Spacer(Modifier.height(6.dp))
-                if (scriptContent.isNotBlank()) {
+                if (scriptMessage == null) {
+                    // Status is already SCRIPT_SENT but message hasn't arrived yet — refreshing
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = TlRed)
+                } else {
                     Text(
-                        text = scriptContent,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF333333)
+                        text = "SCRIPT CONTENT",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray,
+                        letterSpacing = 1.sp
                     )
+                    Spacer(Modifier.height(6.dp))
+                    if (scriptContent.isNotBlank()) {
+                        Text(
+                            text = scriptContent,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF333333)
+                        )
+                    }
                 }
                 // Brand can accept or reject the script
-                if (status == "SCRIPT_SENT" && isBrand) {
+                if (status == "SCRIPT_SENT" && isBrand && scriptMessage != null) {
                     Spacer(Modifier.height(14.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),

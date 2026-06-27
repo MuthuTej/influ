@@ -170,6 +170,23 @@ class ChatViewModel : ViewModel() {
         conversationWsClient = null
     }
 
+    fun refreshMessages() {
+        val otherUserId = currentOtherUserId ?: return
+        val collabId = currentCollaborationId
+        val currentUserId = getCurrentUserId()
+        viewModelScope.launch {
+            val token = getToken() ?: return@launch
+            val history = repository.getMessageHistory(otherUserId, collabId, token)
+            val incoming = history.map { it.copy(isMe = it.senderId == currentUserId) }
+            // Merge: keep existing messages, add any new ones, replace by id
+            val merged = (_messages.value + incoming)
+                .groupBy { it.id }
+                .map { (_, msgs) -> msgs.last() }
+                .sortedBy { it.timestamp }
+            _messages.value = merged
+        }
+    }
+
     // ── Message sending ───────────────────────────────────────────────────────
 
     fun setReplyingTo(message: ChatMessage?) { _replyingTo.value = message }
