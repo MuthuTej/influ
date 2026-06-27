@@ -3,8 +3,6 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,7 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -49,7 +46,6 @@ import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignDetail
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
-import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramProfile
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
@@ -83,9 +79,8 @@ fun InfluencerHomePage(
     campaignViewModel: CampaignViewModel,
     notificationViewModel: NotificationViewModel
 ) {
-    val context = LocalContext.current
     val authState = authViewModel.authState.observeAsState()
-    val collaborations by influencerViewModel.filteredCollaborations.observeAsState(initial = emptyList())
+    val collaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
     val campaigns by campaignViewModel.campaigns.observeAsState(initial = emptyList())
     
     // Recommended Campaign streams
@@ -103,20 +98,15 @@ fun InfluencerHomePage(
     val campaignError by campaignViewModel.error.observeAsState()
     
     val influencerProfile by influencerViewModel.influencerProfile.observeAsState()
-    val activeInstagramProfile by influencerViewModel.activeInstagramProfile.observeAsState()
     val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
     val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
-    var showProfileSwitcher by remember { mutableStateOf(false) }
 
     // State to handle debug visibility
     var showDebugInfo by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val currentUser = FirebaseAuth.getInstance().currentUser
-        if (currentUser != null) {
-            influencerViewModel.loadActiveProfile(context, currentUser.uid)
-        }
         currentUser?.getIdToken(true)
             ?.addOnSuccessListener { result ->
                 firebaseToken = result.token
@@ -163,20 +153,6 @@ fun InfluencerHomePage(
             else -> campaigns
         }
         list.take(10)
-    }
-
-    if (showProfileSwitcher) {
-        val allProfiles = influencerProfile?.instagramProfiles ?: emptyList()
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-        InstagramProfileSwitcherSheet(
-            profiles = allProfiles,
-            activeProfileId = activeInstagramProfile?.id,
-            onSelect = { profileId ->
-                influencerViewModel.switchProfile(context, uid, profileId)
-                showProfileSwitcher = false
-            },
-            onDismiss = { showProfileSwitcher = false }
-        )
     }
 
     Scaffold(
@@ -228,14 +204,7 @@ fun InfluencerHomePage(
 
                     item {
                         val heroStats = remember(collaborations) { computeInfluencerHeroStats(collaborations) }
-                        InfluencerHeaderAndReachSection(
-                            influencerProfile = influencerProfile,
-                            navController = navController,
-                            unreadCount = unreadCount,
-                            heroStats = heroStats,
-                            activeProfile = activeInstagramProfile,
-                            onSwitchProfileClick = { showProfileSwitcher = true }
-                        )
+                        InfluencerHeaderAndReachSection(influencerProfile, navController, unreadCount, heroStats)
                     }
 
                     // Checklist item for debugging - Controlled by showDebugInfo
@@ -436,9 +405,7 @@ fun InfluencerHeaderAndReachSection(
     influencerProfile: InfluencerProfile?,
     navController: NavController,
     unreadCount: Int,
-    heroStats: np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerHeroStats,
-    activeProfile: InstagramProfile? = null,
-    onSwitchProfileClick: () -> Unit = {}
+    heroStats: np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerHeroStats
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
         // Pink background area
@@ -546,41 +513,6 @@ fun InfluencerHeaderAndReachSection(
                             lineHeight = 22.sp,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
-                        if (activeProfile != null || (influencerProfile?.instagramProfiles?.size ?: 0) > 0) {
-                            Spacer(Modifier.height(4.dp))
-                            Surface(
-                                onClick = onSwitchProfileClick,
-                                shape = RoundedCornerShape(20.dp),
-                                color = Color.White.copy(alpha = 0.20f),
-                                modifier = Modifier
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Default.AccountCircle,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(
-                                        "@${activeProfile?.username ?: "select profile"}",
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    Icon(
-                                        Icons.Default.SwapHoriz,
-                                        contentDescription = "Switch",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -646,7 +578,7 @@ fun InfluencerHeaderAndReachSection(
 private fun IconBubbleInfluencer(icon: ImageVector, tint: Color, contentDescription: String? = null, onClick: () -> Unit = {}) {
     Surface(
         shape = CircleShape,
-        color = Color(0xFFF5F5F5),
+        color = Color.White.copy(alpha = 0.2f),
         modifier = Modifier
             .size(42.dp)
             .clickable { onClick() }
@@ -834,17 +766,17 @@ fun CampaignCardInfluencer(
     onCardClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = modifier.clickable { onCardClick() }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Surface(
                     shape = CircleShape,
                     color = brandThemeColor.copy(alpha = 0.1f),
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     if (!campaign.brand?.logoUrl.isNullOrEmpty()) {
                         AsyncImage(
@@ -859,61 +791,49 @@ fun CampaignCardInfluencer(
                                 text = campaign.brand?.name?.firstOrNull()?.uppercase() ?: "?",
                                 color = brandThemeColor,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 24.sp
+                                fontSize = 20.sp
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = campaign.title,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
+                        fontSize = 15.sp,
                         color = Color.Black,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                     Text(
                         text = campaign.brand?.name ?: "Unknown Brand",
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         color = Color.Gray
                     )
-                }
-
-                IconButton(onClick = { onWishlistToggle() }) {
-                    Icon(
-                        imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = "Wishlist",
-                        tint = if (isWishlisted) instagramColor else Color.Gray
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Text(
+                        text = campaign.description,
+                        fontSize = 12.sp,
+                        color = Color.DarkGray,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = campaign.description,
-                fontSize = 13.sp,
-                color = Color.DarkGray,
-                lineHeight = 18.sp,
-                maxLines = 2,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(text = "Budget", fontSize = 11.sp, color = Color.Gray)
+                Column(horizontalAlignment = Alignment.End) {
+                    IconButton(onClick = { onWishlistToggle() }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = "Wishlist",
+                            tint = if (isWishlisted) instagramColor else Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                     
                     val formatBudget = { amount: Int? ->
                         when {
@@ -930,100 +850,7 @@ fun CampaignCardInfluencer(
                         else -> "N/A"
                     }
                     
-                    Text(text = budgetRange, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = brandThemeColor)
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun InstagramProfileSwitcherSheet(
-    profiles: List<InstagramProfile>,
-    activeProfileId: String?,
-    onSelect: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = Color.White,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 32.dp)) {
-            Text(
-                "Switch Instagram Account",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            Text(
-                "Your campaigns and collaborations are scoped to the active account.",
-                fontSize = 13.sp,
-                color = Color(0xFF6C757D),
-                modifier = Modifier.padding(bottom = 20.dp)
-            )
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                profiles.forEach { profile ->
-                    val isActive = profile.id == activeProfileId
-                    Surface(
-                        onClick = { onSelect(profile.id) },
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (isActive) instagramColor.copy(alpha = 0.08f) else Color(0xFFF8F9FA),
-                        border = if (isActive) androidx.compose.foundation.BorderStroke(1.5.dp, instagramColor) else null,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = instagramColor.copy(alpha = 0.15f),
-                                modifier = Modifier.size(44.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.AccountCircle,
-                                        contentDescription = null,
-                                        tint = instagramColor,
-                                        modifier = Modifier.size(26.dp)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("@${profile.username}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    if (profile.isDefault) {
-                                        Spacer(Modifier.width(6.dp))
-                                        Surface(shape = RoundedCornerShape(4.dp), color = instagramColor) {
-                                            Text("PRIMARY", color = Color.White, fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
-                                        }
-                                    }
-                                }
-                                if (profile.followers != null) {
-                                    Text(
-                                        "${formatCompactCount(profile.followers)} followers",
-                                        color = Color(0xFF6C757D),
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
-                            if (isActive) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = "Active",
-                                    tint = instagramColor,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-                    }
+                    Text(text = budgetRange, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = brandThemeColor)
                 }
             }
         }
