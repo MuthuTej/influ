@@ -56,9 +56,9 @@ fun BrandSearchPage(
     notificationViewModel: NotificationViewModel
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedPlatform by remember { mutableStateOf("All") }
-    var selectedCategory by remember { mutableStateOf("All") }
-    var selectedFollowerRange by remember { mutableStateOf("All") }
+    var selectedPlatforms by remember { mutableStateOf(setOf("All")) }
+    var selectedCategories by remember { mutableStateOf(setOf("All")) }
+    var selectedFollowerRanges by remember { mutableStateOf(setOf("All")) }
     var currentPage by remember { mutableIntStateOf(1) }
 
     val influencers by brandViewModel.influencers.observeAsState(initial = emptyList())
@@ -78,28 +78,53 @@ fun BrandSearchPage(
         }
     }
 
-    val filteredInfluencers = remember(searchQuery, selectedPlatform, selectedCategory, selectedFollowerRange, influencers) {
+    val filteredInfluencers = remember(searchQuery, selectedPlatforms, selectedCategories, selectedFollowerRanges, influencers) {
         influencers.filter { influencer ->
             val matchesSearch = influencer.name.contains(searchQuery, ignoreCase = true) ||
                     influencer.bio?.contains(searchQuery, ignoreCase = true) == true ||
                     influencer.categories?.any { it.category.contains(searchQuery, ignoreCase = true) } == true
 
-            val matchesPlatform = selectedPlatform == "All" ||
-                    influencer.platforms?.any { it.platform.equals(selectedPlatform, ignoreCase = true) } == true
+            val matchesPlatform = selectedPlatforms.contains("All") ||
+                    influencer.platforms?.any { plat -> 
+                        selectedPlatforms.any { sel -> plat.platform.equals(sel, ignoreCase = true) } 
+                    } == true
 
-            val matchesCategory = selectedCategory == "All" ||
-                    influencer.categories?.any { it.category.equals(selectedCategory, ignoreCase = true) } == true
+            val matchesCategory = selectedCategories.contains("All") ||
+                    influencer.categories?.any { cat -> 
+                        selectedCategories.any { sel -> cat.category.equals(sel, ignoreCase = true) } 
+                    } == true
 
-            val matchesFollowers = when (selectedFollowerRange) {
-                "All" -> true
-                "0-10K" -> influencer.platforms?.any { (it.followers ?: 0) < 10000 } == true
-                "10K-100K" -> influencer.platforms?.any { (it.followers ?: 0) in 10000..100000 } == true
-                "100K-1M" -> influencer.platforms?.any { (it.followers ?: 0) in 100000..1000000 } == true
-                "1M+" -> influencer.platforms?.any { (it.followers ?: 0) > 1000000 } == true
-                else -> true
+            val matchesFollowers = if (selectedFollowerRanges.contains("All")) true else {
+                influencer.platforms?.any { plat ->
+                    selectedFollowerRanges.any { range ->
+                        when (range) {
+                            "0-10K" -> (plat.followers ?: 0) < 10000
+                            "10K-100K" -> (plat.followers ?: 0) in 10000..100000
+                            "100K-1M" -> (plat.followers ?: 0) in 100000..1000000
+                            "1M+" -> (plat.followers ?: 0) > 1000000
+                            else -> false
+                        }
+                    }
+                } == true
             }
 
             matchesSearch && matchesPlatform && matchesCategory && matchesFollowers
+        }
+    }
+
+    fun toggleFilter(currentSet: Set<String>, option: String): Set<String> {
+        return if (option == "All") {
+            setOf("All")
+        } else {
+            val next = currentSet.toMutableSet()
+            next.remove("All")
+            if (next.contains(option)) {
+                next.remove(option)
+                if (next.isEmpty()) setOf("All") else next
+            } else {
+                next.add(option)
+                next
+            }
         }
     }
 
@@ -110,19 +135,19 @@ fun BrandSearchPage(
             searchQuery = it
             currentPage = 1
         },
-        selectedPlatform = selectedPlatform,
-        onPlatformSelected = { 
-            selectedPlatform = it
+        selectedPlatforms = selectedPlatforms,
+        onPlatformToggle = { 
+            selectedPlatforms = toggleFilter(selectedPlatforms, it)
             currentPage = 1
         },
-        selectedCategory = selectedCategory,
-        onCategorySelected = { 
-            selectedCategory = it
+        selectedCategories = selectedCategories,
+        onCategoryToggle = { 
+            selectedCategories = toggleFilter(selectedCategories, it)
             currentPage = 1
         },
-        selectedFollowerRange = selectedFollowerRange,
-        onFollowerRangeSelected = { 
-            selectedFollowerRange = it
+        selectedFollowerRanges = selectedFollowerRanges,
+        onFollowerRangeToggle = { 
+            selectedFollowerRanges = toggleFilter(selectedFollowerRanges, it)
             currentPage = 1
         },
         filteredInfluencers = filteredInfluencers,
@@ -149,12 +174,12 @@ fun BrandSearchPageContent(
     modifier: Modifier = Modifier,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    selectedPlatform: String,
-    onPlatformSelected: (String) -> Unit,
-    selectedCategory: String,
-    onCategorySelected: (String) -> Unit,
-    selectedFollowerRange: String,
-    onFollowerRangeSelected: (String) -> Unit,
+    selectedPlatforms: Set<String>,
+    onPlatformToggle: (String) -> Unit,
+    selectedCategories: Set<String>,
+    onCategoryToggle: (String) -> Unit,
+    selectedFollowerRanges: Set<String>,
+    onFollowerRangeToggle: (String) -> Unit,
     filteredInfluencers: List<InfluencerProfile>,
     allInfluencers: List<InfluencerProfile>,
     isLoading: Boolean,
@@ -313,9 +338,9 @@ fun BrandSearchPageContent(
                             range to count
                         }
 
-                        FilterDropdown("Platform", selectedPlatform, platformOptions, onPlatformSelected, Modifier.weight(1f))
-                        FilterDropdown("Category", selectedCategory, categoryOptions, onCategorySelected, Modifier.weight(1f))
-                        FilterDropdown("Followers", selectedFollowerRange, followerOptions, onFollowerRangeSelected, Modifier.weight(1f))
+                        FilterDropdown("Platform", selectedPlatforms, platformOptions, onPlatformToggle, Modifier.weight(1f))
+                        FilterDropdown("Category", selectedCategories, categoryOptions, onCategoryToggle, Modifier.weight(1f))
+                        FilterDropdown("Followers", selectedFollowerRanges, followerOptions, onFollowerRangeToggle, Modifier.weight(1f))
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -326,11 +351,11 @@ fun BrandSearchPageContent(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("${filteredInfluencers.size} Influencers Found", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
-                        if (selectedPlatform != "All" || selectedCategory != "All" || selectedFollowerRange != "All" || searchQuery.isNotEmpty()) {
+                        if (!selectedPlatforms.contains("All") || !selectedCategories.contains("All") || !selectedFollowerRanges.contains("All") || searchQuery.isNotEmpty()) {
                             Text("Clear All", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
-                                onPlatformSelected("All")
-                                onCategorySelected("All")
-                                onFollowerRangeSelected("All")
+                                onPlatformToggle("All")
+                                onCategoryToggle("All")
+                                onFollowerRangeToggle("All")
                                 onSearchQueryChange("")
                             })
                         }
@@ -360,7 +385,7 @@ fun BrandSearchPageContent(
                             onWishlistToggle = { onWishlistToggle(influencer) },
                             modifier = Modifier.fillMaxWidth(),
                             onCardClick = { onInfluencerClick(influencer.id) },
-                            selectedPlatform = if (selectedPlatform == "All") null else selectedPlatform
+                            selectedPlatform = if (selectedPlatforms.contains("All")) null else selectedPlatforms.firstOrNull { it != "All" }
                         )
                     }
                 }

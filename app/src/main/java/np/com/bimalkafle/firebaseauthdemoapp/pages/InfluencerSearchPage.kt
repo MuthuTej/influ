@@ -80,11 +80,11 @@ fun InfluencerSearchPage(
             }
     }
 
-    var selectedPlatform by remember { mutableStateOf("All") }
-    var selectedCategory by remember { mutableStateOf("All") }
+    var selectedPlatforms by remember { mutableStateOf(setOf("All")) }
+    var selectedCategories by remember { mutableStateOf(setOf("All")) }
     var currentPage by remember { mutableIntStateOf(1) }
 
-    val filteredCampaigns = remember(searchQuery, selectedPlatform, selectedCategory, campaigns) {
+    val filteredCampaigns = remember(searchQuery, selectedPlatforms, selectedCategories, campaigns) {
         campaigns.filter { campaign ->
             val campaignCategories = campaign.categories?.map { it.category } ?: emptyList()
             val campaignPlatforms = campaign.platforms?.map { it.platform } ?: emptyList()
@@ -94,13 +94,29 @@ fun InfluencerSearchPage(
                     (campaign.brand?.name?.contains(searchQuery, ignoreCase = true) == true) ||
                     campaignCategories.any { it.contains(searchQuery, ignoreCase = true) }
 
-            val matchesPlatform = selectedPlatform == "All" ||
-                    campaignPlatforms.any { it.equals(selectedPlatform, ignoreCase = true) }
+            val matchesPlatform = selectedPlatforms.contains("All") ||
+                    campaignPlatforms.any { plat -> selectedPlatforms.any { sel -> plat.equals(sel, ignoreCase = true) } }
 
-            val matchesCategory = selectedCategory == "All" ||
-                    campaignCategories.any { it.equals(selectedCategory, ignoreCase = true) }
+            val matchesCategory = selectedCategories.contains("All") ||
+                    campaignCategories.any { cat -> selectedCategories.any { sel -> cat.equals(sel, ignoreCase = true) } }
 
             matchesSearch && matchesPlatform && matchesCategory
+        }
+    }
+
+    fun toggleFilter(currentSet: Set<String>, option: String): Set<String> {
+        return if (option == "All") {
+            setOf("All")
+        } else {
+            val next = currentSet.toMutableSet()
+            next.remove("All")
+            if (next.contains(option)) {
+                next.remove(option)
+                if (next.isEmpty()) setOf("All") else next
+            } else {
+                next.add(option)
+                next
+            }
         }
     }
     
@@ -258,8 +274,8 @@ fun InfluencerSearchPage(
                             platform to count
                         }
 
-                        FilterDropdown("Platform", selectedPlatform, platformOptions, { selectedPlatform = it; currentPage = 1 }, Modifier.weight(1f))
-                        FilterDropdown("Category", selectedCategory, categoryOptions, { selectedCategory = it; currentPage = 1 }, Modifier.weight(1f))
+                        FilterDropdown("Platform", selectedPlatforms, platformOptions, { selectedPlatforms = toggleFilter(selectedPlatforms, it); currentPage = 1 }, Modifier.weight(1f))
+                        FilterDropdown("Category", selectedCategories, categoryOptions, { selectedCategories = toggleFilter(selectedCategories, it); currentPage = 1 }, Modifier.weight(1f))
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -270,10 +286,10 @@ fun InfluencerSearchPage(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("${filteredCampaigns.size} Campaigns", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-                        if (selectedPlatform != "All" || selectedCategory != "All" || searchQuery.isNotEmpty()) {
+                        if (!selectedPlatforms.contains("All") || !selectedCategories.contains("All") || searchQuery.isNotEmpty()) {
                             Text("Clear All", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
-                                selectedPlatform = "All"
-                                selectedCategory = "All"
+                                selectedPlatforms = setOf("All")
+                                selectedCategories = setOf("All")
                                 searchQuery = ""
                                 currentPage = 1
                             })
