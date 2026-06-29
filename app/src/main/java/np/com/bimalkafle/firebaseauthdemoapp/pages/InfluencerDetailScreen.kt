@@ -182,6 +182,15 @@ fun InfluencerDetailScreenContent(
                     InfluencerDetailRow("Creator Name", influencerProfile?.name ?: "N/A")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
 
+                    InfluencerDetailRow("Gender", influencerProfile?.gender ?: "N/A")
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
+
+                    InfluencerDetailRow("Mother Tongue", influencerProfile?.motherTongue ?: "N/A")
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
+
+                    InfluencerDetailRow("Languages Known", influencerProfile?.languagesKnown?.joinToString(", ") ?: "N/A")
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
+
                     val categories = influencerProfile?.categories?.joinToString(" | ") { it.category }
                     InfluencerDetailRow("Category", categories ?: "N/A")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
@@ -190,7 +199,7 @@ fun InfluencerDetailScreenContent(
                     InfluencerDetailRow("Location", location)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
 
-                    val availability = influencerProfile?.availability?.toString() ?: "N/A"
+                    val availability = if (influencerProfile?.availability == true) "Available" else "Busy"
                     InfluencerDetailRow("Availability", availability)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
 
@@ -261,6 +270,9 @@ fun InfluencerDetailScreenPreview() {
         updatedAt = "2023-10-27T10:00:00Z",
         bio = "Fashion and lifestyle influencer.",
         location = "New York, USA",
+        gender = "Female",
+        motherTongue = "English",
+        languagesKnown = listOf("English", "Spanish"),
         categories = listOf(Category("Fashion", listOf("Lifestyle"))),
         platforms = listOf(Platform("Instagram", "http://instagram.com/janedoe", 100000, 5000, 5.0f, listOf("Reels", "Stories"), true)),
         audienceInsights = null,

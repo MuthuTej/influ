@@ -217,7 +217,7 @@ fun BrandHeaderAndReachSection(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(260.dp)
+                .height(180.dp)
                 .background(brandThemeColor)
                 .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
         ) {
@@ -239,7 +239,7 @@ fun BrandHeaderAndReachSection(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 12.dp)
+                    .padding(top = 8.dp, bottom = 2.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -269,13 +269,13 @@ fun BrandHeaderAndReachSection(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .fillMaxWidth(0.65f)
-                        .padding(top = 12.dp),
+                        .padding(top = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
                         shape = CircleShape,
                         color = Color.White,
-                        modifier = Modifier.size(54.dp)
+                        modifier = Modifier.size(50.dp)
                     ) {
                         if (!brandProfile?.logoUrl.isNullOrEmpty()) {
                             AsyncImage(
@@ -288,20 +288,19 @@ fun BrandHeaderAndReachSection(
                             Image(
                                 painter = painterResource(id = R.drawable.brand_profile),
                                 contentDescription = null,
-                                modifier = Modifier.padding(6.dp).clip(CircleShape)
+                                modifier = Modifier.padding(8.dp).clip(CircleShape)
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                        Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
+                        Text("Hello!", fontSize = 13.sp, color = Color.White.copy(alpha = 0.9f))
                         Text(
                             brandProfile?.name ?: "Guest",
-                            fontSize = 20.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
-                            maxLines = 2,
-                            lineHeight = 22.sp,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
@@ -309,36 +308,36 @@ fun BrandHeaderAndReachSection(
             }
 
             Box(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                 contentAlignment = Alignment.BottomCenter
             ) {
                 Card(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 27.dp),
-                    shape = RoundedCornerShape(30.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 15.dp)
+                        .fillMaxWidth(0.87f)
+                        .padding(bottom = 18.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
                 ) {
                     Box(modifier = Modifier.background(brush = Brush.verticalGradient(listOf(Color(0xFFFFAFBD), brandThemeColor)))) {
                         Column(
-                            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 32.dp),
+                            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 22.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("Total Reach Delivered", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                            Text(formatCompactCount(heroStats.totalReachDelivered), fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Total Reach Delivered", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                            Text(formatCompactCount(heroStats.totalReachDelivered), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             if (heroStats.reachGrowth > 0) {
                                 Text(
                                     "+${formatCompactCount(heroStats.reachGrowth)} since posting",
-                                    fontSize = 13.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Color.White.copy(alpha = 0.85f)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                BrandStatChip("Pending", heroStats.pendingApplicationsCount.toString(), Modifier.weight(1f))
-                                BrandStatChip("Active", heroStats.activeCollaborationsCount.toString(), Modifier.weight(1f))
-                                BrandStatChip("Spent", formatCompactCurrency(heroStats.totalSpent), Modifier.weight(1f))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                BrandStatChip("Pending", heroStats.pendingApplicationsCount.toString(), Modifier.weight(0.8f))
+                                BrandStatChip("Active", heroStats.activeCollaborationsCount.toString(), Modifier.weight(0.8f))
+                                BrandStatChip("Spent", formatCompactCurrency(heroStats.totalSpent), Modifier.weight(0.8f))
                             }
                         }
                     }
@@ -346,18 +345,18 @@ fun BrandHeaderAndReachSection(
 
                 Button(
                     onClick = { navController.navigate("brand_search") },
-                    shape = RoundedCornerShape(30.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
                     modifier = Modifier
-                        .fillMaxWidth(0.7f)
-                        .height(54.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 10.dp)
+                        .fillMaxWidth(0.55f)
+                        .height(38.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
                 ) {
-                    Text("Find Influencer", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Find Influencer", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
@@ -367,7 +366,7 @@ fun IconBubble(icon: ImageVector, tint: Color, contentDescription: String? = nul
     Surface(
         shape = CircleShape,
         color = Color.White.copy(alpha = 0.2f),
-        modifier = Modifier.size(42.dp).clickable { onClick() }
+        modifier = Modifier.size(40.dp).clickable { onClick() }
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(20.dp))
@@ -378,20 +377,20 @@ fun IconBubble(icon: ImageVector, tint: Color, contentDescription: String? = nul
 @Composable
 fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
     Card(
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        modifier = modifier.aspectRatio(1f)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier.aspectRatio(1.4f)
     ) {
         Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(text = label, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(text = value, color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                Text(text = label, color = Color.Gray, fontSize = 7.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                Spacer(modifier = Modifier.height(1.dp))
+                Text(text = value, color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             }
         }
     }

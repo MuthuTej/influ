@@ -116,6 +116,9 @@ class BrandViewModel : ViewModel() {
                     updatedAt
                     bio
                     location
+                    gender
+                    motherTongue
+                    languagesKnown
                     categories {
                       category
                       subCategories
@@ -296,6 +299,14 @@ class BrandViewModel : ViewModel() {
             AudienceInsights(topLocations, genderSplit, ageGroups)
         } else null
 
+        val languagesArray = obj.optJSONArray("languagesKnown")
+        val languagesList = mutableListOf<String>()
+        if (languagesArray != null) {
+            for (i in 0 until languagesArray.length()) {
+                languagesList.add(languagesArray.getString(i))
+            }
+        }
+
         return InfluencerProfile(
             id = obj.optString("id"),
             email = obj.optString("email"),
@@ -305,6 +316,9 @@ class BrandViewModel : ViewModel() {
             updatedAt = obj.optString("updatedAt"),
             bio = obj.optString("bio"),
             location = obj.optString("location"),
+            gender = obj.optString("gender").takeIf { it.isNotBlank() },
+            motherTongue = obj.optString("motherTongue").takeIf { it.isNotBlank() },
+            languagesKnown = if (languagesList.isNotEmpty()) languagesList else null,
             categories = categories,
             platforms = platforms,
             audienceInsights = audienceInsights,
@@ -379,11 +393,11 @@ class BrandViewModel : ViewModel() {
                     }
                 } catch (e: Exception) {
                     Log.e("BrandViewModel", "Parsing error", e)
-                    _error.postValue("Parsing error: ${'$'}{e.message}")
+                    _error.postValue("Parsing error: ${e.message}")
                 }
             }.onFailure {
                 Log.e("BrandViewModel", "Network error", it)
-                _error.postValue("Network error: ${'$'}{it.message}")
+                _error.postValue("Network error: ${it.message}")
             }
             _loading.postValue(false)
         }
@@ -547,17 +561,7 @@ class BrandViewModel : ViewModel() {
                       retweets
                     }
                     platformAnalytics {
-                      platform
-                      duration
-                      cost
-                      impressions
-                      clicks
-                      likes
-                      comments
-                      shares
-                      saves
-                      views
-                      retweets
+                      platform duration cost impressions clicks likes comments shares saves views retweets
                     }
                     yt {
                       videoId
@@ -827,6 +831,9 @@ class BrandViewModel : ViewModel() {
                       updatedAt
                       bio
                       location
+                      gender
+                      motherTongue
+                      languagesKnown
                       categories {
                         category
                         subCategories

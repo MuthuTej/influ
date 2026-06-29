@@ -224,6 +224,9 @@ class InfluencerViewModel : ViewModel() {
                       updatedAt
                       bio
                       location
+                      gender
+                      motherTongue
+                      languagesKnown
                       categories {
                         category
                         subCategories
@@ -327,6 +330,9 @@ class InfluencerViewModel : ViewModel() {
                     updatedAt
                     bio
                     location
+                    gender
+                    motherTongue
+                    languagesKnown
                     categories {
                       category
                       subCategories
@@ -620,6 +626,14 @@ class InfluencerViewModel : ViewModel() {
             }
         }
 
+        val languagesArray = obj.optJSONArray("languagesKnown")
+        val languagesList = mutableListOf<String>()
+        if (languagesArray != null) {
+            for (i in 0 until languagesArray.length()) {
+                languagesList.add(languagesArray.getString(i))
+            }
+        }
+
         return InfluencerProfile(
             id = obj.optString("id"),
             email = obj.optString("email"),
@@ -629,6 +643,9 @@ class InfluencerViewModel : ViewModel() {
             updatedAt = obj.optString("updatedAt"),
             bio = obj.optString("bio"),
             location = obj.optString("location"),
+            gender = obj.optString("gender").takeIf { it.isNotBlank() },
+            motherTongue = obj.optString("motherTongue").takeIf { it.isNotBlank() },
+            languagesKnown = if (languagesList.isNotEmpty()) languagesList else null,
             categories = categoriesList,
             platforms = platformsList,
             audienceInsights = null,
