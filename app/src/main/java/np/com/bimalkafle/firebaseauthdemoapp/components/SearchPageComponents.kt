@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -97,70 +98,91 @@ fun FilterDropdown(
             }
         }
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = {
-                expanded = false
-                filterText = ""
-            },
-            modifier = Modifier
-                .background(Color.White)
-                .widthIn(min = 200.dp)
-                .heightIn(max = 400.dp)
-        ) {
-            if (searchable) {
-                OutlinedTextField(
-                    value = filterText,
-                    onValueChange = { filterText = it },
-                    placeholder = { Text("Search...", fontSize = 12.sp) },
+        // Dummy box at the bottom of the chip to act as anchor for DropdownMenu
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).align(Alignment.BottomStart)) {
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = {
+                    expanded = false
+                    filterText = ""
+                },
+                offset = DpOffset(x = 0.dp, y = 4.dp),
+                modifier = Modifier
+                    .background(Color.White)
+                    .widthIn(min = 90.dp, max = 150.dp)
+                    .heightIn(max = 380.dp)
+            ) {
+                if (searchable) {
+                    OutlinedTextField(
+                        value = filterText,
+                        onValueChange = { filterText = it },
+                        placeholder = { Text("Search...", fontSize = 12.sp) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        singleLine = true,
+                        textStyle = TextStyle(fontSize = 12.sp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = Color.LightGray
+                        )
+                    )
+                }
+
+                val displayedOptions = if (searchable && filterText.isNotBlank()) {
+                    options.filter { it.first.contains(filterText, ignoreCase = true) || it.first == "All" }
+                } else {
+                    options
+                }
+
+                Column(modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
+                    displayedOptions.forEach { (option, count) ->
+                        val isSelected = selectedOptions.contains(option)
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = if (option == "All" || count == null) option else "$option ($count)",
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 13.sp
+                                    )
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            },
+                            onClick = {
+                                onOptionToggle(option)
+                            }
+                        )
+                    }
+                }
+
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp),
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    singleLine = true,
-                    textStyle = TextStyle(fontSize = 12.sp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.LightGray
-                    )
-                )
-            }
-
-            val displayedOptions = if (searchable && filterText.isNotBlank()) {
-                options.filter { it.first.contains(filterText, ignoreCase = true) || it.first == "All" }
-            } else {
-                options
-            }
-
-            Column(modifier = Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
-                displayedOptions.forEach { (option, count) ->
-                    val isSelected = selectedOptions.contains(option)
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = if (option == "All" || count == null) option else "$option ($count)",
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 13.sp
-                                )
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        },
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    TextButton(
                         onClick = {
-                            onOptionToggle(option)
-                        }
-                    )
+                            expanded = false
+                            filterText = ""
+                        },
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        Text("OK", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

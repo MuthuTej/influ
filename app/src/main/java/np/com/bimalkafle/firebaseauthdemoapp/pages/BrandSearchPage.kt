@@ -442,9 +442,9 @@ fun BrandSearchPageContent(
                         val locationOptions = locationsList.map { loc -> loc to if (loc == "All") allInfluencers.size else allInfluencers.count { it.location.equals(loc, ignoreCase = true) } }
 
                         FilterDropdown("Category", selectedCategories, categoryOptions, onCategoryToggle, Modifier.width(120.dp), searchable = true)
-                        FilterDropdown("Platform", selectedPlatforms, platformOptions, onPlatformToggle, Modifier.width(110.dp))
-                        FilterDropdown("Followers", selectedFollowerRanges, followerOptions, onFollowerRangeToggle, Modifier.width(110.dp))
-                        FilterDropdown("Gender", selectedGenders, genderOptions, onGenderToggle, Modifier.width(100.dp))
+                        FilterDropdown("Platform", selectedPlatforms, platformOptions, onPlatformToggle, Modifier.width(110.dp), searchable = false)
+                        FilterDropdown("Followers", selectedFollowerRanges, followerOptions, onFollowerRangeToggle, Modifier.width(110.dp), searchable = true)
+                        FilterDropdown("Gender", selectedGenders, genderOptions, onGenderToggle, Modifier.width(100.dp), searchable = false)
                         FilterDropdown("Mother Tongue", selectedMotherTongues, mtOptions, onMotherTongueToggle, Modifier.width(140.dp), searchable = true)
                         FilterDropdown("Languages", selectedLanguagesKnown, lkOptions, onLanguagesKnownToggle, Modifier.width(120.dp), searchable = true)
                         FilterDropdown("Location", selectedLocations, locationOptions, onLocationToggle, Modifier.width(120.dp), searchable = true)
