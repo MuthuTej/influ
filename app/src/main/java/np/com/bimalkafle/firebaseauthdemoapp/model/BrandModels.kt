@@ -22,12 +22,27 @@ data class YouTubeVideoSummary(
 data class YouTubeVideoData(
     val videoId: String,
     val title: String,
+    val authorName: String? = null,
+    val channelUrl: String? = null,
+    val description: String? = null,
+    val duration: String? = null,
+    val publishedAt: String? = null,
     val viewCount: String?,
     val likeCount: String?,
+    val commentCount: String? = null,
     val thumbnail: String?,
     val analytics: YouTubeVideoSummary?,
     val videoUrl: String?,
     val fetchedAt: String?
+)
+
+data class PerformanceMilestone(
+    val label: String,
+    val hoursAfterPost: Int,
+    val views: Int?,
+    val likes: Int?,
+    val comments: Int?,
+    val capturedAt: String?
 )
 
 data class InstagramPostData(
@@ -91,6 +106,7 @@ data class Collaboration(
     val platformAnalytics: List<CollaborationAnalytics>? = null,
     val yt: List<YouTubeVideoData>? = null,
     val ig: List<InstagramPostData>? = null,
+    val performanceMilestones: List<PerformanceMilestone>? = null,
     val youtubeVideoId: String? = null,
     // Latest synced view count / growth across submitted content (see the
     // daily content-performance cron job and Collaboration.totalViewsDelivered
