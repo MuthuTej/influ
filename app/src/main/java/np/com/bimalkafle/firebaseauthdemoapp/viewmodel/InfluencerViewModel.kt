@@ -707,13 +707,17 @@ class InfluencerViewModel : ViewModel() {
                       platform duration cost impressions clicks likes comments shares saves views retweets
                     }
                     yt {
-                      videoId title viewCount likeCount thumbnail videoUrl fetchedAt
+                      videoId title authorName channelUrl description duration publishedAt
+                      viewCount likeCount commentCount thumbnail videoUrl fetchedAt
                       analytics {
                         views likes comments shares watchTimeMinutes subscribersGained engagementRate
                       }
                     }
                     ig {
                       postId caption likeCount commentCount viewCount mediaUrl timestamp fetchedAt
+                    }
+                    performanceMilestones {
+                      label hoursAfterPost views likes comments capturedAt
                     }
                     totalViewsDelivered
                     viewsGrowthSincePosting
@@ -869,12 +873,36 @@ class InfluencerViewModel : ViewModel() {
                         YouTubeVideoData(
                             videoId = ytObj.optString("videoId"),
                             title = ytObj.optString("title"),
+                            authorName = if (ytObj.isNull("authorName")) null else ytObj.optString("authorName"),
+                            channelUrl = if (ytObj.isNull("channelUrl")) null else ytObj.optString("channelUrl"),
+                            description = if (ytObj.isNull("description")) null else ytObj.optString("description"),
+                            duration = if (ytObj.isNull("duration")) null else ytObj.optString("duration"),
+                            publishedAt = if (ytObj.isNull("publishedAt")) null else ytObj.optString("publishedAt"),
                             viewCount = if (ytObj.isNull("viewCount")) null else ytObj.optString("viewCount"),
                             likeCount = if (ytObj.isNull("likeCount")) null else ytObj.optString("likeCount"),
+                            commentCount = if (ytObj.isNull("commentCount")) null else ytObj.optString("commentCount"),
                             thumbnail = if (ytObj.isNull("thumbnail")) null else ytObj.optString("thumbnail"),
                             analytics = ytAnalytics,
                             videoUrl = if (ytObj.isNull("videoUrl")) null else ytObj.optString("videoUrl"),
                             fetchedAt = if (ytObj.isNull("fetchedAt")) null else ytObj.optString("fetchedAt")
+                        )
+                    )
+                }
+            }
+
+            val milestoneList = mutableListOf<PerformanceMilestone>()
+            val milestonesArray = obj.optJSONArray("performanceMilestones")
+            if (milestonesArray != null) {
+                for (j in 0 until milestonesArray.length()) {
+                    val m = milestonesArray.optJSONObject(j) ?: continue
+                    milestoneList.add(
+                        PerformanceMilestone(
+                            label = m.optString("label"),
+                            hoursAfterPost = m.optInt("hoursAfterPost"),
+                            views = if (m.isNull("views")) null else m.optInt("views"),
+                            likes = if (m.isNull("likes")) null else m.optInt("likes"),
+                            comments = if (m.isNull("comments")) null else m.optInt("comments"),
+                            capturedAt = if (m.isNull("capturedAt")) null else m.optString("capturedAt")
                         )
                     )
                 }
@@ -924,6 +952,7 @@ class InfluencerViewModel : ViewModel() {
                     platformAnalytics = if (platformAnalyticsList.isEmpty()) null else platformAnalyticsList,
                     yt = if (ytList.isEmpty()) null else ytList,
                     ig = if (igList.isEmpty()) null else igList,
+                    performanceMilestones = if (milestoneList.isEmpty()) null else milestoneList,
                     totalViewsDelivered = if (obj.isNull("totalViewsDelivered")) null else obj.optInt("totalViewsDelivered"),
                     viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting"),
                     selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() }
