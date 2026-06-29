@@ -248,9 +248,9 @@ fun BrandHeaderAndReachSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconBubble(Icons.Default.Campaign, Color(0xFF1877F2), contentDescription = "View all campaigns") { navController.navigate("all_campaigns") }
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     IconBubble(Icons.Default.Favorite, Color(0xFFE1306C), contentDescription = "View wishlist") { navController.navigate("brand_wishlist") }
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Box {
                         IconBubble(Icons.Default.Notifications, Color.Black, contentDescription = "View notifications") { navController.navigate("notifications") }
                         if (unreadCount > 0) {
@@ -259,7 +259,7 @@ fun BrandHeaderAndReachSection(
                                 containerColor = Color.Red,
                                 contentColor = Color.White
                             ) {
-                                Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 9.sp)
+                                Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
                             }
                         }
                     }
@@ -275,7 +275,7 @@ fun BrandHeaderAndReachSection(
                     Surface(
                         shape = CircleShape,
                         color = Color.White,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(50.dp)
                     ) {
                         if (!brandProfile?.logoUrl.isNullOrEmpty()) {
                             AsyncImage(
@@ -288,16 +288,16 @@ fun BrandHeaderAndReachSection(
                             Image(
                                 painter = painterResource(id = R.drawable.brand_profile),
                                 contentDescription = null,
-                                modifier = Modifier.padding(6.dp).clip(CircleShape)
+                                modifier = Modifier.padding(8.dp).clip(CircleShape)
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                        Text("Hello!", fontSize = 11.sp, color = Color.White.copy(alpha = 0.9f))
+                        Text("Hello!", fontSize = 13.sp, color = Color.White.copy(alpha = 0.9f))
                         Text(
                             brandProfile?.name ?: "Guest",
-                            fontSize = 15.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             maxLines = 1,
@@ -313,7 +313,7 @@ fun BrandHeaderAndReachSection(
             ) {
                 Card(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth(0.87f)
                         .padding(bottom = 18.dp),
                     shape = RoundedCornerShape(20.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
@@ -324,20 +324,20 @@ fun BrandHeaderAndReachSection(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text("Total Reach Delivered", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                            Text(formatCompactCount(heroStats.totalReachDelivered), fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(formatCompactCount(heroStats.totalReachDelivered), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             if (heroStats.reachGrowth > 0) {
                                 Text(
                                     "+${formatCompactCount(heroStats.reachGrowth)} since posting",
-                                    fontSize = 10.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Color.White.copy(alpha = 0.85f)
                                 )
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                BrandStatChip("Pending", heroStats.pendingApplicationsCount.toString(), Modifier.weight(1f))
-                                BrandStatChip("Active", heroStats.activeCollaborationsCount.toString(), Modifier.weight(1f))
-                                BrandStatChip("Spent", formatCompactCurrency(heroStats.totalSpent), Modifier.weight(1f))
+                                BrandStatChip("Pending", heroStats.pendingApplicationsCount.toString(), Modifier.weight(0.8f))
+                                BrandStatChip("Active", heroStats.activeCollaborationsCount.toString(), Modifier.weight(0.8f))
+                                BrandStatChip("Spent", formatCompactCurrency(heroStats.totalSpent), Modifier.weight(0.8f))
                             }
                         }
                     }
@@ -366,10 +366,10 @@ fun IconBubble(icon: ImageVector, tint: Color, contentDescription: String? = nul
     Surface(
         shape = CircleShape,
         color = Color.White.copy(alpha = 0.2f),
-        modifier = Modifier.size(32.dp).clickable { onClick() }
+        modifier = Modifier.size(40.dp).clickable { onClick() }
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(20.dp))
         }
     }
 }

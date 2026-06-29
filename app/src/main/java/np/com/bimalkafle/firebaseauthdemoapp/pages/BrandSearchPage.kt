@@ -94,7 +94,8 @@ fun BrandSearchPage(
         influencers.filter { influencer ->
             val matchesSearch = influencer.name.contains(searchQuery, ignoreCase = true) ||
                     influencer.bio?.contains(searchQuery, ignoreCase = true) == true ||
-                    influencer.categories?.any { it.category.contains(searchQuery, ignoreCase = true) } == true
+                    influencer.categories?.any { it.category.contains(searchQuery, ignoreCase = true) } == true ||
+                    influencer.location?.contains(searchQuery, ignoreCase = true) == true
 
             val matchesPlatform = selectedPlatforms.contains("All") ||
                     influencer.platforms?.any { plat -> 
@@ -120,11 +121,14 @@ fun BrandSearchPage(
                 } == true
             }
 
-            val matchesGender = selectedGenders.contains("All") || selectedGenders.contains(influencer.gender)
-            val matchesMotherTongue = selectedMotherTongues.contains("All") || selectedMotherTongues.contains(influencer.motherTongue)
+            val matchesGender = selectedGenders.contains("All") || 
+                    selectedGenders.any { it.equals(influencer.gender, ignoreCase = true) }
+            val matchesMotherTongue = selectedMotherTongues.contains("All") || 
+                    selectedMotherTongues.any { it.equals(influencer.motherTongue, ignoreCase = true) }
             val matchesLanguagesKnown = selectedLanguagesKnown.contains("All") || 
-                    influencer.languagesKnown?.any { selectedLanguagesKnown.contains(it) } == true
-            val matchesLocation = selectedLocations.contains("All") || selectedLocations.contains(influencer.location)
+                    influencer.languagesKnown?.any { lk -> selectedLanguagesKnown.any { sel -> sel.equals(lk, ignoreCase = true) } } == true
+            val matchesLocation = selectedLocations.contains("All") || 
+                    selectedLocations.any { it.equals(influencer.location, ignoreCase = true) }
 
             matchesSearch && matchesPlatform && matchesCategory && matchesFollowers && 
                     matchesGender && matchesMotherTongue && matchesLanguagesKnown && matchesLocation
@@ -254,7 +258,8 @@ fun BrandSearchPageContent(
             val cats = allInfluencers.flatMap { it.categories?.map { c -> c.category } ?: emptyList() }
                 .distinct()
                 .filter { it.contains(searchQuery, ignoreCase = true) }
-            (names + cats).distinct().take(5)
+            val locs = allInfluencers.mapNotNull { it.location }.filter { it.contains(searchQuery, ignoreCase = true) }
+            (names + cats + locs).distinct().take(5)
         }
     }
 
@@ -429,8 +434,8 @@ fun BrandSearchPageContent(
                         val mtOptions = languagesList.map { l -> l to if (l == "All") allInfluencers.size else allInfluencers.count { it.motherTongue.equals(l, ignoreCase = true) } }
                         val lkOptions = languagesList.map { l -> l to if (l == "All") allInfluencers.size else allInfluencers.count { it.languagesKnown?.any { lk -> lk.equals(l, ignoreCase = true) } == true } }
 
-                        val locationsList = listOf(
-                            "All", "Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli", 
+                        val hardcodedLocations = listOf(
+                            "Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli", 
                             "Tiruppur", "Erode", "Vellore", "Thoothukudi", "Dindigul", "Thanjavur", "Kanchipuram", 
                             "Nagercoil", "Karur", "Cuddalore", "Hosur", "Nagapattinam", "Kumbakonam", "Sivakasi", 
                             "Namakkal", "Dharmapuri", "Krishnagiri", "Villupuram", "Tenkasi", "Pudukkottai", 
@@ -439,7 +444,9 @@ fun BrandSearchPageContent(
                             "Karaikudi", "Rajapalayam", "Bodinayakanur", "Coonoor", "Udhagamandalam (Ooty)", 
                             "Valparai", "Chengalpattu", "Tiruvallur", "Kallakurichi"
                         )
-                        val locationOptions = locationsList.map { loc -> loc to if (loc == "All") allInfluencers.size else allInfluencers.count { it.location.equals(loc, ignoreCase = true) } }
+                        val dbLocations = allInfluencers.mapNotNull { it.location }.filter { it.isNotBlank() }.distinct()
+                        val combinedLocations = (listOf("All") + hardcodedLocations + dbLocations).distinct()
+                        val locationOptions = combinedLocations.map { loc -> loc to if (loc == "All") allInfluencers.size else allInfluencers.count { it.location.equals(loc, ignoreCase = true) } }
 
                         FilterDropdown("Category", selectedCategories, categoryOptions, onCategoryToggle, Modifier.width(120.dp), searchable = true)
                         FilterDropdown("Platform", selectedPlatforms, platformOptions, onPlatformToggle, Modifier.width(110.dp), searchable = false)
