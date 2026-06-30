@@ -13,6 +13,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,13 +49,18 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
+import np.com.bimalkafle.firebaseauthdemoapp.AuthState
+import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.CollaborationAnalytics
 import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramPostData
+import np.com.bimalkafle.firebaseauthdemoapp.model.PerformanceAchievement
 import np.com.bimalkafle.firebaseauthdemoapp.model.PerformanceMilestone
+import np.com.bimalkafle.firebaseauthdemoapp.model.PerformanceSnapshot
+import np.com.bimalkafle.firebaseauthdemoapp.model.PerformanceTracking
 import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeVideoData
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
@@ -68,11 +76,24 @@ fun CollaborationAnalyticsPage(
     navController: NavController,
     collaborationId: String,
     brandViewModel: BrandViewModel,
-    influencerViewModel: InfluencerViewModel? = null
+    influencerViewModel: InfluencerViewModel? = null,
+    authViewModel: AuthViewModel? = null
 ) {
     val brandCollaborations by brandViewModel.collaborations.observeAsState(emptyList())
     val influencerCollaborations by (influencerViewModel?.collaborations?.observeAsState(emptyList()) ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) })
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
+
+    // Campaign targets are brand-only: the backend never returns
+    // performanceTargets/performanceTracking for an influencer-authenticated
+    // request, but the UI must also avoid even attempting to render that
+    // section when this screen is opened from the influencer side.
+    // influencerViewModel is a shared singleton passed to every route regardless
+    // of the logged-in role (see MyAppNavigation.kt), so it's always non-null —
+    // it can't be used as the role signal. authState.role (the same source
+    // HomePage.kt uses to pick Brand/Influencer home screens) is the real one.
+    val authState by (authViewModel?.authState?.observeAsState() ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) })
+    val isBrandView = (authState as? AuthState.Authenticated)?.role == "BRAND"
+    var showTargetsDialog by remember { mutableStateOf(false) }
 
     // Prefer the collaboration from whichever ViewModel already has analytics data.
     // The influencer VM may already have it loaded (from ProposalPage) with yt/ig
@@ -169,6 +190,15 @@ fun CollaborationAnalyticsPage(
                 item {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         InfluencerProfileCard(collaboration)
+                    }
+                }
+
+                if (isBrandView) {
+                    item {
+                        BrandTargetsSection(
+                            collaboration = collaboration,
+                            onSetTargets = { showTargetsDialog = true }
+                        )
                     }
                 }
 
@@ -360,6 +390,14 @@ fun CollaborationAnalyticsPage(
                     }
                 }
             }
+        }
+
+        if (isBrandView && showTargetsDialog && collaboration != null) {
+            SetTargetsDialog(
+                collaboration = collaboration,
+                brandViewModel = brandViewModel,
+                onDismiss = { showTargetsDialog = false }
+            )
         }
     }
 }
@@ -1201,6 +1239,355 @@ fun getPlatformIcon(platform: String?): ImageVector {
         "facebook" -> Icons.Default.Facebook
         else -> Icons.Default.Language
     }
+}
+
+// ---------------------------------------------------------------------------
+// Campaign Target Tracking — brand-only. Shown independent of the COMPLETED-
+// gated analytics sections above, since brands should be able to set and
+// monitor targets throughout the live collaboration, not just afterwards.
+// ---------------------------------------------------------------------------
+
+@Composable
+fun BrandTargetsSection(collaboration: Collaboration, onSetTargets: () -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        SectionTitle("CAMPAIGN TARGETS")
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val targets = collaboration.performanceTargets
+        val tracking = collaboration.performanceTracking
+
+        if (targets == null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.GpsFixed,
+                        contentDescription = null,
+                        tint = themeColor_campaign.copy(alpha = 0.5f),
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "No targets set for this collaboration yet",
+                        color = textGray,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onSetTargets,
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColor_campaign)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Set Targets")
+                    }
+                }
+            }
+        } else {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onSetTargets) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp), tint = themeColor_campaign)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Edit Targets", color = themeColor_campaign, fontSize = 13.sp)
+                }
+            }
+
+            if (tracking != null) {
+                PerformanceScoreCard(tracking)
+                Spacer(modifier = Modifier.height(16.dp))
+                TargetAchievementCard(tracking)
+                if (tracking.history.size >= 2) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    PerformanceTrendCard(tracking.history)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PerformanceScoreCard(tracking: PerformanceTracking) {
+    val score = tracking.performanceScore
+    val outcomeColor = when (tracking.campaignOutcome) {
+        "EXCEEDED" -> Color(0xFF2E7D32)
+        "MET" -> Color(0xFF388E3C)
+        "PARTIAL" -> Color(0xFFFFA000)
+        "MISSED" -> Color(0xFFD32F2F)
+        else -> themeColor_campaign
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(outcomeColor)
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "PERFORMANCE SCORE",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    score?.let { "${it.toInt()}/100" } ?: "—",
+                    color = Color.White,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Black
+                )
+                if (tracking.campaignOutcome != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        tracking.campaignOutcome.replace("_", " "),
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            tracking.overallAchievedPercent?.let { pct ->
+                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(56.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("${pct.toInt()}%", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TargetAchievementCard(tracking: PerformanceTracking) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("Target vs Actual", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(16.dp))
+            tracking.achievements.forEachIndexed { index, achievement ->
+                AchievementRow(achievement)
+                if (index != tracking.achievements.lastIndex) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AchievementRow(achievement: PerformanceAchievement) {
+    val statusColor = when (achievement.status) {
+        "ON_TRACK" -> Color(0xFF4CAF50)
+        "AT_RISK" -> Color(0xFFFFA000)
+        "BEHIND" -> Color(0xFFD32F2F)
+        else -> Color.LightGray
+    }
+    val label = achievement.metric.replaceFirstChar { it.uppercase() }
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, color = textGray, fontSize = 13.sp)
+            if (!achievement.tracked) {
+                Text("Not tracked yet", color = Color.LightGray, fontSize = 12.sp, fontStyle = FontStyle.Italic)
+            } else {
+                Text(
+                    "${formatMetricValue(achievement.actual)} / ${formatMetricValue(achievement.target)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = Color.Black
+                )
+            }
+        }
+        if (achievement.tracked && achievement.achievedPercent != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { (achievement.achievedPercent / 100f).toFloat().coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
+                color = statusColor,
+                trackColor = statusColor.copy(alpha = 0.15f)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                "${achievement.achievedPercent.toInt()}% achieved",
+                color = statusColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+fun formatMetricValue(value: Double?): String {
+    if (value == null) return "—"
+    return if (value % 1.0 == 0.0) String.format("%,d", value.toLong()) else String.format("%.1f", value)
+}
+
+private fun formatTargetForInput(value: Double?): String {
+    if (value == null) return ""
+    return if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+}
+
+@Composable
+fun PerformanceTrendCard(history: List<PerformanceSnapshot>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("Performance Score Trend", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val points = history.mapIndexedNotNull { index, snapshot ->
+                snapshot.performanceScore?.let { Point(index.toFloat(), it.toFloat()) }
+            }
+
+            if (points.size >= 2) {
+                Box(modifier = Modifier.height(120.dp).fillMaxWidth()) {
+                    LineChart(
+                        modifier = Modifier.fillMaxSize(),
+                        data = points,
+                        lineColor = themeColor_campaign,
+                        yMaxOverride = 100f
+                    )
+                }
+            } else {
+                Text("Not enough history yet to show a trend", color = textGray, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun SetTargetsDialog(
+    collaboration: Collaboration,
+    brandViewModel: BrandViewModel,
+    onDismiss: () -> Unit
+) {
+    val existing = collaboration.performanceTargets
+    var views by remember { mutableStateOf(formatTargetForInput(existing?.targetViews)) }
+    var reach by remember { mutableStateOf(formatTargetForInput(existing?.targetReach)) }
+    var engagementRate by remember { mutableStateOf(formatTargetForInput(existing?.targetEngagementRate)) }
+    var likes by remember { mutableStateOf(formatTargetForInput(existing?.targetLikes)) }
+    var comments by remember { mutableStateOf(formatTargetForInput(existing?.targetComments)) }
+    var shares by remember { mutableStateOf(formatTargetForInput(existing?.targetShares)) }
+    var saves by remember { mutableStateOf(formatTargetForInput(existing?.targetSaves)) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Set Performance Targets", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "Visible only to you — never shown to the influencer.",
+                    color = textGray,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                TargetField("Target Views", views) { views = it }
+                TargetField("Target Reach", reach) { reach = it }
+                TargetField("Target Engagement Rate (%)", engagementRate) { engagementRate = it }
+                TargetField("Target Likes", likes) { likes = it }
+                TargetField("Target Comments", comments) { comments = it }
+                TargetField("Target Shares", shares) { shares = it }
+                TargetField("Target Saves", saves) { saves = it }
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(error ?: "", color = Color.Red, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !saving,
+                onClick = {
+                    val fields = listOf(views, reach, engagementRate, likes, comments, shares, saves)
+                    if (fields.all { it.isBlank() }) {
+                        error = "Set at least one target"
+                        return@Button
+                    }
+                    error = null
+                    saving = true
+                    FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { tokenResult ->
+                        val token = tokenResult.token
+                        if (token == null) {
+                            saving = false
+                            error = "Could not authenticate. Please try again."
+                            return@addOnSuccessListener
+                        }
+                        scope.launch {
+                            val result = brandViewModel.setCollaborationTargets(
+                                collaborationId = collaboration.id,
+                                targetViews = views.toDoubleOrNull(),
+                                targetReach = reach.toDoubleOrNull(),
+                                targetEngagementRate = engagementRate.toDoubleOrNull(),
+                                targetLikes = likes.toDoubleOrNull(),
+                                targetComments = comments.toDoubleOrNull(),
+                                targetShares = shares.toDoubleOrNull(),
+                                targetSaves = saves.toDoubleOrNull(),
+                                token = token
+                            )
+                            saving = false
+                            if (result.isSuccess) {
+                                onDismiss()
+                            } else {
+                                error = "Failed to save targets. Please try again."
+                            }
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = themeColor_campaign)
+            ) {
+                if (saving) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("Save")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { if (!saving) onDismiss() }) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun TargetField(label: String, value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { new -> if (new.isEmpty() || new.matches(Regex("^\\d*\\.?\\d*$"))) onValueChange(new) },
+        label = { Text(label, fontSize = 13.sp) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        singleLine = true
+    )
 }
 
 @Composable
