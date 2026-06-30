@@ -57,8 +57,9 @@ private val orangeColor = Color(0xFFE89D4D)
 private val pacificColor = Color(0xFF4DAAE8)
 private val southAsiaColor = Color(0xFFE86B4D)
 
-// Data classes for charts
-private data class Point(val x: Float, val y: Float)
+// Data classes for charts. Point/LineChart are not file-private — reused by
+// CollaborationAnalyticsPage.kt to plot the real performance-target trend.
+data class Point(val x: Float, val y: Float)
 private data class BarData(val label: String, val before: Float, val after: Float)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -539,7 +540,7 @@ private fun DonutChart(
 }
 
 @Composable
-private fun LineChart(
+fun LineChart(
     modifier: Modifier = Modifier,
     data: List<Point>,
     lineColor: Color,

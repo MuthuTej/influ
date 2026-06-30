@@ -590,6 +590,45 @@ class BrandViewModel : ViewModel() {
                     totalViewsDelivered
                     viewsGrowthSincePosting
                     selectedInstagramProfileId
+                    performanceTargets {
+                      targetViews
+                      targetReach
+                      targetEngagementRate
+                      targetLikes
+                      targetComments
+                      targetShares
+                      targetSaves
+                      setAt
+                      setBy
+                    }
+                    performanceTracking {
+                      overallAchievedPercent
+                      performanceScore
+                      campaignOutcome
+                      achievements {
+                        metric
+                        target
+                        actual
+                        achievedPercent
+                        status
+                        tracked
+                      }
+                      history {
+                        capturedAt
+                        performanceScore
+                        campaignOutcome
+                        isFinal
+                        actual {
+                          views
+                          reach
+                          engagementRate
+                          likes
+                          comments
+                          shares
+                          saves
+                        }
+                      }
+                    }
                   }
                 }
             """.trimIndent()
@@ -779,6 +818,9 @@ class BrandViewModel : ViewModel() {
                 }
             }
 
+            val performanceTargets = parsePerformanceTargets(obj.optJSONObject("performanceTargets"))
+            val performanceTracking = parsePerformanceTracking(obj.optJSONObject("performanceTracking"))
+
             list.add(
                 Collaboration(
                     id = obj.optString("id"),
@@ -805,11 +847,91 @@ class BrandViewModel : ViewModel() {
                     ig = if (igList.isEmpty()) null else igList,
                     totalViewsDelivered = if (obj.isNull("totalViewsDelivered")) null else obj.optInt("totalViewsDelivered"),
                     viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting"),
-                    selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() }
+                    selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() },
+                    performanceTargets = performanceTargets,
+                    performanceTracking = performanceTracking
                 )
             )
         }
         return list
+    }
+
+    private fun parsePerformanceTargets(obj: JSONObject?): PerformanceTargets? {
+        if (obj == null) return null
+        fun d(key: String): Double? = if (obj.isNull(key)) null else obj.optDouble(key)
+        return PerformanceTargets(
+            targetViews = d("targetViews"),
+            targetReach = d("targetReach"),
+            targetEngagementRate = d("targetEngagementRate"),
+            targetLikes = d("targetLikes"),
+            targetComments = d("targetComments"),
+            targetShares = d("targetShares"),
+            targetSaves = d("targetSaves"),
+            setAt = if (obj.isNull("setAt")) null else obj.optString("setAt"),
+            setBy = if (obj.isNull("setBy")) null else obj.optString("setBy")
+        )
+    }
+
+    private fun parseActualMetrics(obj: JSONObject?): ActualMetrics? {
+        if (obj == null) return null
+        fun d(key: String): Double? = if (obj.isNull(key)) null else obj.optDouble(key)
+        return ActualMetrics(
+            views = d("views"),
+            reach = d("reach"),
+            engagementRate = d("engagementRate"),
+            likes = d("likes"),
+            comments = d("comments"),
+            shares = d("shares"),
+            saves = d("saves")
+        )
+    }
+
+    private fun parsePerformanceTracking(obj: JSONObject?): PerformanceTracking? {
+        if (obj == null) return null
+
+        val achievements = mutableListOf<PerformanceAchievement>()
+        val achievementsArray = obj.optJSONArray("achievements")
+        if (achievementsArray != null) {
+            for (j in 0 until achievementsArray.length()) {
+                val aObj = achievementsArray.optJSONObject(j) ?: continue
+                achievements.add(
+                    PerformanceAchievement(
+                        metric = aObj.optString("metric"),
+                        target = aObj.optDouble("target"),
+                        actual = if (aObj.isNull("actual")) null else aObj.optDouble("actual"),
+                        achievedPercent = if (aObj.isNull("achievedPercent")) null else aObj.optDouble("achievedPercent"),
+                        status = aObj.optString("status"),
+                        tracked = aObj.optBoolean("tracked")
+                    )
+                )
+            }
+        }
+
+        val history = mutableListOf<PerformanceSnapshot>()
+        val historyArray = obj.optJSONArray("history")
+        if (historyArray != null) {
+            for (j in 0 until historyArray.length()) {
+                val hObj = historyArray.optJSONObject(j) ?: continue
+                history.add(
+                    PerformanceSnapshot(
+                        capturedAt = hObj.optString("capturedAt"),
+                        actual = parseActualMetrics(hObj.optJSONObject("actual")),
+                        targets = null,
+                        performanceScore = if (hObj.isNull("performanceScore")) null else hObj.optDouble("performanceScore"),
+                        campaignOutcome = if (hObj.isNull("campaignOutcome")) null else hObj.optString("campaignOutcome"),
+                        isFinal = if (hObj.isNull("isFinal")) null else hObj.optBoolean("isFinal")
+                    )
+                )
+            }
+        }
+
+        return PerformanceTracking(
+            achievements = achievements,
+            overallAchievedPercent = if (obj.isNull("overallAchievedPercent")) null else obj.optDouble("overallAchievedPercent"),
+            performanceScore = if (obj.isNull("performanceScore")) null else obj.optDouble("performanceScore"),
+            campaignOutcome = if (obj.isNull("campaignOutcome")) null else obj.optString("campaignOutcome"),
+            history = history
+        )
     }
 
     fun fetchWishlist(token: String, force: Boolean = false) {
@@ -1080,6 +1202,63 @@ class BrandViewModel : ViewModel() {
                 Log.e("BrandViewModel", "Error toggling wishlist", it)
             }
         }
+    }
+
+    /**
+     * Brand-only: sets/updates the internal performance targets for a collaboration
+     * (setCollaborationTargets mutation, src/graphql/modules/collaboration/index.js).
+     * Suspends and returns the Result directly (rather than fire-and-forget +
+     * LiveData) so the calling dialog can show its own saving/error state without
+     * a round trip through a shared LiveData — re-saving the same outcome twice in
+     * a row wouldn't reliably re-trigger a LiveData-observing composable since
+     * Compose skips state updates for structurally-equal values. Re-fetches
+     * collaborations on success so performanceTargets/performanceTracking reflect
+     * the change immediately.
+     */
+    suspend fun setCollaborationTargets(
+        collaborationId: String,
+        targetViews: Double?,
+        targetReach: Double?,
+        targetEngagementRate: Double?,
+        targetLikes: Double?,
+        targetComments: Double?,
+        targetShares: Double?,
+        targetSaves: Double?,
+        token: String
+    ): Result<Unit> {
+        val mutation = """
+            mutation SetCollaborationTargets(${'$'}collaborationId: ID!, ${'$'}targets: PerformanceTargetsInput!) {
+              setCollaborationTargets(collaborationId: ${'$'}collaborationId, targets: ${'$'}targets) {
+                id
+              }
+            }
+        """.trimIndent()
+
+        val targets = mutableMapOf<String, Any?>()
+        targetViews?.let { targets["targetViews"] = it }
+        targetReach?.let { targets["targetReach"] = it }
+        targetEngagementRate?.let { targets["targetEngagementRate"] = it }
+        targetLikes?.let { targets["targetLikes"] = it }
+        targetComments?.let { targets["targetComments"] = it }
+        targetShares?.let { targets["targetShares"] = it }
+        targetSaves?.let { targets["targetSaves"] = it }
+
+        val variables = mapOf(
+            "collaborationId" to collaborationId,
+            "targets" to targets
+        )
+
+        val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+        return result.fold(
+            onSuccess = {
+                fetchCollaborations(token, force = true)
+                Result.success(Unit)
+            },
+            onFailure = {
+                Log.e("BrandViewModel", "Error setting collaboration targets", it)
+                Result.failure(it)
+            }
+        )
     }
 
     fun updateBrandProfile(

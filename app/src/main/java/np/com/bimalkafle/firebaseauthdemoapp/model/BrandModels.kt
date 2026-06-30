@@ -68,6 +68,61 @@ data class OverallAnalytics(
     val replies: Int? = null
 )
 
+// Brand-only performance targets for a collaboration. The backend never
+// returns these fields for an influencer-authenticated request (role-gated
+// field resolvers on Collaboration.performanceTargets/.performanceTracking),
+// but the UI must also avoid requesting/rendering them for that role.
+data class PerformanceTargets(
+    val targetViews: Double?,
+    val targetReach: Double?,
+    val targetEngagementRate: Double?,
+    val targetLikes: Double?,
+    val targetComments: Double?,
+    val targetShares: Double?,
+    val targetSaves: Double?,
+    val setAt: String? = null,
+    val setBy: String? = null
+)
+
+// tracked == false means there's no live data source for this metric yet
+// (e.g. Instagram shares/saves, or reach in general) — render "Not tracked"
+// rather than a misleading 0%.
+data class PerformanceAchievement(
+    val metric: String,
+    val target: Double,
+    val actual: Double?,
+    val achievedPercent: Double?,
+    val status: String,
+    val tracked: Boolean
+)
+
+data class ActualMetrics(
+    val views: Double?,
+    val reach: Double?,
+    val engagementRate: Double?,
+    val likes: Double?,
+    val comments: Double?,
+    val shares: Double?,
+    val saves: Double?
+)
+
+data class PerformanceSnapshot(
+    val capturedAt: String,
+    val actual: ActualMetrics?,
+    val targets: PerformanceTargets?,
+    val performanceScore: Double?,
+    val campaignOutcome: String?,
+    val isFinal: Boolean?
+)
+
+data class PerformanceTracking(
+    val achievements: List<PerformanceAchievement>,
+    val overallAchievedPercent: Double?,
+    val performanceScore: Double?,
+    val campaignOutcome: String?,
+    val history: List<PerformanceSnapshot>
+)
+
 data class Collaboration(
     val id: String,
     val campaignId: String,
@@ -97,7 +152,11 @@ data class Collaboration(
     // / viewsGrowthSincePosting resolvers on the backend).
     val totalViewsDelivered: Int? = null,
     val viewsGrowthSincePosting: Int? = null,
-    val selectedInstagramProfileId: String? = null
+    val selectedInstagramProfileId: String? = null,
+    // Brand-only — always null when this collaboration was fetched by the
+    // InfluencerViewModel (the backend won't return them for that role).
+    val performanceTargets: PerformanceTargets? = null,
+    val performanceTracking: PerformanceTracking? = null
 )
 
 data class Campaign(
