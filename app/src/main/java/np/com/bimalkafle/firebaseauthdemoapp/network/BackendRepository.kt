@@ -9,8 +9,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object BackendRepository {
-    // See app/build.gradle.kts — override via local.properties (BACKEND_BASE_URL_DEBUG/_RELEASE)
-    // instead of editing this file for a different environment.
     private val BACKEND_URL = BuildConfig.BACKEND_BASE_URL
 
     suspend fun signUp(name: String, role: String, token: String): Result<String> = withContext(Dispatchers.IO) {
@@ -22,7 +20,6 @@ object BackendRepository {
             connection.setRequestProperty("Authorization", "Bearer $token")
             connection.doOutput = true
 
-            // GraphQL Mutation
             val query = """
                 mutation SignUp(${'$'}name: String!, ${'$'}role: Role!) {
                     signUp(name: ${'$'}name, role: ${'$'}role) {
@@ -142,6 +139,9 @@ object BackendRepository {
                         name
                         role
                         profileCompleted
+                        gender
+                        motherTongue
+                        languagesKnown
                     }
                 }
             """.trimIndent()
@@ -1078,8 +1078,6 @@ object BackendRepository {
             Result.failure(e)
         }
     }
-
-    // ── Chat ──────────────────────────────────────────────────────────────────
 
     suspend fun getChatList(token: String): Result<List<JSONObject>> = withContext(Dispatchers.IO) {
         try {
