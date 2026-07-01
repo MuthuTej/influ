@@ -1,12 +1,17 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,22 +33,17 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.ImageLoader
 import coil.compose.AsyncImage
-import coil.disk.DiskCache
-import coil.memory.MemoryCache
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
-import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
-import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramMetrics
-import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeInsights
-import np.com.bimalkafle.firebaseauthdemoapp.model.Platform
-import np.com.bimalkafle.firebaseauthdemoapp.model.YoutubeDemographics
+import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
@@ -51,10 +51,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import np.com.bimalkafle.firebaseauthdemoapp.model.Category
-import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramProfile
-import np.com.bimalkafle.firebaseauthdemoapp.model.PricingInfo
 
 @Composable
 fun InfluencerProfileScreen(
@@ -65,16 +61,23 @@ fun InfluencerProfileScreen(
 ) {
     val influencerProfile by influencerViewModel.influencerProfile.observeAsState()
     val isLoading by influencerViewModel.loading.observeAsState(initial = false)
+    val error by influencerViewModel.error.observeAsState()
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
             val firebaseToken = result.token
             if (firebaseToken != null) {
-                influencerViewModel.fetchInfluencerDetails(firebaseToken)
-                // Clear Coil cache
+                influencerViewModel.fetchInfluencerDetails(firebaseToken, force = true)
                 clearCoilCache(context)
             }
+        }
+    }
+
+    LaunchedEffect(error) {
+        error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            influencerViewModel.clearError()
         }
     }
 
@@ -104,7 +107,7 @@ fun InfluencerProfileScreen(
                         availability = updatedProfile.availability ?: true
                     ) { success ->
                         if (success) {
-                            influencerViewModel.fetchInfluencerDetails(firebaseToken)
+                            influencerViewModel.fetchInfluencerDetails(firebaseToken, force = true)
                         }
                     }
                 }
@@ -169,6 +172,7 @@ fun InfluencerProfileContent(
     floatingActionButton: @Composable () -> Unit = {}
 ) {
     var isEditMode by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     // State for editable fields
     var name by remember(influencerProfile) { mutableStateOf(influencerProfile?.name ?: "") }
@@ -178,8 +182,7 @@ fun InfluencerProfileContent(
     var logoUrl by remember(influencerProfile) { mutableStateOf(influencerProfile?.logoUrl ?: "") }
     var availability by remember(influencerProfile) { mutableStateOf(influencerProfile?.availability ?: true) }
     
-    // Structured Categories State
-    val editableCategories = remember(influencerProfile) { 
+    val editableCategories = remember(influencerProfile) {
         mutableStateListOf<Category>().apply {
             addAll(influencerProfile?.categories ?: emptyList()) 
         } 
@@ -187,7 +190,6 @@ fun InfluencerProfileContent(
     
     var platforms by remember(influencerProfile) { mutableStateOf(influencerProfile?.platforms ?: emptyList()) }
     
-    // Services setup
     val availablePlatforms = listOf("Instagram", "YouTube", "Facebook")
     val servicesByPlatform = mapOf(
         "Instagram" to listOf("Story", "Reel", "Post"),
@@ -195,13 +197,11 @@ fun InfluencerProfileContent(
         "Facebook" to listOf("Post", "Story", "Video", "Shorts")
     )
     
-    var selectedPricing = remember(influencerProfile) { 
+    val selectedPricing = remember(influencerProfile) {
         mutableStateMapOf<String, MutableMap<String, String>>().apply {
             influencerProfile?.pricing?.forEach { info ->
                 val platformKey = availablePlatforms.find { it.equals(info.platform, ignoreCase = true) } ?: info.platform
                 val platformMap = getOrPut(platformKey) { mutableMapOf() }
-                
-                // Match deliverable name with servicesByPlatform keys if possible
                 val serviceKey = servicesByPlatform[platformKey]?.find { it.equals(info.deliverable, ignoreCase = true) } ?: info.deliverable
                 platformMap[serviceKey] = info.price.toString()
             }
@@ -226,6 +226,20 @@ fun InfluencerProfileContent(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 LoadingState(message = "Loading your profile…")
             }
+        } else if (influencerProfile == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Could not load profile", color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { 
+                        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                            // This would ideally trigger a fetch, but since we're in content, we'd need to pass a retry lambda
+                        }
+                    }) {
+                        Text("Retry")
+                    }
+                }
+            }
         } else {
             Column(
                 modifier = modifier
@@ -235,7 +249,7 @@ fun InfluencerProfileContent(
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = padding.calculateBottomPadding())
             ) {
-                // Reduced and elegant header
+                // Header section
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -260,28 +274,46 @@ fun InfluencerProfileContent(
                             .statusBarsPadding()
                             .padding(top = 24.dp, bottom = 32.dp)
                     ) {
-                        Surface(
-                            modifier = Modifier.size(90.dp),
-                            shape = CircleShape,
-                            color = Color.White,
-                            shadowElevation = 8.dp
-                        ) {
-                            if (!logoUrl.isNullOrEmpty()) {
-                                AsyncImage(
-                                    model = logoUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.Person,
+                        // Profile Picture with Verified Badge
+                        Box(contentAlignment = Alignment.BottomEnd) {
+                            Surface(
+                                modifier = Modifier.size(90.dp),
+                                shape = CircleShape,
+                                color = Color.White,
+                                shadowElevation = 8.dp
+                            ) {
+                                if (!logoUrl.isNullOrEmpty()) {
+                                    AsyncImage(
+                                        model = logoUrl,
                                         contentDescription = null,
-                                        modifier = Modifier.size(40.dp),
-                                        tint = themeColor
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Person,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(40.dp),
+                                            tint = themeColor
+                                        )
+                                    }
+                                }
+                            }
+                            if (influencerProfile.isVerified == true) {
+                                Surface(
+                                    modifier = Modifier.size(24.dp),
+                                    shape = CircleShape,
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = "Verified",
+                                        tint = Color(0xFF1DA1F2),
+                                        modifier = Modifier.padding(2.dp)
                                     )
                                 }
                             }
@@ -313,15 +345,35 @@ fun InfluencerProfileContent(
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                            influencerProfile.username?.let {
+                                Text(
+                                    text = "@$it",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 14.sp
+                                )
+                            }
                         }
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Profile Stats Row (Followers, Following, Posts)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            StatItem(label = "Followers", value = formatCount(influencerProfile.followers ?: 0))
+                            StatItem(label = "Following", value = formatCount(influencerProfile.following ?: 0))
+                            StatItem(label = "Posts", value = formatCount(influencerProfile.totalPosts ?: 0))
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
                         Surface(
                             color = Color.White.copy(alpha = 0.2f),
                             shape = RoundedCornerShape(16.dp)
                         ) {
                             Text(
-                                text = influencerProfile?.role ?: "INFLUENCER",
+                                text = influencerProfile.role ?: "INFLUENCER",
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -331,9 +383,41 @@ fun InfluencerProfileContent(
                     }
                 }
 
-                // Attractive Details Section
+                // Main Content
                 Column(modifier = Modifier.padding(20.dp)) {
                     
+                    // AI Summary Card
+                    influencerProfile.aiInsights?.aiSummary?.let { summary ->
+                        InfluencerDetailSection(icon = Icons.Default.AutoAwesome, title = "AI Profile Summary") {
+                            Text(
+                                text = summary,
+                                color = Color.Black,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Normal,
+                                lineHeight = 21.sp,
+                                maxLines = 8,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Justify
+                            )
+                        }
+                    }
+
+                    // AI Insights Grid Section
+                    influencerProfile.aiInsights?.let { insights ->
+                        AIInsightsSection(insights, themeColor)
+                    }
+
+                    // Advanced Analytics Card
+                    influencerProfile.instagramMetrics?.let { metrics ->
+                        AnalyticsSection(metrics, themeColor, platformsColors)
+                    }
+
+                    // Recent Posts Section
+                    if (!influencerProfile.recentPosts.isNullOrEmpty()) {
+                        RecentPostsSection(influencerProfile.recentPosts!!, context)
+                    }
+
+                    // Standard Details
                     InfluencerDetailSection(icon = Icons.Default.Email, title = "Email Address") {
                         if (isEditMode) {
                             OutlinedTextField(
@@ -382,27 +466,22 @@ fun InfluencerProfileContent(
                         }
                     }
 
-                    InfluencerDetailSection(icon = Icons.Default.EventAvailable, title = "Availability Status") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = if (availability) "Currently Available" else "Currently Busy",
-                                color = Color.Black,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            if (isEditMode) {
-                                Switch(
-                                    checked = availability,
-                                    onCheckedChange = { availability = it },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = themeColor,
-                                        checkedTrackColor = Color.White,
-                                        checkedBorderColor = themeColor
-                                    )
+                    influencerProfile.website?.let { site ->
+                        if (site.isNotBlank()) {
+                            InfluencerDetailSection(icon = Icons.Default.Language, title = "Website") {
+                                Text(
+                                    text = site,
+                                    color = themeColor,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.clickable {
+                                        try {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(if (site.startsWith("http")) site else "https://$site"))
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            Log.e("Profile", "Failed to open link", e)
+                                        }
+                                    }
                                 )
                             }
                         }
@@ -481,14 +560,14 @@ fun InfluencerProfileContent(
                         }
                     }
 
-                    influencerProfile?.youtubeInsights?.let { ytInsights ->
+                    influencerProfile.youtubeInsights?.let { ytInsights ->
                         YouTubeInsightsSection(ytInsights, platformsColors, detailDarkerGray)
                         Spacer(modifier = Modifier.height(20.dp))
                     }
 
                     InstagramProfilesSection(
-                        profiles = influencerProfile?.instagramProfiles ?: emptyList(),
-                        legacyMetrics = influencerProfile?.instagramMetrics,
+                        profiles = influencerProfile.instagramProfiles ?: emptyList(),
+                        legacyMetrics = influencerProfile.instagramMetrics,
                         platformsColors = platformsColors,
                         detailDarkerGray = detailDarkerGray,
                         detailSoftGray = detailSoftGray,
@@ -526,7 +605,7 @@ fun InfluencerProfileContent(
                                 }
                             }
                         } else {
-                            if (influencerProfile?.pricing?.isEmpty() != false) {
+                            if (influencerProfile.pricing?.isEmpty() != false) {
                                 Text("No pricing information", color = Color.Gray, fontSize = 15.sp)
                             } else {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -562,7 +641,6 @@ fun InfluencerProfileContent(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Buttons
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -579,7 +657,7 @@ fun InfluencerProfileContent(
                                         }
                                     }
 
-                                    val updatedProfile = influencerProfile?.copy(
+                                    val updatedProfile = influencerProfile.copy(
                                         name = name,
                                         email = email,
                                         bio = bio,
@@ -590,9 +668,7 @@ fun InfluencerProfileContent(
                                         platforms = platforms,
                                         pricing = updatedPricing
                                     )
-                                    if (updatedProfile != null) {
-                                        onUpdateProfile(updatedProfile)
-                                    }
+                                    onUpdateProfile(updatedProfile)
                                 }
                                 isEditMode = !isEditMode
                             },
@@ -619,6 +695,250 @@ fun InfluencerProfileContent(
                     }
                     
                     Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text(text = label, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun AIInsightsSection(insights: AiInsights, themeColor: Color) {
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Text("AI Insights", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Niche + Tone — allow text to wrap so nothing is cut off
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            InsightSmallCard(
+                title = "Primary Niche",
+                value = insights.primaryNiche ?: "N/A",
+                icon = Icons.Default.Star,
+                modifier = Modifier.weight(1f)
+            )
+            InsightSmallCard(
+                title = "Tone",
+                value = insights.tone ?: "N/A",
+                icon = Icons.Default.Audiotrack,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Audience Interests + Content Style card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+            border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Audience Interests", fontWeight = FontWeight.Bold, color = Color.Gray, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    insights.audienceInterests?.forEach { interest ->
+                        InsightChip(interest, themeColor)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("Content Style", fontWeight = FontWeight.Bold, color = Color.Gray, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = insights.contentStyle ?: "N/A",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = Color.Black
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Strengths only — full width
+        ListInsightCard(
+            title = "Strengths",
+            items = insights.strengths ?: emptyList(),
+            color = Color(0xFF4CAF50),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+fun InsightSmallCard(title: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(title, fontWeight = FontWeight.Bold, color = Color.Gray, fontSize = 11.sp, letterSpacing = 0.3.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(value, fontWeight = FontWeight.Bold, fontSize = 14.sp, lineHeight = 19.sp)
+        }
+    }
+}
+
+@Composable
+fun InsightChip(text: String, themeColor: Color) {
+    Surface(
+        color = themeColor.copy(alpha = 0.1f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, themeColor.copy(alpha = 0.2f))
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            fontSize = 12.sp,
+            color = themeColor,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+fun ListInsightCard(title: String, items: List<String>, color: Color, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.05f)),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.15f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, fontWeight = FontWeight.Bold, color = color, fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+            items.take(5).forEach { item ->
+                Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 3.dp)) {
+                    Text("✓  ", color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(item, fontSize = 13.sp, lineHeight = 18.sp, color = Color.Black)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AnalyticsSection(metrics: InstagramMetrics, themeColor: Color, platformsColors: Map<String, Color>) {
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Text("Engagement Analytics", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Engagement Rate", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Based on recent activity", color = Color.Gray, fontSize = 12.sp)
+                    }
+                    Text(
+                        text = "${String.format("%.2f", metrics.engagementRate ?: 0f)}%",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 24.sp,
+                        color = themeColor
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    AnalyticsMiniStat("Avg Likes", formatCount(metrics.avgLikes?.toInt() ?: 0))
+                    AnalyticsMiniStat("Avg Comments", formatCount(metrics.avgComments?.toInt() ?: 0))
+                    AnalyticsMiniStat("Avg Views", formatCount(metrics.avgViews?.toInt() ?: 0))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AnalyticsMiniStat(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text(label, fontSize = 11.sp, color = Color.Gray)
+    }
+}
+
+@Composable
+fun RecentPostsSection(posts: List<RecentPost>, context: Context) {
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Text("Recent Content", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 0.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(posts) { post ->
+                RecentPostCard(post, context)
+            }
+        }
+    }
+}
+
+@Composable
+fun RecentPostCard(post: RecentPost, context: Context) {
+    Card(
+        modifier = Modifier
+            .width(160.dp)
+            .clickable {
+                post.url?.let {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(it))
+                        context.startActivity(intent)
+                    } catch (e: Exception) {}
+                }
+            },
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            AsyncImage(
+                model = post.thumbnail,
+                contentDescription = null,
+                modifier = Modifier.fillMaxWidth().height(160.dp),
+                contentScale = ContentScale.Crop
+            )
+            Column(modifier = Modifier.padding(8.dp)) {
+                Text(
+                    text = post.caption ?: "",
+                    fontSize = 11.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 14.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Favorite, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.Gray)
+                    Text(formatCount(post.likes ?: 0), fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(Icons.Default.Comment, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.Gray)
+                    Text(formatCount(post.comments ?: 0), fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
                 }
             }
         }
@@ -672,7 +992,7 @@ private fun formatCount(count: Int): String {
 }
 
 @Composable
-private fun YouTubeInsightsSection(insights: np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeInsights, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
+private fun YouTubeInsightsSection(insights: YouTubeInsights, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("YouTube Insights", fontWeight = FontWeight.Bold, fontSize = 20.sp)
         Text("Channel: ${insights.title ?: "N/A"}", color = detailDarkerGray, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
@@ -692,7 +1012,7 @@ private fun YouTubeInsightsSection(insights: np.com.bimalkafle.firebaseauthdemoa
 }
 
 @Composable
-private fun YouTubeStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, modifier: Modifier = Modifier, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
+private fun YouTubeStatCard(label: String, value: String, icon: ImageVector?, modifier: Modifier = Modifier, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
     Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             if (icon != null) {
@@ -709,7 +1029,7 @@ private fun YouTubeStatCard(label: String, value: String, icon: androidx.compose
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebaseauthdemoapp.model.YoutubeDemographics>, detailDarkerGray: Color) {
+private fun YouTubeDemographicsCard(demographics: List<YoutubeDemographics>, detailDarkerGray: Color) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text("YouTube Audience Demographics", fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -727,7 +1047,7 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
                         Text("${values.sum().toInt()}%", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
-                    androidx.compose.foundation.layout.FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         labels.forEachIndexed { index, label ->
                             Row(modifier = Modifier.fillMaxWidth(0.45f).padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.size(8.dp).background(colors[index], CircleShape))
@@ -813,7 +1133,6 @@ private fun InstagramProfilesSection(
         Spacer(Modifier.height(12.dp))
 
         if (profiles.isEmpty() && legacyMetrics != null) {
-            // Fallback: show legacy aggregated metrics if no profiles are set up yet
             InstagramInsightsSection(legacyMetrics, platformsColors, detailDarkerGray, detailSoftGray)
         } else {
             profiles.forEach { profile ->
@@ -978,7 +1297,7 @@ private fun InstagramProfileCard(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MetricChip("📅 ${String.format("%.1f", m.postingFrequencyDays ?: 0f)}d", "Post Freq.", modifier = Modifier.weight(1f))
                         MetricChip("📊 ${m.totalPostsAnalyzed ?: 0}", "Posts Analyzed", modifier = Modifier.weight(1f))
-                        Spacer(modifier = Modifier.weight(1f))
+                        MetricChip("📈 ${String.format("%.1f", m.engagementRate ?: 0f)}%", "Eng. Rate", modifier = Modifier.weight(1f))
                     }
                 } ?: run {
                     Text("No analytics yet — tap Refresh to fetch metrics", color = detailDarkerGray, fontSize = 13.sp)
@@ -1056,7 +1375,7 @@ private fun MetricChip(value: String, label: String, modifier: Modifier = Modifi
 }
 
 @Composable
-private fun InstagramInsightsSection(metrics: np.com.bimalkafle.firebaseauthdemoapp.model.InstagramMetrics, platformsColors: Map<String, Color>, detailDarkerGray: Color, detailSoftGray: Color) {
+private fun InstagramInsightsSection(metrics: InstagramMetrics, platformsColors: Map<String, Color>, detailDarkerGray: Color, detailSoftGray: Color) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Instagram Insights", fontWeight = FontWeight.Bold, fontSize = 20.sp)
         Text("Detailed Platform Analytics", color = detailDarkerGray, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
@@ -1066,25 +1385,19 @@ private fun InstagramInsightsSection(metrics: np.com.bimalkafle.firebaseauthdemo
             InstagramStatCard(
                 label = "Avg Likes",
                 value = formatCount(metrics.avgLikes?.toInt() ?: 0),
-                icon = Icons.Default.Favorite,
                 modifier = Modifier.weight(1f),
-                platformsColors = platformsColors,
                 detailDarkerGray = detailDarkerGray
             )
             InstagramStatCard(
                 label = "Avg Comments",
                 value = formatCount(metrics.avgComments?.toInt() ?: 0),
-                icon = Icons.Default.Comment,
                 modifier = Modifier.weight(1f),
-                platformsColors = platformsColors,
                 detailDarkerGray = detailDarkerGray
             )
             InstagramStatCard(
                 label = "Avg Views",
                 value = formatCount(metrics.avgViews?.toInt() ?: 0),
-                icon = Icons.Default.Visibility,
                 modifier = Modifier.weight(1f),
-                platformsColors = platformsColors,
                 detailDarkerGray = detailDarkerGray
             )
         }
@@ -1146,7 +1459,7 @@ private fun InstagramInsightsSection(metrics: np.com.bimalkafle.firebaseauthdemo
 }
 
 @Composable
-private fun InstagramStatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier, platformsColors: Map<String, Color>, detailDarkerGray: Color) {
+private fun InstagramStatCard(label: String, value: String, modifier: Modifier = Modifier, detailDarkerGray: Color) {
     Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Image(painter = painterResource(id = R.drawable.instagram_logo), contentDescription = null, modifier = Modifier.size(24.dp))
@@ -1176,10 +1489,9 @@ private fun InfluencerDonutChart(
     }
 }
 
-// Function to clear Coil cache
 fun clearCoilCache(context: Context) {
     val imageLoader = ImageLoader.Builder(context).build()
-    imageLoader.memoryCache?.clear() // Corrected line
+    imageLoader.memoryCache?.clear()
     imageLoader.diskCache?.clear()
     Log.d("InfluencerProfileScreen", "Coil cache cleared")
 }

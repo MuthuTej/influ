@@ -91,17 +91,16 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     var isYouTubeConnected by remember { mutableStateOf(false) }
     var youtubeAuthCode by remember { mutableStateOf<String?>(null) }
     
-    // --- Instagram Connection State (supports multiple profiles) ---
-    // Each entry: Pair(url, isConnected)
+    // --- Instagram Connection State ---
     val instagramEntries = remember { mutableStateListOf(Pair("", false)) }
     var connectingIndex by remember { mutableStateOf<Int?>(null) }
 
-    // --- Facebook Connection State (Dummy) ---
+    // --- Facebook Connection State ---
     var isFacebookConnecting by remember { mutableStateOf(false) }
     var isFacebookConnected by remember { mutableStateOf(false) }
     var facebookUrl by remember { mutableStateOf("") }
 
-    // --- Google Sign-In Launcher for Activity Result ---
+    // --- Google Sign-In Launcher ---
     val youtubeAuthLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -143,7 +142,6 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     val formPaddingTop = headerHeight - 40.dp
 
     Box(modifier = Modifier.fillMaxSize().imePadding()) {
-        // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -181,7 +179,6 @@ fun InfluencerRegistrationScreen(navController: NavController) {
             }
         }
 
-        // Form
         Column(
             modifier = Modifier
                 .padding(top = formPaddingTop)
@@ -200,8 +197,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 onValueChange = { name = it },
                 label = { Text("Creator Name") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -210,8 +206,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 label = { Text("Location") },
                 trailingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -219,8 +214,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 onValueChange = { bio = it },
                 label = { Text("Short Bio / About") },
                 modifier = Modifier.fillMaxWidth().height(100.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -228,13 +222,11 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 onValueChange = { logoUrl = it },
                 label = { Text("Logo URL") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+                shape = RoundedCornerShape(12.dp)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
             
-            // Multiselect Category Chips
             Text("Select Categories *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             FlowRow(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -248,11 +240,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                             selectedCategories = if (isSelected) selectedCategories - category else selectedCategories + category
                             if (isSelected) selectedSubCategories = selectedSubCategories - category
                         },
-                        label = { Text(category) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = Color.White
-                        )
+                        label = { Text(category) }
                     )
                 }
             }
@@ -275,11 +263,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                     val newSubCats = if (isSubSelected) currentSubCats - subCat else currentSubCats + subCat
                                     selectedSubCategories = selectedSubCategories + (category to newSubCats)
                                 },
-                                label = { Text(subCat, fontSize = 12.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                    selectedLabelColor = Color.White
-                                )
+                                label = { Text(subCat, fontSize = 12.sp) }
                             )
                         }
                     }
@@ -291,7 +275,6 @@ fun InfluencerRegistrationScreen(navController: NavController) {
             
             platformsList.forEach { platform ->
                 val isPlatformSelected = selectedPlatforms.contains(platform)
-                
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Row(
                         modifier = Modifier
@@ -317,11 +300,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                         Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(platform, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                        Checkbox(
-                            checked = isPlatformSelected,
-                            onCheckedChange = null,
-                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
-                        )
+                        Checkbox(checked = isPlatformSelected, onCheckedChange = null)
                     }
 
                     if (isPlatformSelected) {
@@ -347,11 +326,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                             deliverablePricing = newPricing
                                         }
                                     },
-                                    label = { Text(format, fontSize = 12.sp) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                        selectedLabelColor = Color.White
-                                    )
+                                    label = { Text(format, fontSize = 12.sp) }
                                 )
                             }
                         }
@@ -380,14 +355,11 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                 label = { Text("$deliverable Price (INR)") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+                                shape = RoundedCornerShape(8.dp)
                             )
                         }
                     }
                 }
-            } else {
-                Text(text = "Please select platforms and deliverables to set pricing", color = Color.Gray, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp))
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -430,18 +402,10 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                             label = { Text("Profile URL ${index + 1}") },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFFE1306C),
-                                unfocusedBorderColor = if (connected) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline
-                            ),
                             enabled = !connected && connectingIndex != index,
                             singleLine = true,
                             trailingIcon = {
-                                if (connected) Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = Color(0xFF4CAF50)
-                                )
+                                if (connected) Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF4CAF50))
                             }
                         )
                         if (!connected) {
@@ -461,70 +425,22 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                 },
                                 enabled = connectingIndex == null,
                                 shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C))
                             ) {
-                                if (connectingIndex == index) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Text("Link", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                }
-                            }
-                        }
-                        if (instagramEntries.size > 1) {
-                            IconButton(
-                                onClick = { instagramEntries.removeAt(index) },
-                                enabled = connectingIndex == null
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.Gray)
+                                if (connectingIndex == index) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                else Text("Link", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 if (instagramEntries.size < 5) {
-                    TextButton(
-                        onClick = { instagramEntries.add(Pair("", false)) },
-                        enabled = connectingIndex == null
-                    ) {
+                    TextButton(onClick = { instagramEntries.add(Pair("", false)) }, enabled = connectingIndex == null) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFFE1306C))
                         Spacer(Modifier.width(4.dp))
                         Text("Add another Instagram profile", color = Color(0xFFE1306C), fontSize = 13.sp)
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            if (selectedPlatforms.contains("Facebook")) {
-                OutlinedTextField(
-                    value = facebookUrl,
-                    onValueChange = { facebookUrl = it },
-                    label = { Text("Facebook Profile URL") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
-                    enabled = !isFacebookConnected && !isFacebookConnecting
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        if (facebookUrl.isEmpty()) return@Button
-                        isFacebookConnecting = true
-                        coroutineScope.launch {
-                            kotlinx.coroutines.delay(1000)
-                            isFacebookConnected = true
-                            isFacebookConnecting = false
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    enabled = !isFacebookConnected && !isFacebookConnecting,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (isFacebookConnected) Color(0xFF4CAF50) else Color(0xFF1877F2))
-                ) {
-                    if (isFacebookConnecting) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    else Text(if (isFacebookConnected) "Facebook Connected ✓" else "Connect Facebook", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-                Spacer(modifier = Modifier.height(16.dp))
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -560,18 +476,11 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                         }
                                         put("categories", categoriesJson)
 
-                                        val primaryInstagramUrl = instagramEntries.firstOrNull { it.second }?.first
-                                            ?: instagramEntries.firstOrNull()?.first ?: ""
-
                                         val platformsJson = JSONArray()
                                         selectedPlatforms.forEach { plat ->
                                             platformsJson.put(JSONObject().apply {
                                                 put("platform", plat)
-                                                put("profileUrl", when (plat) {
-                                                    "Instagram" -> primaryInstagramUrl
-                                                    "Facebook" -> facebookUrl
-                                                    else -> ""
-                                                })
+                                                put("profileUrl", if (plat == "Instagram") instagramEntries.firstOrNull()?.first ?: "" else "")
                                                 put("followers", 0)
                                                 put("avgViews", 0)
                                                 put("engagement", 0.0)
@@ -594,14 +503,15 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                             }
                                         }
                                         put("pricing", pricingJson)
-                                        put("strengths", JSONArray())
-                                        put("audienceInsights", JSONObject.NULL)
                                     }
 
                                     BackendRepository.setupInfluencerProfile(input, token).onSuccess {
                                         prefsManager.saveProfileCompleted(user.uid, true)
                                         Toast.makeText(context, "Profile setup successful!", Toast.LENGTH_SHORT).show()
-                                        navController.navigate("influencer_detail")
+                                        // Navigate directly to home and clear stack
+                                        navController.navigate("influencer_home") {
+                                            popUpTo(0) { inclusive = true }
+                                        }
                                     }.onFailure {
                                         Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_LONG).show()
                                     }
@@ -617,16 +527,10 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 enabled = !isLoading,
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = PaddingValues()
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize().background(if (isLoading) Color.Gray else MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    else Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
-                }
+                if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                else Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }
