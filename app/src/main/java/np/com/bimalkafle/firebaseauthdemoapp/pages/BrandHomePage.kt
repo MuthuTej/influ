@@ -101,7 +101,7 @@ fun BrandHomePage(
                 firebaseToken = result.token
                 firebaseToken?.let { token ->
                     brandViewModel.fetchCollaborations(token)
-                    brandViewModel.fetchInfluencers(token)
+                    brandViewModel.fetchHomeRecommendations(token)
                     brandViewModel.fetchBrandDetails(token)
                     notificationViewModel.fetchNotifications(currentUser.uid, token)
                 }
@@ -154,7 +154,7 @@ fun BrandHomePage(
                         firebaseToken = result.token
                         firebaseToken?.let { token ->
                             brandViewModel.fetchCollaborations(token, force = true)
-                            brandViewModel.fetchInfluencers(token, force = true)
+                            brandViewModel.fetchHomeRecommendations(token, force = true)
                             brandViewModel.fetchBrandDetails(token, force = true)
                             notificationViewModel.fetchNotifications(currentUser.uid, token, force = true)
                         }

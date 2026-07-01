@@ -32,7 +32,13 @@ data class InfluencerProfile(
     val website: String? = null,
     val languages: List<String>? = null,
     val recentPosts: List<RecentPost>? = null,
-    val aiInsights: AiInsights? = null
+    val aiInsights: AiInsights? = null,
+    // Computed by backend resolvers (engagementRate, tier, totalFollowers from
+    // contentAnalytics/platforms; collaborationCount from collaborations collection)
+    val engagementRate: Double? = null,
+    val collaborationCount: Int? = null,
+    val tier: String? = null,
+    val totalFollowers: Int? = null
 )
 
 data class RecentPost(

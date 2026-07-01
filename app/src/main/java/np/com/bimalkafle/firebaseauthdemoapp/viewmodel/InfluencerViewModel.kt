@@ -514,7 +514,20 @@ class InfluencerViewModel : ViewModel() {
                         postingFrequencyDays
                         totalPostsAnalyzed
                         updatedAt
+                        engagementRate
                       }
+                    }
+                    audienceInsights {
+                      topLocations { city country percentage }
+                      genderSplit { male female }
+                      ageGroups { range percentage }
+                    }
+                    recentPosts {
+                      id thumbnail caption likes comments views uploadDate url
+                    }
+                    aiInsights {
+                      primaryNiche secondaryNiche contentStyle tone audienceInterests
+                      topics brandSuitability strengths weaknesses professionalSummary aiSummary
                     }
                   }
                 }
@@ -777,7 +790,19 @@ class InfluencerViewModel : ViewModel() {
             languagesKnown = if (languagesList.isNotEmpty()) languagesList else null,
             categories = categoriesList,
             platforms = platformsList,
-            audienceInsights = null,
+            audienceInsights = obj.optJSONObject("audienceInsights")?.let { aiObj ->
+                val topLocations = (0 until (aiObj.optJSONArray("topLocations")?.length() ?: 0))
+                    .mapNotNull { i -> aiObj.optJSONArray("topLocations")?.optJSONObject(i)?.let { l ->
+                        LocationInsight(l.optString("city"), l.optString("country"), l.optDouble("percentage").toFloat())
+                    }}
+                val gsObj = aiObj.optJSONObject("genderSplit")
+                val genderSplit = gsObj?.let { GenderSplit(it.optDouble("male").toFloat(), it.optDouble("female").toFloat()) }
+                val ageGroups = (0 until (aiObj.optJSONArray("ageGroups")?.length() ?: 0))
+                    .mapNotNull { i -> aiObj.optJSONArray("ageGroups")?.optJSONObject(i)?.let { a ->
+                        AgeGroupInsight(a.optString("range"), a.optDouble("percentage").toFloat())
+                    }}
+                AudienceInsights(topLocations, genderSplit, ageGroups)
+            },
             strengths = strengthsList,
             pricing = pricingList,
             availability = if (obj.has("availability")) obj.optBoolean("availability") else null,
@@ -793,8 +818,37 @@ class InfluencerViewModel : ViewModel() {
             totalPosts = if (obj.has("totalPosts") && !obj.isNull("totalPosts")) obj.optInt("totalPosts") else null,
             website = obj.optString("website"),
             languages = languagesList,
-            recentPosts = recentPostsList,
-            aiInsights = aiInsights
+            recentPosts = obj.optJSONArray("recentPosts")?.let { arr ->
+                (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.let { p ->
+                    RecentPost(
+                        id = p.optString("id").takeIf { it.isNotBlank() },
+                        thumbnail = p.optString("thumbnail").takeIf { it.isNotBlank() },
+                        caption = p.optString("caption").takeIf { it.isNotBlank() },
+                        likes = if (p.has("likes") && !p.isNull("likes")) p.optInt("likes") else null,
+                        comments = if (p.has("comments") && !p.isNull("comments")) p.optInt("comments") else null,
+                        views = if (p.has("views") && !p.isNull("views")) p.optInt("views") else null,
+                        uploadDate = p.optString("uploadDate").takeIf { it.isNotBlank() },
+                        url = p.optString("url").takeIf { it.isNotBlank() }
+                    )
+                }}
+            },
+            aiInsights = obj.optJSONObject("aiInsights")?.let { ai ->
+                AiInsights(
+                    primaryNiche = ai.optString("primaryNiche").takeIf { it.isNotBlank() },
+                    secondaryNiche = ai.optString("secondaryNiche").takeIf { it.isNotBlank() },
+                    contentStyle = ai.optString("contentStyle").takeIf { it.isNotBlank() },
+                    tone = ai.optString("tone").takeIf { it.isNotBlank() },
+                    audienceInterests = ai.optJSONArray("audienceInterests")?.let { arr ->
+                        (0 until arr.length()).map { arr.getString(it) }
+                    },
+                    topics = ai.optJSONArray("topics")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } },
+                    brandSuitability = ai.optString("brandSuitability").takeIf { it.isNotBlank() },
+                    strengths = ai.optJSONArray("strengths")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } },
+                    weaknesses = ai.optJSONArray("weaknesses")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } },
+                    professionalSummary = ai.optString("professionalSummary").takeIf { it.isNotBlank() },
+                    aiSummary = ai.optString("aiSummary").takeIf { it.isNotBlank() }
+                )
+            }
         )
     }
 
