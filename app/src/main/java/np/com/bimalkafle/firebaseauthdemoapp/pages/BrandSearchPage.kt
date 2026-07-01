@@ -3,9 +3,11 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -61,6 +63,10 @@ fun BrandSearchPage(
     var selectedPlatforms by remember { mutableStateOf(setOf("All")) }
     var selectedCategories by remember { mutableStateOf(setOf("All")) }
     var selectedFollowerRanges by remember { mutableStateOf(setOf("All")) }
+    var selectedGenders by remember { mutableStateOf(setOf("All")) }
+    var selectedMotherTongues by remember { mutableStateOf(setOf("All")) }
+    var selectedLanguagesKnown by remember { mutableStateOf(setOf("All")) }
+    var selectedLocations by remember { mutableStateOf(setOf("All")) }
     var currentPage by remember { mutableIntStateOf(1) }
 
     val influencers by brandViewModel.influencers.observeAsState(initial = emptyList())
@@ -80,11 +86,16 @@ fun BrandSearchPage(
         }
     }
 
-    val filteredInfluencers = remember(searchQuery, selectedPlatforms, selectedCategories, selectedFollowerRanges, influencers) {
+    val filteredInfluencers = remember(
+        searchQuery, selectedPlatforms, selectedCategories, selectedFollowerRanges,
+        selectedGenders, selectedMotherTongues, selectedLanguagesKnown, selectedLocations,
+        influencers
+    ) {
         influencers.filter { influencer ->
             val matchesSearch = influencer.name.contains(searchQuery, ignoreCase = true) ||
                     influencer.bio?.contains(searchQuery, ignoreCase = true) == true ||
-                    influencer.categories?.any { it.category.contains(searchQuery, ignoreCase = true) } == true
+                    influencer.categories?.any { it.category.contains(searchQuery, ignoreCase = true) } == true ||
+                    influencer.location?.contains(searchQuery, ignoreCase = true) == true
 
             val matchesPlatform = selectedPlatforms.contains("All") ||
                     influencer.platforms?.any { plat -> 
@@ -110,7 +121,17 @@ fun BrandSearchPage(
                 } == true
             }
 
-            matchesSearch && matchesPlatform && matchesCategory && matchesFollowers
+            val matchesGender = selectedGenders.contains("All") || 
+                    selectedGenders.any { it.equals(influencer.gender, ignoreCase = true) }
+            val matchesMotherTongue = selectedMotherTongues.contains("All") || 
+                    selectedMotherTongues.any { it.equals(influencer.motherTongue, ignoreCase = true) }
+            val matchesLanguagesKnown = selectedLanguagesKnown.contains("All") || 
+                    influencer.languagesKnown?.any { lk -> selectedLanguagesKnown.any { sel -> sel.equals(lk, ignoreCase = true) } } == true
+            val matchesLocation = selectedLocations.contains("All") || 
+                    selectedLocations.any { it.equals(influencer.location, ignoreCase = true) }
+
+            matchesSearch && matchesPlatform && matchesCategory && matchesFollowers && 
+                    matchesGender && matchesMotherTongue && matchesLanguagesKnown && matchesLocation
         }
     }
 
@@ -152,6 +173,26 @@ fun BrandSearchPage(
             selectedFollowerRanges = toggleFilter(selectedFollowerRanges, it)
             currentPage = 1
         },
+        selectedGenders = selectedGenders,
+        onGenderToggle = {
+            selectedGenders = toggleFilter(selectedGenders, it)
+            currentPage = 1
+        },
+        selectedMotherTongues = selectedMotherTongues,
+        onMotherTongueToggle = {
+            selectedMotherTongues = toggleFilter(selectedMotherTongues, it)
+            currentPage = 1
+        },
+        selectedLanguagesKnown = selectedLanguagesKnown,
+        onLanguagesKnownToggle = {
+            selectedLanguagesKnown = toggleFilter(selectedLanguagesKnown, it)
+            currentPage = 1
+        },
+        selectedLocations = selectedLocations,
+        onLocationToggle = {
+            selectedLocations = toggleFilter(selectedLocations, it)
+            currentPage = 1
+        },
         filteredInfluencers = filteredInfluencers,
         allInfluencers = influencers,
         isLoading = isLoading,
@@ -182,6 +223,14 @@ fun BrandSearchPageContent(
     onCategoryToggle: (String) -> Unit,
     selectedFollowerRanges: Set<String>,
     onFollowerRangeToggle: (String) -> Unit,
+    selectedGenders: Set<String>,
+    onGenderToggle: (String) -> Unit,
+    selectedMotherTongues: Set<String>,
+    onMotherTongueToggle: (String) -> Unit,
+    selectedLanguagesKnown: Set<String>,
+    onLanguagesKnownToggle: (String) -> Unit,
+    selectedLocations: Set<String>,
+    onLocationToggle: (String) -> Unit,
     filteredInfluencers: List<InfluencerProfile>,
     allInfluencers: List<InfluencerProfile>,
     isLoading: Boolean,
@@ -209,7 +258,8 @@ fun BrandSearchPageContent(
             val cats = allInfluencers.flatMap { it.categories?.map { c -> c.category } ?: emptyList() }
                 .distinct()
                 .filter { it.contains(searchQuery, ignoreCase = true) }
-            (names + cats).distinct().take(5)
+            val locs = allInfluencers.mapNotNull { it.location }.filter { it.contains(searchQuery, ignoreCase = true) }
+            (names + cats + locs).distinct().take(5)
         }
     }
 
@@ -340,14 +390,22 @@ fun BrandSearchPageContent(
 
             // ---------------- FILTERS SECTION ----------------
             item {
-                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val categories = listOf("All", "Tech", "Fashion", "Food", "Lifestyle", "Beauty", "Sports")
-                        val categoryOptions = categories.map { cat -> cat to if (cat == "All") allInfluencers.size else allInfluencers.count { it.categories?.any { c -> c.category.equals(cat, ignoreCase = true) } == true } }
+                        val categoriesList = listOf(
+                            "All", "Agriculture", "Arts & Creativity", "Automotive", "Business & Entrepreneurship", 
+                            "Education", "Entertainment", "Fashion & Beauty", "Finance", "Fitness", "Food", 
+                            "Gaming", "Health & Wellness", "Lifestyle", "Music", "Parenting & Family", 
+                            "Spirituality & Religion", "Sports", "Technology", "Travel"
+                        )
+                        val categoryOptions = categoriesList.map { cat -> cat to if (cat == "All") allInfluencers.size else allInfluencers.count { it.categories?.any { c -> c.category.equals(cat, ignoreCase = true) } == true } }
 
                         val platformsList = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK")
                         val platformOptions = platformsList.map { plat -> plat to if (plat == "All") allInfluencers.size else allInfluencers.count { it.platforms?.any { p -> p.platform.equals(plat, ignoreCase = true) } == true } }
@@ -365,24 +423,59 @@ fun BrandSearchPageContent(
                             range to count
                         }
 
-                        FilterDropdown("Platform", selectedPlatforms, platformOptions, onPlatformToggle, Modifier.weight(1f))
-                        FilterDropdown("Category", selectedCategories, categoryOptions, onCategoryToggle, Modifier.weight(1f))
-                        FilterDropdown("Followers", selectedFollowerRanges, followerOptions, onFollowerRangeToggle, Modifier.weight(1f))
+                        val gendersList = listOf("All", "Male", "Female", "Other")
+                        val genderOptions = gendersList.map { g -> g to if (g == "All") allInfluencers.size else allInfluencers.count { it.gender.equals(g, ignoreCase = true) } }
+
+                        val languagesList = listOf(
+                            "All", "Assamese", "Bengali", "Bodo", "Dogri", "Gujarati", "Hindi", "Kannada", "Kashmiri", 
+                            "Konkani", "Maithili", "Malayalam", "Manipuri (Meitei)", "Marathi", "Nepali", "Odia", 
+                            "Punjabi", "Sanskrit", "Santali", "Sindhi", "Tamil", "Telugu", "Urdu"
+                        )
+                        val mtOptions = languagesList.map { l -> l to if (l == "All") allInfluencers.size else allInfluencers.count { it.motherTongue.equals(l, ignoreCase = true) } }
+                        val lkOptions = languagesList.map { l -> l to if (l == "All") allInfluencers.size else allInfluencers.count { it.languagesKnown?.any { lk -> lk.equals(l, ignoreCase = true) } == true } }
+
+                        val hardcodedLocations = listOf(
+                            "Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli", 
+                            "Tiruppur", "Erode", "Vellore", "Thoothukudi", "Dindigul", "Thanjavur", "Kanchipuram", 
+                            "Nagercoil", "Karur", "Cuddalore", "Hosur", "Nagapattinam", "Kumbakonam", "Sivakasi", 
+                            "Namakkal", "Dharmapuri", "Krishnagiri", "Villupuram", "Tenkasi", "Pudukkottai", 
+                            "Ramanathapuram", "Virudhunagar", "Ariyalur", "Perambalur", "Mayiladuthurai", 
+                            "Pollachi", "Mettur", "Udumalaipettai", "Ranipet", "Ambur", "Tiruvannamalai", 
+                            "Karaikudi", "Rajapalayam", "Bodinayakanur", "Coonoor", "Udhagamandalam (Ooty)", 
+                            "Valparai", "Chengalpattu", "Tiruvallur", "Kallakurichi"
+                        )
+                        val dbLocations = allInfluencers.mapNotNull { it.location }.filter { it.isNotBlank() }.distinct()
+                        val combinedLocations = (listOf("All") + hardcodedLocations + dbLocations).distinct()
+                        val locationOptions = combinedLocations.map { loc -> loc to if (loc == "All") allInfluencers.size else allInfluencers.count { it.location.equals(loc, ignoreCase = true) } }
+
+                        FilterDropdown("Category", selectedCategories, categoryOptions, onCategoryToggle, Modifier.width(120.dp), searchable = true)
+                        FilterDropdown("Platform", selectedPlatforms, platformOptions, onPlatformToggle, Modifier.width(110.dp), searchable = false)
+                        FilterDropdown("Followers", selectedFollowerRanges, followerOptions, onFollowerRangeToggle, Modifier.width(110.dp), searchable = true)
+                        FilterDropdown("Gender", selectedGenders, genderOptions, onGenderToggle, Modifier.width(100.dp), searchable = false)
+                        FilterDropdown("Mother Tongue", selectedMotherTongues, mtOptions, onMotherTongueToggle, Modifier.width(140.dp), searchable = true)
+                        FilterDropdown("Languages", selectedLanguagesKnown, lkOptions, onLanguagesKnownToggle, Modifier.width(120.dp), searchable = true)
+                        FilterDropdown("Location", selectedLocations, locationOptions, onLocationToggle, Modifier.width(120.dp), searchable = true)
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("${filteredInfluencers.size} Influencers Found", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
-                        if (!selectedPlatforms.contains("All") || !selectedCategories.contains("All") || !selectedFollowerRanges.contains("All") || searchQuery.isNotEmpty()) {
+                        if (!selectedPlatforms.contains("All") || !selectedCategories.contains("All") || !selectedFollowerRanges.contains("All") || 
+                            !selectedGenders.contains("All") || !selectedMotherTongues.contains("All") || !selectedLanguagesKnown.contains("All") || 
+                            !selectedLocations.contains("All") || searchQuery.isNotEmpty()) {
                             Text("Clear All", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
                                 onPlatformToggle("All")
                                 onCategoryToggle("All")
                                 onFollowerRangeToggle("All")
+                                onGenderToggle("All")
+                                onMotherTongueToggle("All")
+                                onLanguagesKnownToggle("All")
+                                onLocationToggle("All")
                                 onSearchQueryChange("")
                             })
                         }

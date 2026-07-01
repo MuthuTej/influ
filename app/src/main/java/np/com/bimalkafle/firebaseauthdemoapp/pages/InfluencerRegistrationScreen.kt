@@ -56,6 +56,9 @@ import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
 fun InfluencerRegistrationScreen(navController: NavController) {
     var name by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
+    var gender by remember { mutableStateOf("") }
+    var motherTongue by remember { mutableStateOf("") }
+    var languagesKnown by remember { mutableStateOf("") }
     var logoUrl by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -207,6 +210,33 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 trailingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = gender,
+                onValueChange = { gender = it },
+                label = { Text("Gender") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = motherTongue,
+                onValueChange = { motherTongue = it },
+                label = { Text("Mother Tongue") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = languagesKnown,
+                onValueChange = { languagesKnown = it },
+                label = { Text("Languages Known (comma separated)") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -463,6 +493,10 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                         put("name", name)
                                         put("bio", bio)
                                         put("location", location)
+                                        put("gender", gender)
+                                        put("motherTongue", motherTongue)
+                                        val langsArray = languagesKnown.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                        put("languagesKnown", JSONArray(langsArray))
                                         put("availability", true)
                                         put("logoUrl", logoUrl)
 
