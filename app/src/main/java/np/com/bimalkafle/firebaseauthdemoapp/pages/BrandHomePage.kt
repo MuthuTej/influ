@@ -17,6 +17,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.AppPullToRefreshBox
+import np.com.bimalkafle.firebaseauthdemoapp.components.HeroStatColumnData
+import np.com.bimalkafle.firebaseauthdemoapp.components.HomeHeroCard
+import np.com.bimalkafle.firebaseauthdemoapp.components.PerformanceStatsSection
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -38,10 +41,9 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
-import np.com.bimalkafle.firebaseauthdemoapp.utils.formatCompactCount
-import np.com.bimalkafle.firebaseauthdemoapp.utils.formatCompactCurrency
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.computeBrandHeroStats
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.computePerformanceStats
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 import java.time.Instant
 import java.time.LocalDateTime
@@ -171,6 +173,15 @@ fun BrandHomePage(
                         BrandHeaderAndReachSection(brandProfile, navController, unreadCount, heroStats)
                     }
                     item {
+                        val performanceStats = remember(collaborations) { computePerformanceStats(collaborations) }
+                        Spacer(modifier = Modifier.height(20.dp))
+                        PerformanceStatsSection(
+                            views = performanceStats.views,
+                            engagementRatePercent = performanceStats.engagementRatePercent,
+                            impressions = performanceStats.impressions
+                        )
+                    }
+                    item {
                         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
                             ActiveCampaignSection(
                                 collaborations = collaborations,
@@ -213,187 +224,35 @@ fun BrandHeaderAndReachSection(
     unreadCount: Int,
     heroStats: np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandHeroStats
 ) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-                .background(brandThemeColor)
-                .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.vector),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().alpha(0.15f),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 2.dp)
+    HomeHeroCard(
+        greetingName = brandProfile?.name ?: "Guest",
+        profileLogoUrl = brandProfile?.logoUrl,
+        unreadCount = unreadCount,
+        amountLabel = "Total Spend",
+        amount = heroStats.totalSpent,
+        trendPercent = heroStats.spendTrendPercent,
+        statColumns = listOf(
+            HeroStatColumnData("Pending", heroStats.pendingApplicationsCount.toString()),
+            HeroStatColumnData("Active", heroStats.activeCollaborationsCount.toString()),
+            HeroStatColumnData("Completed", heroStats.completedCount.toString())
+        ),
+        ctaLabel = "Find Influencer",
+        onCtaClick = { navController.navigate("brand_search") },
+        onHeartClick = { navController.navigate("brand_wishlist") },
+        onBellClick = { navController.navigate("notifications") },
+        leadingIcons = {
+            Surface(
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.22f),
+                modifier = Modifier.size(48.dp).clickable { navController.navigate("all_campaigns") }
             ) {
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(y = (-4).dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconBubble(Icons.Default.Campaign, Color(0xFF1877F2), contentDescription = "View all campaigns") { navController.navigate("all_campaigns") }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    IconBubble(Icons.Default.Favorite, Color(0xFFE1306C), contentDescription = "View wishlist") { navController.navigate("brand_wishlist") }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box {
-                        IconBubble(Icons.Default.Notifications, Color.Black, contentDescription = "View notifications") { navController.navigate("notifications") }
-                        if (unreadCount > 0) {
-                            Badge(
-                                modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
-                                containerColor = Color.Red,
-                                contentColor = Color.White
-                            ) {
-                                Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
-                            }
-                        }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .fillMaxWidth(0.65f)
-                        .padding(top = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.White,
-                        modifier = Modifier.size(50.dp)
-                    ) {
-                        if (!brandProfile?.logoUrl.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = brandProfile?.logoUrl,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Image(
-                                painter = painterResource(id = R.drawable.brand_profile),
-                                contentDescription = null,
-                                modifier = Modifier.padding(8.dp).clip(CircleShape)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text("Hello!", fontSize = 13.sp, color = Color.White.copy(alpha = 0.9f))
-                        Text(
-                            brandProfile?.name ?: "Guest",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Campaign, contentDescription = "View all campaigns", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
-
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth(0.87f)
-                        .padding(bottom = 18.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
-                ) {
-                    Box(modifier = Modifier.background(brush = Brush.verticalGradient(listOf(Color(0xFFFFAFBD), brandThemeColor)))) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 22.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text("Total Reach Delivered", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                            Text(formatCompactCount(heroStats.totalReachDelivered), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            if (heroStats.reachGrowth > 0) {
-                                Text(
-                                    "+${formatCompactCount(heroStats.reachGrowth)} since posting",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White.copy(alpha = 0.85f)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                BrandStatChip("Pending", heroStats.pendingApplicationsCount.toString(), Modifier.weight(0.8f))
-                                BrandStatChip("Active", heroStats.activeCollaborationsCount.toString(), Modifier.weight(0.8f))
-                                BrandStatChip("Spent", formatCompactCurrency(heroStats.totalSpent), Modifier.weight(0.8f))
-                            }
-                        }
-                    }
-                }
-
-                Button(
-                    onClick = { navController.navigate("brand_search") },
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
-                    modifier = Modifier
-                        .fillMaxWidth(0.55f)
-                        .height(38.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
-                ) {
-                    Text("Find Influencer", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.width(8.dp))
         }
-    }
-}
-
-@Composable
-fun IconBubble(icon: ImageVector, tint: Color, contentDescription: String? = null, onClick: () -> Unit = {}) {
-    Surface(
-        shape = CircleShape,
-        color = Color.White.copy(alpha = 0.2f),
-        modifier = Modifier.size(40.dp).clickable { onClick() }
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(20.dp))
-        }
-    }
-}
-
-@Composable
-fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = modifier.aspectRatio(1.4f)
-    ) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(text = label, color = Color.Gray, fontSize = 7.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                Spacer(modifier = Modifier.height(1.dp))
-                Text(text = value, color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-            }
-        }
-    }
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

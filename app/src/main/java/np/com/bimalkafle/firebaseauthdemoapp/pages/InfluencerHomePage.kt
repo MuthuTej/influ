@@ -16,6 +16,9 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.AppPullToRefreshBox
+import np.com.bimalkafle.firebaseauthdemoapp.components.HeroStatColumnData
+import np.com.bimalkafle.firebaseauthdemoapp.components.HomeHeroCard
+import np.com.bimalkafle.firebaseauthdemoapp.components.PerformanceStatsSection
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -51,10 +54,9 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
-import np.com.bimalkafle.firebaseauthdemoapp.utils.formatCompactCount
-import np.com.bimalkafle.firebaseauthdemoapp.utils.formatCompactCurrency
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.computeInfluencerHeroStats
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.computePerformanceStats
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 import java.time.Instant
 import java.time.LocalDateTime
@@ -205,6 +207,16 @@ fun InfluencerHomePage(
                     item {
                         val heroStats = remember(collaborations) { computeInfluencerHeroStats(collaborations) }
                         InfluencerHeaderAndReachSection(influencerProfile, navController, unreadCount, heroStats)
+                    }
+
+                    item {
+                        val performanceStats = remember(collaborations) { computePerformanceStats(collaborations) }
+                        Spacer(modifier = Modifier.height(20.dp))
+                        PerformanceStatsSection(
+                            views = performanceStats.views,
+                            engagementRatePercent = performanceStats.engagementRatePercent,
+                            impressions = performanceStats.impressions
+                        )
                     }
 
                     // Checklist item for debugging - Controlled by showDebugInfo
@@ -407,210 +419,23 @@ fun InfluencerHeaderAndReachSection(
     unreadCount: Int,
     heroStats: np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerHeroStats
 ) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        // Pink background area
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(260.dp)
-                .background(brandThemeColor)
-                .clip(RoundedCornerShape(bottomStart = 50.dp, bottomEnd = 50.dp))
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.vector),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().alpha(0.15f),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        // Content Column
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top Row: Profile + Hello + Icons
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 12.dp)
-            ) {
-                // Icons pinned to TopEnd and moved up
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(y = (-4).dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconBubbleInfluencer(
-                        icon = Icons.Default.Favorite,
-                        tint = instagramColor,
-                        contentDescription = "View wishlist",
-                        onClick = { navController.navigate("wishlist") }
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Box {
-                        IconBubbleInfluencer(
-                            icon = Icons.Default.Notifications,
-                            tint = Color.Black,
-                            contentDescription = "View notifications",
-                            onClick = { navController.navigate("notifications") }
-                        )
-                        if (unreadCount > 0) {
-                            Badge(
-                                modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
-                                containerColor = Color.Red,
-                                contentColor = Color.White
-                            ) {
-                                Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
-                            }
-                        }
-                    }
-                }
-
-                // Profile and Welcome Text
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .fillMaxWidth(0.65f)
-                        .padding(top = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.White,
-                        modifier = Modifier.size(54.dp),
-                        shadowElevation = 4.dp
-                    ) {
-                        if (!influencerProfile?.logoUrl.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = influencerProfile?.logoUrl,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Image(
-                                painter = painterResource(id = R.drawable.brand_profile),
-                                contentDescription = null,
-                                modifier = Modifier.padding(6.dp).clip(CircleShape)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column {
-                        Text("Hello!", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
-                        Text(
-                            influencerProfile?.name ?: "Guest",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 2,
-                            lineHeight = 22.sp,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-
-            // Earnings Box: Attached to the header row with a little gap
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 27.dp),
-                    shape = RoundedCornerShape(30.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 15.dp)
-                ) {
-                    Box(
-                        modifier = Modifier.background(
-                            brush = Brush.verticalGradient(listOf(Color(0xFFFFAFBD), brandThemeColor))
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text("Total Earnings", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                            Text(formatCompactCurrency(heroStats.totalEarnings), fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                InfluencerStatChip("Awaiting", heroStats.awaitingResponseCount.toString(), Modifier.weight(1f))
-                                InfluencerStatChip("Active", heroStats.activeCollaborationsCount.toString(), Modifier.weight(1f))
-                                InfluencerStatChip("Views Generated", formatCompactCount(heroStats.totalViewsGenerated), Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-
-                // Find Campaigns Button attached to the bottom
-                Button(
-                    onClick = { navController.navigate("influencer_search") },
-                    shape = RoundedCornerShape(30.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
-                    modifier = Modifier
-                        .fillMaxWidth(0.7f)
-                        .height(54.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 10.dp)
-                ) {
-                    Text("Find Campaigns", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
-}
-
-@Composable
-private fun IconBubbleInfluencer(icon: ImageVector, tint: Color, contentDescription: String? = null, onClick: () -> Unit = {}) {
-    Surface(
-        shape = CircleShape,
-        color = Color.White.copy(alpha = 0.2f),
-        modifier = Modifier
-            .size(42.dp)
-            .clickable { onClick() }
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(20.dp))
-        }
-    }
-}
-
-@Composable
-private fun InfluencerStatChip(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(
-        shape = RoundedCornerShape(26.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        modifier = modifier.aspectRatio(1f)
-    ) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 4.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(text = label, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(text = value, color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-            }
-        }
-    }
+    HomeHeroCard(
+        greetingName = influencerProfile?.name ?: "Guest",
+        profileLogoUrl = influencerProfile?.logoUrl,
+        unreadCount = unreadCount,
+        amountLabel = "Total Earnings",
+        amount = heroStats.totalEarnings,
+        trendPercent = heroStats.earningsTrendPercent,
+        statColumns = listOf(
+            HeroStatColumnData("Awaiting", heroStats.awaitingResponseCount.toString()),
+            HeroStatColumnData("Active", heroStats.activeCollaborationsCount.toString()),
+            HeroStatColumnData("Completed", heroStats.completedCount.toString())
+        ),
+        ctaLabel = "Find Campaigns",
+        onCtaClick = { navController.navigate("influencer_search") },
+        onHeartClick = { navController.navigate("wishlist") },
+        onBellClick = { navController.navigate("notifications") }
+    )
 }
 
 @Composable
