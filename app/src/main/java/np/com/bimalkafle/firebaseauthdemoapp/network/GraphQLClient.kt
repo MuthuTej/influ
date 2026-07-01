@@ -48,7 +48,7 @@ object GraphQLClient {
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("Connection", "close") // Try disabling keep-alive to avoid stale connections
+            connection.setRequestProperty("Connection", "close")
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
             
@@ -93,12 +93,22 @@ object GraphQLClient {
                     return Result.failure(ServerException(responseCode, "HTTP Error: $responseCode - $response"))
                 }
 
-                return try {
-                    Result.success(JSONObject(response.toString()))
+                val jsonResponse = try {
+                    JSONObject(response.toString())
                 } catch (e: org.json.JSONException) {
                     Log.e("GraphQLClient", "Malformed JSON response: $response", e)
-                    Result.failure(MalformedResponseException("Server returned an unreadable response", e))
+                    return Result.failure(MalformedResponseException("Server returned an unreadable response", e))
                 }
+
+                // Check for GraphQL errors even if HTTP status is 200
+                val errors = jsonResponse.optJSONArray("errors")
+                if (errors != null && errors.length() > 0) {
+                    val firstErrorMessage = errors.optJSONObject(0)?.optString("message") ?: "Unknown GraphQL Error"
+                    Log.e("GraphQLClient", "GraphQL Errors: $response")
+                    return Result.failure(Exception(firstErrorMessage))
+                }
+
+                return Result.success(jsonResponse)
             } else {
                 return Result.failure(ServerException(responseCode, "HTTP Error: $responseCode (No error body)"))
             }
