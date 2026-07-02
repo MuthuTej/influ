@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,7 +16,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,10 +37,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.delay
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SearchFilters
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SearchMeta
 import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.BrandCardBrand
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
@@ -76,22 +79,16 @@ fun BrandSearchPage(
     
     var currentPage by remember { mutableIntStateOf(1) }
 
-    val influencers by brandViewModel.influencers.observeAsState(initial = emptyList())
+    val searchResults by brandViewModel.searchResults.observeAsState(initial = emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
+    val isLoadingMore by brandViewModel.loadingMore.observeAsState(initial = false)
+    val searchMeta by brandViewModel.searchMeta.observeAsState(initial = SearchMeta())
     val wishlistedInfluencers by brandViewModel.wishlistedInfluencers.observeAsState(initial = emptyList())
-    var firebaseToken by remember { mutableStateOf<String?>(null) }
     val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
 
-    LaunchedEffect(Unit) {
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-            firebaseToken = result.token
-            if (firebaseToken != null) {
-                brandViewModel.fetchInfluencers(firebaseToken!!)
-                notificationViewModel.fetchUnreadCount(currentUser.uid, firebaseToken!!)
-            }
-        }
-    }
+    var firebaseToken by remember { mutableStateOf<String?>(null) }
+    var isSearchFocused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
     // Helper functions for matching
     fun isAudienceGenderMatch(influencer: InfluencerProfile, selGender: String): Boolean {
@@ -142,18 +139,14 @@ fun BrandSearchPage(
                         selectedCategories.any { sel -> cat.category.equals(sel, ignoreCase = true) || cat.subCategories.any { sub -> sub.equals(sel, ignoreCase = true) } } 
                     } == true
 
-            val matchesFollowers = if (selectedFollowerRanges.contains("All")) true else {
-                influencer.platforms?.any { plat ->
-                    selectedFollowerRanges.any { range ->
-                        when (range) {
-                            "0-10K" -> (plat.followers ?: 0) < 10000
-                            "10K-100K" -> (plat.followers ?: 0) in 10000..100000
-                            "100K-1M" -> (plat.followers ?: 0) in 100000..1000000
-                            "1M+" -> (plat.followers ?: 0) > 1000000
-                            else -> false
-                        }
-                    }
-                } == true
+    // Fetch token on launch + fetch wishlist + initial search
+    LaunchedEffect(Unit) {
+        val user = FirebaseAuth.getInstance().currentUser
+        user?.getIdToken(true)?.addOnSuccessListener { result ->
+            firebaseToken = result.token
+            result.token?.let { tok ->
+                brandViewModel.fetchWishlist(tok)
+                notificationViewModel.fetchUnreadCount(user.uid, tok)
             }
 
             val matchesGender = selectedGenders.contains("All") || 
@@ -175,19 +168,23 @@ fun BrandSearchPage(
         }
     }
 
-    fun toggleFilter(currentSet: Set<String>, option: String): Set<String> {
-        return if (option == "All") {
-            setOf("All")
-        } else {
-            val next = currentSet.toMutableSet()
-            next.remove("All")
-            if (next.contains(option)) {
-                next.remove(option)
-                if (next.isEmpty()) setOf("All") else next
-            } else {
-                next.add(option)
-                next
-            }
+    // Trigger a fresh page-0 search whenever token becomes available or filters change.
+    // 300ms debounce only for text changes to avoid firing per-keystroke.
+    LaunchedEffect(firebaseToken, currentFilters) {
+        val tok = firebaseToken ?: return@LaunchedEffect
+        if (currentFilters.query.isNotBlank()) delay(300L)
+        brandViewModel.searchInfluencers(tok, currentFilters, 0, false)
+    }
+
+    // Suggestions for the search autocomplete popup
+    val suggestions = remember(searchQuery, searchResults) {
+        if (searchQuery.length < 2) emptyList()
+        else {
+            val names = searchResults.map { it.name }.filter { it.contains(searchQuery, ignoreCase = true) }
+            val cats = searchResults.flatMap { it.categories?.map { c -> c.category } ?: emptyList() }
+                .distinct().filter { it.contains(searchQuery, ignoreCase = true) }
+            val locs = searchResults.mapNotNull { it.location }.filter { it.contains(searchQuery, ignoreCase = true) }
+            (names + cats + locs).distinct().take(5)
         }
     }
 
@@ -268,8 +265,6 @@ fun BrandSearchPage(
                 brandViewModel.toggleWishlist(influencer, token)
             }
         }
-    )
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -322,15 +317,19 @@ fun BrandSearchPageContent(
     val focusManager = LocalFocusManager.current
     var isSearchFocused by remember { mutableStateOf(false) }
 
-    val suggestions = remember(searchQuery, allInfluencers) {
-        if (searchQuery.length < 2) emptyList()
-        else {
-            val names = allInfluencers.map { it.name }.filter { it.contains(searchQuery, ignoreCase = true) }
-            val cats = allInfluencers.flatMap { it.categories?.map { c -> c.category } ?: emptyList() }
-                .distinct()
-                .filter { it.contains(searchQuery, ignoreCase = true) }
-            val locs = allInfluencers.mapNotNull { it.location }.filter { it.contains(searchQuery, ignoreCase = true) }
-            (names + cats + locs).distinct().take(5)
+    // Infinite scroll: load next page when near the bottom
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            val total = listState.layoutInfo.totalItemsCount
+            lastVisible >= total - 3 && total > 0 && searchMeta.hasMore && !isLoadingMore && !isLoading
+        }
+    }
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) {
+            firebaseToken?.let { tok ->
+                brandViewModel.searchInfluencers(tok, currentFilters, searchMeta.page + 1, true)
+            }
         }
     }
 
@@ -338,7 +337,7 @@ fun BrandSearchPageContent(
         bottomBar = {
             CmnBottomNavigationBar(
                 selectedItem = "Search",
-                onItemSelected = { /* Handled in component */ },
+                onItemSelected = { },
                 navController = navController,
                 isBrand = true
             )
@@ -346,13 +345,14 @@ fun BrandSearchPageContent(
         floatingActionButton = { AiChatFab(navController) }
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = modifier
                 .fillMaxSize()
                 .padding(bottom = padding.calculateBottomPadding())
                 .background(Color(0xFFF8F9FE)),
             contentPadding = PaddingValues(bottom = 8.dp)
         ) {
-            // ---------------- REFINED HEADER ----------------
+            // Header
             item {
                 Box(
                     modifier = Modifier
@@ -367,7 +367,6 @@ fun BrandSearchPageContent(
                         modifier = Modifier.matchParentSize().alpha(0.2f),
                         contentScale = ContentScale.Crop
                     )
-
                     Column(
                         modifier = Modifier
                             .statusBarsPadding()
@@ -382,40 +381,40 @@ fun BrandSearchPageContent(
                             Surface(
                                 shape = CircleShape,
                                 color = Color.White.copy(alpha = 0.2f),
-                                modifier = Modifier.size(40.dp).clickable { onBackClick() }
+                                modifier = Modifier.size(40.dp).clickable { navController.popBackStack() }
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(24.dp))
                                 }
                             }
-
                             Row {
                                 IconBubbleSearch(Icons.Default.Favorite, Color.Red, contentDescription = "View wishlist") { navController.navigate("brand_wishlist") }
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Box {
-                                    IconBubbleSearch(Icons.Default.Notifications, Color.Black, contentDescription = "View notifications") { navController.navigate("notifications") }
+                                    IconBubbleSearch(Icons.Default.Notifications, Color.Black, contentDescription = "Notifications") { navController.navigate("notifications") }
                                     if (unreadCount > 0) {
                                         Badge(
                                             modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
                                             containerColor = Color.Red,
                                             contentColor = Color.White
-                                        ) {
-                                            Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp)
-                                        }
+                                        ) { Text(if (unreadCount > 9) "9+" else unreadCount.toString(), fontSize = 10.sp) }
                                     }
                                 }
                             }
                         }
-
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Discover", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                        Text("Find influencers for your campaign", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            "Find influencers for your campaign",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                         Spacer(modifier = Modifier.height(10.dp))
-
                         Box {
                             BasicTextField(
                                 value = searchQuery,
-                                onValueChange = onSearchQueryChange,
+                                onValueChange = { searchQuery = it },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(44.dp)
@@ -428,29 +427,21 @@ fun BrandSearchPageContent(
                                 keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                                 decorationBox = { innerTextField ->
                                     Row(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(horizontal = 16.dp),
+                                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                                            if (searchQuery.isEmpty()) {
-                                                Text("Search influencers...", color = Color.Gray, fontSize = 14.sp)
-                                            }
+                                            if (searchQuery.isEmpty()) Text("Search influencers...", color = Color.Gray, fontSize = 14.sp)
                                             innerTextField()
                                         }
                                     }
                                 }
                             )
-
                             SearchSuggestionsPopup(
                                 suggestions = suggestions,
-                                onSuggestionClick = { 
-                                    onSearchQueryChange(it)
-                                    focusManager.clearFocus()
-                                },
+                                onSuggestionClick = { searchQuery = it; focusManager.clearFocus() },
                                 isVisible = isSearchFocused && suggestions.isNotEmpty(),
                                 modifier = Modifier.padding(top = 48.dp)
                             )
@@ -459,7 +450,7 @@ fun BrandSearchPageContent(
                 }
             }
 
-            // ---------------- FILTERS SECTION ----------------
+            // Filters
             item {
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Row(
@@ -484,21 +475,7 @@ fun BrandSearchPageContent(
                         }
 
                         val platformsList = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK")
-                        val platformOptions = platformsList.map { plat -> plat to if (plat == "All") allInfluencers.size else allInfluencers.count { it.platforms?.any { p -> p.platform.equals(plat, ignoreCase = true) } == true } }
-
                         val followerRanges = listOf("All", "0-10K", "10K-100K", "100K-1M", "1M+")
-                        val followerOptions = followerRanges.map { range ->
-                            val count = when (range) {
-                                "All" -> allInfluencers.size
-                                "0-10K" -> allInfluencers.count { inf -> inf.platforms?.any { (it.followers ?: 0) < 10000 } == true }
-                                "10K-100K" -> allInfluencers.count { inf -> inf.platforms?.any { (it.followers ?: 0) in 10000..100000 } == true }
-                                "100K-1M" -> allInfluencers.count { inf -> inf.platforms?.any { (it.followers ?: 0) in 100000..1000000 } == true }
-                                "1M+" -> allInfluencers.count { inf -> inf.platforms?.any { (it.followers ?: 0) > 1000000 } == true }
-                                else -> 0
-                            }
-                            range to count
-                        }
-
                         val gendersList = listOf("All", "Male", "Female", "Other")
                         val genderOptions = gendersList.map { g -> g to if (g == "All") allInfluencers.size else allInfluencers.count { it.gender.equals(g, ignoreCase = true) } }
 
@@ -555,9 +532,7 @@ fun BrandSearchPageContent(
                             modifier = Modifier.width(120.dp)
                         )
                     }
-
                     Spacer(modifier = Modifier.height(10.dp))
-
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -586,55 +561,51 @@ fun BrandSearchPageContent(
                 }
             }
 
-            // ---------------- RESULTS SECTION ----------------
-            if (isLoading) {
+            // Results
+            if (isLoading && searchResults.isEmpty()) {
                 items(4) {
-                    SkeletonCard(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), height = 120.dp)
+                    SkeletonCard(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), height = 160.dp)
                 }
-            } else if (filteredInfluencers.isEmpty()) {
+            } else if (searchResults.isEmpty() && !isLoading) {
                 item {
                     EmptyState(
                         icon = Icons.Default.SearchOff,
                         title = "No influencers found",
-                        subtitle = "Try adjusting your filters."
+                        subtitle = "Try adjusting your filters or search terms."
                     )
                 }
             } else {
-                items(paginatedInfluencers) { influencer ->
+                items(searchResults, key = { it.id }) { influencer ->
                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                         BrandCardBrand(
                             influencer = influencer,
                             isWishlisted = wishlistedInfluencers.any { it.id == influencer.id },
-                            onWishlistToggle = { onWishlistToggle(influencer) },
+                            onWishlistToggle = {
+                                firebaseToken?.let { tok -> brandViewModel.toggleWishlist(influencer, tok) }
+                            },
                             modifier = Modifier.fillMaxWidth(),
-                            onCardClick = { onInfluencerClick(influencer.id) },
-                            selectedPlatform = if (selectedPlatforms.contains("All")) null else selectedPlatforms.firstOrNull { it != "All" }
+                            onCardClick = { navController.navigate("brand_influencer_detail/${influencer.id}") },
+                            selectedPlatform = if (selectedPlatforms.contains("All")) null
+                                              else selectedPlatforms.firstOrNull { it != "All" }
                         )
                     }
                 }
 
-                if (totalPages > 1) {
+                // Loading-more indicator at the bottom
+                if (isLoadingMore) {
                     item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = { if (currentPage > 1) onPageChange(currentPage - 1) },
-                                enabled = currentPage > 1,
-                                modifier = Modifier.size(36.dp)
-                            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous") }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("$currentPage / $totalPages", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            IconButton(
-                                onClick = { if (currentPage < totalPages) onPageChange(currentPage + 1) },
-                                enabled = currentPage < totalPages,
-                                modifier = Modifier.size(36.dp)
-                            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next") }
+                        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    }
+                } else if (!searchMeta.hasMore && searchResults.isNotEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                            Text("All ${searchMeta.total} influencers loaded", fontSize = 12.sp, color = Color.Gray)
                         }
                     }
                 }

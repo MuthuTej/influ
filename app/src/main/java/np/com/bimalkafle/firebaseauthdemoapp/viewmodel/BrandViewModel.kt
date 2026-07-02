@@ -6,6 +6,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
@@ -20,6 +21,18 @@ class BrandViewModel : ViewModel() {
 
     private val _influencers = MutableLiveData<List<InfluencerProfile>>()
     val influencers: LiveData<List<InfluencerProfile>> = _influencers
+
+    // Separate LiveData for the search page — server-ranked+paginated results
+    // from searchInfluencers, so home-page recommendation data in _influencers
+    // is never overwritten by a partial page.
+    private val _searchResults = MutableLiveData<List<InfluencerProfile>>(emptyList())
+    val searchResults: LiveData<List<InfluencerProfile>> = _searchResults
+
+    private val _searchMeta = MutableLiveData(SearchMeta())
+    val searchMeta: LiveData<SearchMeta> = _searchMeta
+
+    private val _loadingMore = MutableLiveData(false)
+    val loadingMore: LiveData<Boolean> = _loadingMore
 
     private val _overallTopInfluencers = MutableLiveData<List<InfluencerProfile>>()
     val overallTopInfluencers: LiveData<List<InfluencerProfile>> = _overallTopInfluencers
@@ -79,6 +92,53 @@ class BrandViewModel : ViewModel() {
             }.onFailure {
                 Log.e("BrandViewModel", "Failed to fetch recommendations", it)
             }
+        }
+    }
+
+    fun fetchHomeRecommendations(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("homeRecs", force)) return
+        _loading.value = true
+        viewModelScope.launch {
+            launch { fetchWishlist(token) }
+            val allDef   = async { runHomeSearchQuery(token, null) }
+            val ytDef    = async { runHomeSearchQuery(token, "YOUTUBE") }
+            val igDef    = async { runHomeSearchQuery(token, "INSTAGRAM") }
+            _overallTopInfluencers.postValue(allDef.await())
+            _youtubeTopInfluencers.postValue(ytDef.await())
+            _instagramTopInfluencers.postValue(igDef.await())
+            _loading.postValue(false)
+        }
+    }
+
+    private suspend fun runHomeSearchQuery(token: String, platform: String?): List<InfluencerProfile> {
+        val filterArg = if (platform != null) "filters: { platforms: [\"$platform\"] }, " else ""
+        val query = """
+            query HomeRecs {
+              searchInfluencers(${filterArg}page: 0, limit: 10) {
+                influencers {
+                  id email name bio location gender availability logoUrl isVerified averageRating
+                  tier totalFollowers engagementRate collaborationCount
+                  categories { category subCategories }
+                  platforms { platform profileUrl followers avgViews engagement formats connected }
+                  strengths
+                  instagramMetrics { avgLikes avgComments avgViews engagementRate }
+                  aiInsights { primaryNiche brandSuitability }
+                }
+                total page hasMore
+              }
+            }
+        """.trimIndent()
+        return try {
+            val result = GraphQLClient.query(query = query, token = token)
+            result.getOrNull()
+                ?.optJSONObject("data")
+                ?.optJSONObject("searchInfluencers")
+                ?.optJSONArray("influencers")
+                ?.let { parseInfluencers(it) }
+                ?: emptyList()
+        } catch (e: Exception) {
+            Log.e("BrandViewModel", "homeSearch error", e)
+            emptyList()
         }
     }
 
@@ -399,6 +459,40 @@ class BrandViewModel : ViewModel() {
             youtubeInsights = youtubeInsights,
             instagramMetrics = instagramMetrics,
             instagramProfiles = instagramProfiles
+            engagementRate = if (obj.has("engagementRate") && !obj.isNull("engagementRate")) obj.optDouble("engagementRate") else null,
+            collaborationCount = if (obj.has("collaborationCount") && !obj.isNull("collaborationCount")) obj.optInt("collaborationCount") else null,
+            tier = obj.optString("tier").takeIf { it.isNotBlank() },
+            totalFollowers = if (obj.has("totalFollowers") && !obj.isNull("totalFollowers")) obj.optInt("totalFollowers") else null,
+            instagramMetrics = obj.optJSONObject("instagramMetrics")?.let { im ->
+                InstagramMetrics(
+                    avgLikes = if (im.has("avgLikes") && !im.isNull("avgLikes")) im.optDouble("avgLikes").toFloat() else null,
+                    avgComments = if (im.has("avgComments") && !im.isNull("avgComments")) im.optDouble("avgComments").toFloat() else null,
+                    avgViews = if (im.has("avgViews") && !im.isNull("avgViews")) im.optDouble("avgViews").toFloat() else null,
+                    postingFrequencyDays = if (im.has("postingFrequencyDays") && !im.isNull("postingFrequencyDays")) im.optDouble("postingFrequencyDays").toFloat() else null,
+                    totalPostsAnalyzed = if (im.has("totalPostsAnalyzed") && !im.isNull("totalPostsAnalyzed")) im.optInt("totalPostsAnalyzed") else null,
+                    updatedAt = im.optString("updatedAt").takeIf { it.isNotBlank() },
+                    engagementRate = if (im.has("engagementRate") && !im.isNull("engagementRate")) im.optDouble("engagementRate").toFloat() else null
+                )
+            },
+            aiInsights = obj.optJSONObject("aiInsights")?.let { ai ->
+                AiInsights(
+                    primaryNiche = ai.optString("primaryNiche").takeIf { it.isNotBlank() },
+                    secondaryNiche = ai.optString("secondaryNiche").takeIf { it.isNotBlank() },
+                    contentStyle = ai.optString("contentStyle").takeIf { it.isNotBlank() },
+                    tone = ai.optString("tone").takeIf { it.isNotBlank() },
+                    audienceInterests = ai.optJSONArray("audienceInterests")?.let { arr ->
+                        (0 until arr.length()).map { arr.getString(it) }
+                    },
+                    topics = null,
+                    brandSuitability = ai.optString("brandSuitability").takeIf { it.isNotBlank() },
+                    strengths = ai.optJSONArray("strengths")?.let { arr ->
+                        (0 until arr.length()).map { arr.getString(it) }
+                    },
+                    weaknesses = null,
+                    professionalSummary = ai.optString("professionalSummary").takeIf { it.isNotBlank() },
+                    aiSummary = ai.optString("aiSummary").takeIf { it.isNotBlank() }
+                )
+            }
         )
     }
 
@@ -637,8 +731,14 @@ class BrandViewModel : ViewModel() {
                     yt {
                       videoId
                       title
+                      authorName
+                      channelUrl
+                      description
+                      duration
+                      publishedAt
                       viewCount
                       likeCount
+                      commentCount
                       thumbnail
                       videoUrl
                       fetchedAt
@@ -662,6 +762,14 @@ class BrandViewModel : ViewModel() {
                       timestamp
                       fetchedAt
                     }
+                    performanceMilestones {
+                      label
+                      hoursAfterPost
+                      views
+                      likes
+                      comments
+                      capturedAt
+                    }
                     totalViewsDelivered
                     viewsGrowthSincePosting
                     selectedInstagramProfileId
@@ -679,8 +787,12 @@ class BrandViewModel : ViewModel() {
                         _collaborations.postValue(list)
                     }
                 } catch (e: Exception) {
-                    Log.e("BrandViewModel", "Parsing error", e)
+                    Log.e("BrandViewModel", "fetchCollaborations parse error", e)
+                    _error.postValue("Failed to load collaborations: ${e.message}")
                 }
+            }.onFailure { err ->
+                Log.e("BrandViewModel", "fetchCollaborations network error", err)
+                _error.postValue(err.message)
             }
             _loading.postValue(false)
         }
@@ -822,12 +934,37 @@ class BrandViewModel : ViewModel() {
                         YouTubeVideoData(
                             videoId = ytObj.optString("videoId"),
                             title = ytObj.optString("title"),
+                            authorName = if (ytObj.isNull("authorName")) null else ytObj.optString("authorName"),
+                            channelUrl = if (ytObj.isNull("channelUrl")) null else ytObj.optString("channelUrl"),
+                            description = if (ytObj.isNull("description")) null else ytObj.optString("description"),
+                            duration = if (ytObj.isNull("duration")) null else ytObj.optString("duration"),
+                            publishedAt = if (ytObj.isNull("publishedAt")) null else ytObj.optString("publishedAt"),
                             viewCount = if (ytObj.isNull("viewCount")) null else ytObj.optString("viewCount"),
                             likeCount = if (ytObj.isNull("likeCount")) null else ytObj.optString("likeCount"),
+                            commentCount = if (ytObj.isNull("commentCount")) null else ytObj.optString("commentCount"),
                             thumbnail = if (ytObj.isNull("thumbnail")) null else ytObj.optString("thumbnail"),
                             analytics = ytAnalytics,
                             videoUrl = if (ytObj.isNull("videoUrl")) null else ytObj.optString("videoUrl"),
                             fetchedAt = if (ytObj.isNull("fetchedAt")) null else ytObj.optString("fetchedAt")
+                        )
+                    )
+                }
+            }
+
+            // Parse performanceMilestones
+            val milestoneList = mutableListOf<PerformanceMilestone>()
+            val milestonesArray = obj.optJSONArray("performanceMilestones")
+            if (milestonesArray != null) {
+                for (j in 0 until milestonesArray.length()) {
+                    val m = milestonesArray.optJSONObject(j) ?: continue
+                    milestoneList.add(
+                        PerformanceMilestone(
+                            label = m.optString("label"),
+                            hoursAfterPost = m.optInt("hoursAfterPost"),
+                            views = if (m.isNull("views")) null else m.optInt("views"),
+                            likes = if (m.isNull("likes")) null else m.optInt("likes"),
+                            comments = if (m.isNull("comments")) null else m.optInt("comments"),
+                            capturedAt = if (m.isNull("capturedAt")) null else m.optString("capturedAt")
                         )
                     )
                 }
@@ -854,6 +991,9 @@ class BrandViewModel : ViewModel() {
                 }
             }
 
+            val performanceTargets = parsePerformanceTargets(obj.optJSONObject("performanceTargets"))
+            val performanceTracking = parsePerformanceTracking(obj.optJSONObject("performanceTracking"))
+
             list.add(
                 Collaboration(
                     id = obj.optString("id"),
@@ -878,13 +1018,94 @@ class BrandViewModel : ViewModel() {
                     platformAnalytics = if (platformAnalyticsList.isEmpty()) null else platformAnalyticsList,
                     yt = if (ytList.isEmpty()) null else ytList,
                     ig = if (igList.isEmpty()) null else igList,
+                    performanceMilestones = if (milestoneList.isEmpty()) null else milestoneList,
                     totalViewsDelivered = if (obj.isNull("totalViewsDelivered")) null else obj.optInt("totalViewsDelivered"),
                     viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting"),
-                    selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() }
+                    selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() },
+                    performanceTargets = performanceTargets,
+                    performanceTracking = performanceTracking
                 )
             )
         }
         return list
+    }
+
+    private fun parsePerformanceTargets(obj: JSONObject?): PerformanceTargets? {
+        if (obj == null) return null
+        fun d(key: String): Double? = if (obj.isNull(key)) null else obj.optDouble(key)
+        return PerformanceTargets(
+            targetViews = d("targetViews"),
+            targetReach = d("targetReach"),
+            targetEngagementRate = d("targetEngagementRate"),
+            targetLikes = d("targetLikes"),
+            targetComments = d("targetComments"),
+            targetShares = d("targetShares"),
+            targetSaves = d("targetSaves"),
+            setAt = if (obj.isNull("setAt")) null else obj.optString("setAt"),
+            setBy = if (obj.isNull("setBy")) null else obj.optString("setBy")
+        )
+    }
+
+    private fun parseActualMetrics(obj: JSONObject?): ActualMetrics? {
+        if (obj == null) return null
+        fun d(key: String): Double? = if (obj.isNull(key)) null else obj.optDouble(key)
+        return ActualMetrics(
+            views = d("views"),
+            reach = d("reach"),
+            engagementRate = d("engagementRate"),
+            likes = d("likes"),
+            comments = d("comments"),
+            shares = d("shares"),
+            saves = d("saves")
+        )
+    }
+
+    private fun parsePerformanceTracking(obj: JSONObject?): PerformanceTracking? {
+        if (obj == null) return null
+
+        val achievements = mutableListOf<PerformanceAchievement>()
+        val achievementsArray = obj.optJSONArray("achievements")
+        if (achievementsArray != null) {
+            for (j in 0 until achievementsArray.length()) {
+                val aObj = achievementsArray.optJSONObject(j) ?: continue
+                achievements.add(
+                    PerformanceAchievement(
+                        metric = aObj.optString("metric"),
+                        target = aObj.optDouble("target"),
+                        actual = if (aObj.isNull("actual")) null else aObj.optDouble("actual"),
+                        achievedPercent = if (aObj.isNull("achievedPercent")) null else aObj.optDouble("achievedPercent"),
+                        status = aObj.optString("status"),
+                        tracked = aObj.optBoolean("tracked")
+                    )
+                )
+            }
+        }
+
+        val history = mutableListOf<PerformanceSnapshot>()
+        val historyArray = obj.optJSONArray("history")
+        if (historyArray != null) {
+            for (j in 0 until historyArray.length()) {
+                val hObj = historyArray.optJSONObject(j) ?: continue
+                history.add(
+                    PerformanceSnapshot(
+                        capturedAt = hObj.optString("capturedAt"),
+                        actual = parseActualMetrics(hObj.optJSONObject("actual")),
+                        targets = null,
+                        performanceScore = if (hObj.isNull("performanceScore")) null else hObj.optDouble("performanceScore"),
+                        campaignOutcome = if (hObj.isNull("campaignOutcome")) null else hObj.optString("campaignOutcome"),
+                        isFinal = if (hObj.isNull("isFinal")) null else hObj.optBoolean("isFinal")
+                    )
+                )
+            }
+        }
+
+        return PerformanceTracking(
+            achievements = achievements,
+            overallAchievedPercent = if (obj.isNull("overallAchievedPercent")) null else obj.optDouble("overallAchievedPercent"),
+            performanceScore = if (obj.isNull("performanceScore")) null else obj.optDouble("performanceScore"),
+            campaignOutcome = if (obj.isNull("campaignOutcome")) null else obj.optString("campaignOutcome"),
+            history = history
+        )
     }
 
     fun fetchWishlist(token: String, force: Boolean = false) {
@@ -1160,6 +1381,63 @@ class BrandViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Brand-only: sets/updates the internal performance targets for a collaboration
+     * (setCollaborationTargets mutation, src/graphql/modules/collaboration/index.js).
+     * Suspends and returns the Result directly (rather than fire-and-forget +
+     * LiveData) so the calling dialog can show its own saving/error state without
+     * a round trip through a shared LiveData — re-saving the same outcome twice in
+     * a row wouldn't reliably re-trigger a LiveData-observing composable since
+     * Compose skips state updates for structurally-equal values. Re-fetches
+     * collaborations on success so performanceTargets/performanceTracking reflect
+     * the change immediately.
+     */
+    suspend fun setCollaborationTargets(
+        collaborationId: String,
+        targetViews: Double?,
+        targetReach: Double?,
+        targetEngagementRate: Double?,
+        targetLikes: Double?,
+        targetComments: Double?,
+        targetShares: Double?,
+        targetSaves: Double?,
+        token: String
+    ): Result<Unit> {
+        val mutation = """
+            mutation SetCollaborationTargets(${'$'}collaborationId: ID!, ${'$'}targets: PerformanceTargetsInput!) {
+              setCollaborationTargets(collaborationId: ${'$'}collaborationId, targets: ${'$'}targets) {
+                id
+              }
+            }
+        """.trimIndent()
+
+        val targets = mutableMapOf<String, Any?>()
+        targetViews?.let { targets["targetViews"] = it }
+        targetReach?.let { targets["targetReach"] = it }
+        targetEngagementRate?.let { targets["targetEngagementRate"] = it }
+        targetLikes?.let { targets["targetLikes"] = it }
+        targetComments?.let { targets["targetComments"] = it }
+        targetShares?.let { targets["targetShares"] = it }
+        targetSaves?.let { targets["targetSaves"] = it }
+
+        val variables = mapOf(
+            "collaborationId" to collaborationId,
+            "targets" to targets
+        )
+
+        val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+        return result.fold(
+            onSuccess = {
+                fetchCollaborations(token, force = true)
+                Result.success(Unit)
+            },
+            onFailure = {
+                Log.e("BrandViewModel", "Error setting collaboration targets", it)
+                Result.failure(it)
+            }
+        )
+    }
+
     fun updateBrandProfile(
         token: String,
         name: String,
@@ -1311,4 +1589,111 @@ class BrandViewModel : ViewModel() {
             .document(collaborationId)
             .set(mapOf("status" to status, "lastUpdated" to System.currentTimeMillis(), "updatedBy" to uid))
     }
+
+    fun searchInfluencers(
+        token: String,
+        filters: SearchFilters = SearchFilters(),
+        page: Int = 0,
+        append: Boolean = false
+    ) {
+        if (append) _loadingMore.value = true
+        else { _loading.value = true; _error.value = null }
+
+        viewModelScope.launch {
+            val filtersArg = buildFiltersArg(filters)
+            val filtersParam = if (filtersArg.isEmpty()) "" else "filters: $filtersArg, "
+            val query = """
+                query SearchInfluencers {
+                  searchInfluencers(${filtersParam}page: $page, limit: 10) {
+                    influencers {
+                      id email name bio location gender motherTongue languagesKnown
+                      availability logoUrl isVerified averageRating
+                      tier totalFollowers engagementRate collaborationCount
+                      categories { category subCategories }
+                      platforms { platform profileUrl followers avgViews engagement formats connected }
+                      strengths
+                      audienceInsights {
+                        topLocations { city country percentage }
+                        genderSplit { male female }
+                        ageGroups { range percentage }
+                      }
+                      instagramMetrics {
+                        avgLikes avgComments avgViews postingFrequencyDays totalPostsAnalyzed engagementRate
+                      }
+                      aiInsights {
+                        primaryNiche secondaryNiche brandSuitability strengths weaknesses
+                        contentStyle tone audienceInterests topics professionalSummary aiSummary
+                      }
+                    }
+                    total page hasMore
+                  }
+                }
+            """.trimIndent()
+
+            val result = GraphQLClient.query(query = query, token = token)
+            result.onSuccess { jsonObject ->
+                try {
+                    val payload = jsonObject.optJSONObject("data")?.optJSONObject("searchInfluencers")
+                    if (payload != null) {
+                        val arr = payload.optJSONArray("influencers")
+                        val newList = if (arr != null) parseInfluencers(arr) else emptyList()
+                        if (append) {
+                            _searchResults.postValue((_searchResults.value ?: emptyList()) + newList)
+                        } else {
+                            _searchResults.postValue(newList)
+                        }
+                        _searchMeta.postValue(
+                            SearchMeta(
+                                total = payload.optInt("total"),
+                                page = payload.optInt("page"),
+                                hasMore = payload.optBoolean("hasMore")
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("BrandViewModel", "searchInfluencers parse error", e)
+                }
+            }.onFailure { _error.postValue(it.message) }
+
+            if (append) _loadingMore.postValue(false)
+            else _loading.postValue(false)
+        }
+    }
+
+    private fun buildFiltersArg(f: SearchFilters): String {
+        val parts = mutableListOf<String>()
+        if (f.query.isNotBlank()) parts.add("query: \"${f.query.replace("\"", "\\\"")}\"")
+        val platforms = f.platforms.filter { it != "All" }
+        if (platforms.isNotEmpty()) parts.add("platforms: [${platforms.joinToString(",") { "\"$it\"" }}]")
+        val categories = f.categories.filter { it != "All" }
+        if (categories.isNotEmpty()) parts.add("categories: [${categories.joinToString(",") { "\"$it\"" }}]")
+        val followerRanges = f.followerRange.filter { it != "All" }
+        if (followerRanges.isNotEmpty()) parts.add("followerRanges: [${followerRanges.joinToString(",") { "\"$it\"" }}]")
+        val genders = f.gender.filter { it != "All" }
+        if (genders.isNotEmpty()) parts.add("genders: [${genders.joinToString(",") { "\"$it\"" }}]")
+        val motherTongues = f.motherTongue.filter { it != "All" }
+        if (motherTongues.isNotEmpty()) parts.add("motherTongues: [${motherTongues.joinToString(",") { "\"$it\"" }}]")
+        val langs = f.languagesKnown.filter { it != "All" }
+        if (langs.isNotEmpty()) parts.add("languagesKnown: [${langs.joinToString(",") { "\"$it\"" }}]")
+        val locations = f.location.filter { it != "All" }
+        if (locations.isNotEmpty()) parts.add("locations: [${locations.joinToString(",") { "\"$it\"" }}]")
+        return if (parts.isEmpty()) "" else "{ ${parts.joinToString(", ")} }"
+    }
 }
+
+data class SearchFilters(
+    val query: String = "",
+    val platforms: Set<String> = setOf("All"),
+    val categories: Set<String> = setOf("All"),
+    val followerRange: Set<String> = setOf("All"),
+    val gender: Set<String> = setOf("All"),
+    val motherTongue: Set<String> = setOf("All"),
+    val languagesKnown: Set<String> = setOf("All"),
+    val location: Set<String> = setOf("All")
+)
+
+data class SearchMeta(
+    val total: Int = 0,
+    val page: Int = 0,
+    val hasMore: Boolean = false
+)

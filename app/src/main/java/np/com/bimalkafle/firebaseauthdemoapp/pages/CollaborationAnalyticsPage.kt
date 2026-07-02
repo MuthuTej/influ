@@ -3,13 +3,22 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,7 +27,6 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -27,21 +35,32 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
+import np.com.bimalkafle.firebaseauthdemoapp.AuthState
+import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.model.CollaborationAnalytics
 import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramPostData
+import np.com.bimalkafle.firebaseauthdemoapp.model.PerformanceAchievement
+import np.com.bimalkafle.firebaseauthdemoapp.model.PerformanceMilestone
+import np.com.bimalkafle.firebaseauthdemoapp.model.PerformanceSnapshot
+import np.com.bimalkafle.firebaseauthdemoapp.model.PerformanceTracking
 import np.com.bimalkafle.firebaseauthdemoapp.model.YouTubeVideoData
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
@@ -57,11 +76,24 @@ fun CollaborationAnalyticsPage(
     navController: NavController,
     collaborationId: String,
     brandViewModel: BrandViewModel,
-    influencerViewModel: InfluencerViewModel? = null
+    influencerViewModel: InfluencerViewModel? = null,
+    authViewModel: AuthViewModel? = null
 ) {
     val brandCollaborations by brandViewModel.collaborations.observeAsState(emptyList())
     val influencerCollaborations by (influencerViewModel?.collaborations?.observeAsState(emptyList()) ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) })
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
+
+    // Campaign targets are brand-only: the backend never returns
+    // performanceTargets/performanceTracking for an influencer-authenticated
+    // request, but the UI must also avoid even attempting to render that
+    // section when this screen is opened from the influencer side.
+    // influencerViewModel is a shared singleton passed to every route regardless
+    // of the logged-in role (see MyAppNavigation.kt), so it's always non-null —
+    // it can't be used as the role signal. authState.role (the same source
+    // HomePage.kt uses to pick Brand/Influencer home screens) is the real one.
+    val authState by (authViewModel?.authState?.observeAsState() ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) })
+    val isBrandView = (authState as? AuthState.Authenticated)?.role == "BRAND"
+    var showTargetsDialog by remember { mutableStateOf(false) }
 
     // Prefer the collaboration from whichever ViewModel already has analytics data.
     // The influencer VM may already have it loaded (from ProposalPage) with yt/ig
@@ -158,6 +190,15 @@ fun CollaborationAnalyticsPage(
                 item {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         InfluencerProfileCard(collaboration)
+                    }
+                }
+
+                if (isBrandView) {
+                    item {
+                        BrandTargetsSection(
+                            collaboration = collaboration,
+                            onSetTargets = { showTargetsDialog = true }
+                        )
                     }
                 }
 
@@ -301,6 +342,17 @@ fun CollaborationAnalyticsPage(
                         }
                     }
 
+                    // Performance Timeline (milestones)
+                    if (!collaboration.performanceMilestones.isNullOrEmpty()) {
+                        item {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                SectionTitle("PERFORMANCE TIMELINE")
+                                Spacer(modifier = Modifier.height(8.dp))
+                                PerformanceTimelineCard(collaboration.performanceMilestones)
+                            }
+                        }
+                    }
+
                     // Instagram Post Analytics Section
                     if (collaboration.ig != null && collaboration.ig.isNotEmpty()) {
                         item {
@@ -339,11 +391,30 @@ fun CollaborationAnalyticsPage(
                 }
             }
         }
+
+        if (isBrandView && showTargetsDialog && collaboration != null) {
+            SetTargetsDialog(
+                collaboration = collaboration,
+                brandViewModel = brandViewModel,
+                onDismiss = { showTargetsDialog = false }
+            )
+        }
     }
 }
 
 @Composable
 fun InstagramPostCard(post: InstagramPostData) {
+    val context = LocalContext.current
+    val igColor = Color(0xFFC13584)
+    val caption = post.caption ?: ""
+    val hashtags = remember(caption) {
+        Regex("#\\w+").findAll(caption).map { it.value }.toList()
+    }
+    val captionWithoutTags = remember(caption) {
+        caption.replace(Regex("#\\w+"), "").trim()
+    }
+    val postDate = post.timestamp?.split("T")?.get(0) ?: "N/A"
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -351,151 +422,408 @@ fun InstagramPostCard(post: InstagramPostData) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // Header row: thumbnail + metadata
             Row(verticalAlignment = Alignment.Top) {
-                // Post Media/Thumbnail
-                AsyncImage(
-                    model = post.mediaUrl,
-                    contentDescription = "Instagram Post",
-                    modifier = Modifier
-                        .size(width = 100.dp, height = 100.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop,
-                    error = painterResource(id = R.drawable.instagram_logo)
-                )
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                Column {
-                    Text(
-                        text = post.caption ?: "No caption",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        color = Color.Black
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Posted on: ${post.timestamp?.split("T")?.get(0) ?: "N/A"}",
-                        fontSize = 12.sp,
-                        color = textGray
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = softGray)
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Metrics
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                VideoStatItem("Likes", String.format("%,d", post.likeCount ?: 0))
-                VideoStatItem("Comments", String.format("%,d", post.commentCount ?: 0))
-                VideoStatItem("Views", String.format("%,d", post.viewCount ?: 0))
-            }
-        }
-    }
-}
-
-@Composable
-fun YouTubeVideoCard(video: YouTubeVideoData) {
-    val context = LocalContext.current
-    val videoUrl = video.videoUrl?.takeIf { it.isNotBlank() }
-        ?: video.videoId?.let { "https://www.youtube.com/watch?v=$it" }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (videoUrl != null) Modifier.clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl)))
-                } else Modifier
-            ),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                // Video Thumbnail — play icon overlay signals it's tappable
                 Box {
                     AsyncImage(
-                        model = video.thumbnail,
-                        contentDescription = video.title,
+                        model = post.mediaUrl,
+                        contentDescription = "Instagram Post",
                         modifier = Modifier
-                            .size(width = 120.dp, height = 68.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
+                            .size(90.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(id = R.drawable.instagram_logo)
                     )
-                    if (videoUrl != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(width = 120.dp, height = 68.dp)
-                                .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayCircle,
-                                contentDescription = "Play",
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
+                    Surface(
+                        color = igColor,
+                        shape = RoundedCornerShape(bottomEnd = 8.dp),
+                        modifier = Modifier.align(Alignment.TopStart)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.padding(4.dp).size(12.dp)
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
+                    // Content type badge
+                    ContentTypeBadge(
+                        label = "Instagram Post",
+                        color = igColor
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = video.title,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        maxLines = 2,
+                        text = captionWithoutTags.ifBlank { "No caption" },
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                         color = Color.Black
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Views: ${video.viewCount ?: video.analytics?.views?.toString() ?: "—"}",
-                        fontSize = 12.sp,
+                        text = "Posted $postDate",
+                        fontSize = 11.sp,
                         color = textGray
                     )
-                    if (videoUrl != null) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Tap to watch",
-                            fontSize = 11.sp,
-                            color = Color(0xFFFF0000)
-                        )
+                }
+            }
+
+            // Hashtags row
+            if (hashtags.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    hashtags.take(6).forEach { tag ->
+                        HashtagChip(tag, igColor)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             HorizontalDivider(color = softGray)
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Detailed Analytics
-            val analytics = video.analytics
-            if (analytics != null) {
-                // Likes has a reliable public-stats source (video.likeCount) that works
-                // for any video; the Analytics API equivalent only returns real numbers
-                // if the connected YouTube channel actually owns this video, and
-                // otherwise reports a real (non-null) zero that would silently mask the
-                // public number if checked first. Comments/Shares have no Android-side
-                // public fallback wired through yet — see backend TODO on commentCount.
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    VideoStatItem("Likes", video.likeCount ?: analytics.likes?.toString() ?: "0")
-                    VideoStatItem("Comments", analytics.comments?.toString() ?: "0")
-                    VideoStatItem("Shares", analytics.shares?.toString() ?: "0")
-                }
+            // Metrics
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                VideoStatItem("Likes", String.format("%,d", post.likeCount ?: 0))
+                VideoStatItem("Comments", String.format("%,d", post.commentCount ?: 0))
+                VideoStatItem("Views", String.format("%,d", post.viewCount ?: 0))
+            }
+
+            // Open on Instagram button
+            if (!post.postId.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    val watchTime = analytics.watchTimeMinutes ?: 0.0
-                    VideoStatItem("Watch Time", if (watchTime >= 1000) "${(watchTime / 60).toInt()}h" else "${watchTime.toInt()}m")
-                    VideoStatItem("Subs Gained", analytics.subscribersGained?.toString() ?: "0")
-                    VideoStatItem("Engagement", analytics.engagementRate ?: "0%")
+                OutlinedButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse("https://www.instagram.com/p/${post.postId}/"))
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = igColor)
+                ) {
+                    Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Open on Instagram", fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+
+private fun parseDuration(iso: String?): String? {
+    iso ?: return null
+    val hours = Regex("(\\d+)H").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+    val mins  = Regex("(\\d+)M").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+    val secs  = Regex("(\\d+)S").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+    return if (hours > 0) "%d:%02d:%02d".format(hours, mins, secs)
+           else "%d:%02d".format(mins, secs)
+}
+
+private fun formatCount(raw: String?): String {
+    val n = raw?.toLongOrNull() ?: return raw ?: "—"
+    return when {
+        n >= 1_000_000 -> "%.1fM".format(n / 1_000_000.0)
+        n >= 1_000     -> "%.1fK".format(n / 1_000.0)
+        else           -> n.toString()
+    }
+}
+
+private fun formatDate(iso: String?): String {
+    iso ?: return "N/A"
+    return iso.split("T").firstOrNull() ?: iso
+}
+
+@Composable
+fun YouTubeVideoCard(video: YouTubeVideoData) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val ytRed = Color(0xFFFF0000)
+
+    val isShort = video.duration?.let {
+        val mins = Regex("(\\d+)M").find(it)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        val hrs  = Regex("(\\d+)H").find(it)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        hrs == 0 && mins < 1
+    } ?: false
+
+    val contentTypeLabel = if (isShort) "YouTube Short" else "YouTube Video"
+    val durationStr = parseDuration(video.duration)
+
+    var playerVisible by remember { mutableStateOf(false) }
+    var playerReady   by remember { mutableStateOf(false) }
+    var playerError   by remember { mutableStateOf(false) }
+    var descExpanded  by remember { mutableStateOf(false) }
+
+    val videoUrl = video.videoUrl?.takeIf { it.isNotBlank() }
+        ?: "https://www.youtube.com/watch?v=${video.videoId}"
+
+    val playerViewRef = remember { mutableStateOf<YouTubePlayerView?>(null) }
+    DisposableEffect(lifecycleOwner) {
+        onDispose {
+            playerViewRef.value?.let { view ->
+                lifecycleOwner.lifecycle.removeObserver(view)
+                view.release()
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            // ── Video area: thumbnail → WebView player on tap ──
+            if (video.videoId.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                ) {
+                    when {
+                        playerError -> {
+                            // Video embedding is disabled by owner — offer YouTube app fallback
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Text(
+                                        "Embedding disabled for this video",
+                                        color = Color.White.copy(alpha = 0.8f),
+                                        fontSize = 12.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Button(
+                                        onClick = {
+                                            val uri = Uri.parse("https://www.youtube.com/watch?v=${video.videoId}")
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ytRed),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Open in YouTube", color = Color.White, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+                        }
+                        playerVisible -> {
+                            // Player + optional loading overlay
+                            AndroidView(
+                                factory = { ctx ->
+                                    YouTubePlayerView(ctx).also { view ->
+                                        playerViewRef.value = view
+                                        lifecycleOwner.lifecycle.addObserver(view)
+                                        view.addYouTubePlayerListener(object : AbstractYouTubePlayerListener() {
+                                            override fun onReady(youTubePlayer: YouTubePlayer) {
+                                                playerReady = true
+                                                youTubePlayer.loadVideo(video.videoId, 0f)
+                                            }
+                                            override fun onError(youTubePlayer: YouTubePlayer, error: PlayerConstants.PlayerError) {
+                                                playerError = true
+                                            }
+                                        })
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            if (!playerReady) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize().background(Color.Black),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(color = ytRed, strokeWidth = 3.dp)
+                                }
+                            }
+                        }
+                        else -> {
+                            // Thumbnail with play button overlay
+                            AsyncImage(
+                                model = video.thumbnail
+                                    ?: "https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg",
+                                contentDescription = video.title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.3f))
+                                    .clickable { playerVisible = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = ytRed,
+                                    modifier = Modifier.size(56.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.PlayArrow,
+                                        contentDescription = "Play",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(12.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Column(modifier = Modifier.padding(16.dp)) {
+                // Badges: content type + duration
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ContentTypeBadge(contentTypeLabel, ytRed)
+                    if (durationStr != null) {
+                        Surface(color = Color.Black, shape = RoundedCornerShape(4.dp)) {
+                            Text(
+                                durationStr,
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Title
+                Text(
+                    text = video.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = Color.Black,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // Channel + publish date
+                if (!video.authorName.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = textGray,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(video.authorName, fontSize = 12.sp, color = textGray)
+                        if (!video.publishedAt.isNullOrBlank()) {
+                            Text(
+                                "  ·  ${formatDate(video.publishedAt)}",
+                                fontSize = 12.sp,
+                                color = textGray
+                            )
+                        }
+                    }
+                }
+
+                // Collapsible description
+                if (!video.description.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = video.description,
+                        fontSize = 12.sp,
+                        color = textGray,
+                        fontStyle = FontStyle.Italic,
+                        maxLines = if (descExpanded) Int.MAX_VALUE else 2,
+                        overflow = if (descExpanded) TextOverflow.Clip else TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .animateContentSize()
+                            .clickable { descExpanded = !descExpanded }
+                    )
+                    Text(
+                        text = if (descExpanded) "Show less" else "Show more",
+                        fontSize = 11.sp,
+                        color = ytRed,
+                        modifier = Modifier.clickable { descExpanded = !descExpanded }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = softGray)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Public metrics
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    VideoStatItem("Views",    formatCount(video.viewCount ?: video.analytics?.views?.toString()))
+                    VideoStatItem("Likes",    formatCount(video.likeCount ?: video.analytics?.likes?.toString()))
+                    VideoStatItem("Comments", formatCount(video.commentCount ?: video.analytics?.comments?.toString()))
+                }
+
+                // Private channel analytics (YouTube Analytics API)
+                val analytics = video.analytics
+                if (analytics != null && (analytics.watchTimeMinutes != null || analytics.engagementRate != null)) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = softGray)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val watchTime = analytics.watchTimeMinutes ?: 0.0
+                        VideoStatItem(
+                            "Watch Time",
+                            if (watchTime >= 1000) "${(watchTime / 60).toInt()}h" else "${watchTime.toInt()}m"
+                        )
+                        VideoStatItem("Subs Gained", analytics.subscribersGained?.toString() ?: "—")
+                        VideoStatItem("Engagement",  analytics.engagementRate ?: "—")
+                    }
+                }
+
+                // Watch on YouTube button
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl)))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ytRed)
+                ) {
+                    Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Watch on YouTube", fontSize = 13.sp)
                 }
             }
         }
@@ -910,5 +1238,474 @@ fun getPlatformIcon(platform: String?): ImageVector {
         "youtube" -> Icons.Default.PlayCircle
         "facebook" -> Icons.Default.Facebook
         else -> Icons.Default.Language
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Campaign Target Tracking — brand-only. Shown independent of the COMPLETED-
+// gated analytics sections above, since brands should be able to set and
+// monitor targets throughout the live collaboration, not just afterwards.
+// ---------------------------------------------------------------------------
+
+@Composable
+fun BrandTargetsSection(collaboration: Collaboration, onSetTargets: () -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        SectionTitle("CAMPAIGN TARGETS")
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val targets = collaboration.performanceTargets
+        val tracking = collaboration.performanceTracking
+
+        if (targets == null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.GpsFixed,
+                        contentDescription = null,
+                        tint = themeColor_campaign.copy(alpha = 0.5f),
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "No targets set for this collaboration yet",
+                        color = textGray,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onSetTargets,
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColor_campaign)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Set Targets")
+                    }
+                }
+            }
+        } else {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onSetTargets) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp), tint = themeColor_campaign)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Edit Targets", color = themeColor_campaign, fontSize = 13.sp)
+                }
+            }
+
+            if (tracking != null) {
+                PerformanceScoreCard(tracking)
+                Spacer(modifier = Modifier.height(16.dp))
+                TargetAchievementCard(tracking)
+                if (tracking.history.size >= 2) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    PerformanceTrendCard(tracking.history)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PerformanceScoreCard(tracking: PerformanceTracking) {
+    val score = tracking.performanceScore
+    val outcomeColor = when (tracking.campaignOutcome) {
+        "EXCEEDED" -> Color(0xFF2E7D32)
+        "MET" -> Color(0xFF388E3C)
+        "PARTIAL" -> Color(0xFFFFA000)
+        "MISSED" -> Color(0xFFD32F2F)
+        else -> themeColor_campaign
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(outcomeColor)
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "PERFORMANCE SCORE",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    score?.let { "${it.toInt()}/100" } ?: "—",
+                    color = Color.White,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Black
+                )
+                if (tracking.campaignOutcome != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        tracking.campaignOutcome.replace("_", " "),
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            tracking.overallAchievedPercent?.let { pct ->
+                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(56.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("${pct.toInt()}%", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TargetAchievementCard(tracking: PerformanceTracking) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("Target vs Actual", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(16.dp))
+            tracking.achievements.forEachIndexed { index, achievement ->
+                AchievementRow(achievement)
+                if (index != tracking.achievements.lastIndex) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AchievementRow(achievement: PerformanceAchievement) {
+    val statusColor = when (achievement.status) {
+        "ON_TRACK" -> Color(0xFF4CAF50)
+        "AT_RISK" -> Color(0xFFFFA000)
+        "BEHIND" -> Color(0xFFD32F2F)
+        else -> Color.LightGray
+    }
+    val label = achievement.metric.replaceFirstChar { it.uppercase() }
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, color = textGray, fontSize = 13.sp)
+            if (!achievement.tracked) {
+                Text("Not tracked yet", color = Color.LightGray, fontSize = 12.sp, fontStyle = FontStyle.Italic)
+            } else {
+                Text(
+                    "${formatMetricValue(achievement.actual)} / ${formatMetricValue(achievement.target)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = Color.Black
+                )
+            }
+        }
+        if (achievement.tracked && achievement.achievedPercent != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { (achievement.achievedPercent / 100f).toFloat().coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
+                color = statusColor,
+                trackColor = statusColor.copy(alpha = 0.15f)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                "${achievement.achievedPercent.toInt()}% achieved",
+                color = statusColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+fun formatMetricValue(value: Double?): String {
+    if (value == null) return "—"
+    return if (value % 1.0 == 0.0) String.format("%,d", value.toLong()) else String.format("%.1f", value)
+}
+
+private fun formatTargetForInput(value: Double?): String {
+    if (value == null) return ""
+    return if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+}
+
+@Composable
+fun PerformanceTrendCard(history: List<PerformanceSnapshot>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("Performance Score Trend", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val points = history.mapIndexedNotNull { index, snapshot ->
+                snapshot.performanceScore?.let { Point(index.toFloat(), it.toFloat()) }
+            }
+
+            if (points.size >= 2) {
+                Box(modifier = Modifier.height(120.dp).fillMaxWidth()) {
+                    LineChart(
+                        modifier = Modifier.fillMaxSize(),
+                        data = points,
+                        lineColor = themeColor_campaign,
+                        yMaxOverride = 100f
+                    )
+                }
+            } else {
+                Text("Not enough history yet to show a trend", color = textGray, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun SetTargetsDialog(
+    collaboration: Collaboration,
+    brandViewModel: BrandViewModel,
+    onDismiss: () -> Unit
+) {
+    val existing = collaboration.performanceTargets
+    var views by remember { mutableStateOf(formatTargetForInput(existing?.targetViews)) }
+    var reach by remember { mutableStateOf(formatTargetForInput(existing?.targetReach)) }
+    var engagementRate by remember { mutableStateOf(formatTargetForInput(existing?.targetEngagementRate)) }
+    var likes by remember { mutableStateOf(formatTargetForInput(existing?.targetLikes)) }
+    var comments by remember { mutableStateOf(formatTargetForInput(existing?.targetComments)) }
+    var shares by remember { mutableStateOf(formatTargetForInput(existing?.targetShares)) }
+    var saves by remember { mutableStateOf(formatTargetForInput(existing?.targetSaves)) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Set Performance Targets", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "Visible only to you — never shown to the influencer.",
+                    color = textGray,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                TargetField("Target Views", views) { views = it }
+                TargetField("Target Reach", reach) { reach = it }
+                TargetField("Target Engagement Rate (%)", engagementRate) { engagementRate = it }
+                TargetField("Target Likes", likes) { likes = it }
+                TargetField("Target Comments", comments) { comments = it }
+                TargetField("Target Shares", shares) { shares = it }
+                TargetField("Target Saves", saves) { saves = it }
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(error ?: "", color = Color.Red, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !saving,
+                onClick = {
+                    val fields = listOf(views, reach, engagementRate, likes, comments, shares, saves)
+                    if (fields.all { it.isBlank() }) {
+                        error = "Set at least one target"
+                        return@Button
+                    }
+                    error = null
+                    saving = true
+                    FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { tokenResult ->
+                        val token = tokenResult.token
+                        if (token == null) {
+                            saving = false
+                            error = "Could not authenticate. Please try again."
+                            return@addOnSuccessListener
+                        }
+                        scope.launch {
+                            val result = brandViewModel.setCollaborationTargets(
+                                collaborationId = collaboration.id,
+                                targetViews = views.toDoubleOrNull(),
+                                targetReach = reach.toDoubleOrNull(),
+                                targetEngagementRate = engagementRate.toDoubleOrNull(),
+                                targetLikes = likes.toDoubleOrNull(),
+                                targetComments = comments.toDoubleOrNull(),
+                                targetShares = shares.toDoubleOrNull(),
+                                targetSaves = saves.toDoubleOrNull(),
+                                token = token
+                            )
+                            saving = false
+                            if (result.isSuccess) {
+                                onDismiss()
+                            } else {
+                                error = "Failed to save targets. Please try again."
+                            }
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = themeColor_campaign)
+            ) {
+                if (saving) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("Save")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { if (!saving) onDismiss() }) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun TargetField(label: String, value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { new -> if (new.isEmpty() || new.matches(Regex("^\\d*\\.?\\d*$"))) onValueChange(new) },
+        label = { Text(label, fontSize = 13.sp) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        singleLine = true
+    )
+}
+
+@Composable
+fun ContentTypeBadge(label: String, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.1f),
+        shape = RoundedCornerShape(4.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f))
+    ) {
+        Text(
+            text = label.uppercase(),
+            color = color,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.5.sp,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+        )
+    }
+}
+
+@Composable
+fun HashtagChip(tag: String, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Text(
+            text = tag,
+            fontSize = 11.sp,
+            color = color,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+fun PerformanceTimelineCard(milestones: List<PerformanceMilestone>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Growth over time", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            milestones.forEachIndexed { idx, m ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    // Timeline spine
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.width(32.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(10.dp)
+                        ) {}
+                        if (idx < milestones.lastIndex) {
+                            Box(
+                                modifier = Modifier
+                                    .width(2.dp)
+                                    .height(48.dp)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            m.label.ifBlank { "${m.hoursAfterPost}h after post" },
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = Color.Black
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            if (m.views != null) {
+                                Text(
+                                    "${String.format("%,d", m.views)} views",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF4285F4)
+                                )
+                            }
+                            if (m.likes != null) {
+                                Text(
+                                    "${String.format("%,d", m.likes)} likes",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFFF5252)
+                                )
+                            }
+                            if (m.comments != null) {
+                                Text(
+                                    "${String.format("%,d", m.comments)} comments",
+                                    fontSize = 11.sp,
+                                    color = textGray
+                                )
+                            }
+                        }
+                        if (!m.capturedAt.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                m.capturedAt.split("T").firstOrNull() ?: m.capturedAt,
+                                fontSize = 10.sp,
+                                color = textGray
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            }
+        }
     }
 }

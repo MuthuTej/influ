@@ -23,7 +23,47 @@ data class InfluencerProfile(
     val isVerified: Boolean? = false,
     val youtubeInsights: YouTubeInsights? = null,
     val instagramMetrics: InstagramMetrics? = null,
-    val instagramProfiles: List<InstagramProfile>? = null
+    val instagramProfiles: List<InstagramProfile>? = null,
+    // New Fields
+    val username: String? = null,
+    val followers: Int? = null,
+    val following: Int? = null,
+    val totalPosts: Int? = null,
+    val website: String? = null,
+    val languages: List<String>? = null,
+    val recentPosts: List<RecentPost>? = null,
+    val aiInsights: AiInsights? = null,
+    // Computed by backend resolvers (engagementRate, tier, totalFollowers from
+    // contentAnalytics/platforms; collaborationCount from collaborations collection)
+    val engagementRate: Double? = null,
+    val collaborationCount: Int? = null,
+    val tier: String? = null,
+    val totalFollowers: Int? = null
+)
+
+data class RecentPost(
+    val id: String?,
+    val thumbnail: String?,
+    val caption: String?,
+    val likes: Int?,
+    val comments: Int?,
+    val views: Int?,
+    val uploadDate: String?,
+    val url: String?
+)
+
+data class AiInsights(
+    val primaryNiche: String?,
+    val secondaryNiche: String?,
+    val contentStyle: String?,
+    val tone: String?,
+    val audienceInterests: List<String>?,
+    val topics: List<String>?,
+    val brandSuitability: String?,
+    val strengths: List<String>?,
+    val weaknesses: List<String>?,
+    val professionalSummary: String?,
+    val aiSummary: String?
 )
 
 data class InstagramProfile(
@@ -42,7 +82,8 @@ data class InstagramMetrics(
     val avgViews: Float?,
     val postingFrequencyDays: Float?,
     val totalPostsAnalyzed: Int?,
-    val updatedAt: String?
+    val updatedAt: String?,
+    val engagementRate: Float? = null
 )
 
 data class YouTubeInsights(
