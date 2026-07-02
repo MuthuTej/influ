@@ -149,6 +149,29 @@ class BrandViewModel : ViewModel() {
                         percentage
                       }
                     }
+                    youtubeInsights {
+                      demographics {
+                        ageGroup
+                        gender
+                        percentage
+                      }
+                    }
+                    instagramMetrics {
+                      avgComments
+                      avgLikes
+                      avgViews
+                      postingFrequencyDays
+                      totalPostsAnalyzed
+                      updatedAt
+                    }
+                    instagramProfiles {
+                      id
+                      profileUrl
+                      username
+                      followers
+                      isDefault
+                      connectedAt
+                    }
                     strengths
                     pricing {
                       platform
@@ -307,6 +330,51 @@ class BrandViewModel : ViewModel() {
             }
         }
 
+        val ytObj = obj.optJSONObject("youtubeInsights")
+        val youtubeInsights = if (ytObj != null) {
+            val demoArray = ytObj.optJSONArray("demographics")
+            val demoList = mutableListOf<YoutubeDemographics>()
+            if (demoArray != null) {
+                for (i in 0 until demoArray.length()) {
+                    val d = demoArray.optJSONObject(i)
+                    if (d != null) demoList.add(YoutubeDemographics(d.optString("ageGroup"), d.optString("gender"), d.optDouble("percentage").toFloat()))
+                }
+            }
+            YouTubeInsights(null, null, null, null, null, null, demoList, null, null)
+        } else null
+
+        val igMetricsObj = obj.optJSONObject("instagramMetrics")
+        val instagramMetrics = if (igMetricsObj != null) {
+            InstagramMetrics(
+                avgComments = if (igMetricsObj.isNull("avgComments")) null else igMetricsObj.optDouble("avgComments").toFloat(),
+                avgLikes = if (igMetricsObj.isNull("avgLikes")) null else igMetricsObj.optDouble("avgLikes").toFloat(),
+                avgViews = if (igMetricsObj.isNull("avgViews")) null else igMetricsObj.optDouble("avgViews").toFloat(),
+                postingFrequencyDays = if (igMetricsObj.isNull("postingFrequencyDays")) null else igMetricsObj.optDouble("postingFrequencyDays").toFloat(),
+                totalPostsAnalyzed = if (igMetricsObj.isNull("totalPostsAnalyzed")) null else igMetricsObj.optInt("totalPostsAnalyzed"),
+                updatedAt = igMetricsObj.optString("updatedAt")
+            )
+        } else null
+
+        val igProfilesArray = obj.optJSONArray("instagramProfiles")
+        val instagramProfiles = if (igProfilesArray != null) {
+            val list = mutableListOf<InstagramProfile>()
+            for (i in 0 until igProfilesArray.length()) {
+                val p = igProfilesArray.optJSONObject(i)
+                if (p != null) {
+                    list.add(InstagramProfile(
+                        id = p.optString("id"),
+                        profileUrl = p.optString("profileUrl"),
+                        username = p.optString("username"),
+                        followers = if (p.has("followers")) p.optInt("followers") else null,
+                        isDefault = p.optBoolean("isDefault"),
+                        connectedAt = p.optString("connectedAt"),
+                        metrics = null
+                    ))
+                }
+            }
+            list
+        } else null
+
         return InfluencerProfile(
             id = obj.optString("id"),
             email = obj.optString("email"),
@@ -327,7 +395,10 @@ class BrandViewModel : ViewModel() {
             availability = if (obj.has("availability")) obj.optBoolean("availability") else null,
             logoUrl = obj.optString("logoUrl"),
             averageRating = if (obj.has("averageRating") && !obj.isNull("averageRating")) obj.optDouble("averageRating").toFloat() else null,
-            isVerified = obj.optBoolean("isVerified", false)
+            isVerified = obj.optBoolean("isVerified", false),
+            youtubeInsights = youtubeInsights,
+            instagramMetrics = instagramMetrics,
+            instagramProfiles = instagramProfiles
         )
     }
 

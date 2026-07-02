@@ -387,7 +387,7 @@ fun BrandStatChip(label: String, value: String, modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            ){
                 Text(text = label, color = Color.Gray, fontSize = 7.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                 Spacer(modifier = Modifier.height(1.dp))
                 Text(text = value, color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
