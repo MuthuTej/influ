@@ -15,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -32,11 +31,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
@@ -47,12 +44,10 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.FilterDropdown
 import np.com.bimalkafle.firebaseauthdemoapp.components.IconBubbleSearch
 import np.com.bimalkafle.firebaseauthdemoapp.components.SearchSuggestionsPopup
 import np.com.bimalkafle.firebaseauthdemoapp.components.SkeletonCard
-import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignDetail
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
 
 private val brandThemeColor: Color
     @Composable get() = MaterialTheme.colorScheme.primary
-private val instagramColor = Color(0xFFE1306C)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -340,19 +335,19 @@ fun InfluencerSearchPage(
                 }
             } else {
                 items(paginatedCampaigns) { campaign ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                        CampaignCardSearch(
-                            campaign = campaign,
-                            isWishlisted = wishlistedCampaigns.any { it.id == campaign.id },
-                            onWishlistToggle = { 
-                                if (firebaseToken != null) {
-                                    campaignViewModel.toggleWishlist(campaign, firebaseToken!!)
-                                } 
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            onCardClick = { navController.navigate("campaign_detail/${campaign.id}") }
-                        )
-                    }
+                    CampaignCardInfluencer(
+                        campaign = campaign,
+                        isWishlisted = wishlistedCampaigns.any { it.id == campaign.id },
+                        onWishlistToggle = {
+                            if (firebaseToken != null) {
+                                campaignViewModel.toggleWishlist(campaign, firebaseToken!!)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        onCardClick = { navController.navigate("campaign_detail/${campaign.id}") }
+                    )
                 }
                 
                 if (totalPages > 1) {
@@ -383,102 +378,3 @@ fun InfluencerSearchPage(
     }
 }
 
-@Composable
-fun CampaignCardSearch(
-    campaign: CampaignDetail,
-    isWishlisted: Boolean = false,
-    onWishlistToggle: () -> Unit = {},
-    modifier: Modifier = Modifier,
-    onCardClick: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = modifier.clickable { onCardClick() }
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                Surface(
-                    shape = CircleShape,
-                    color = brandThemeColor.copy(alpha = 0.1f),
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    if (!campaign.brand?.logoUrl.isNullOrEmpty()) {
-                        AsyncImage(
-                            model = campaign.brand?.logoUrl,
-                            contentDescription = campaign.brand?.name,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = campaign.brand?.name?.firstOrNull()?.uppercase() ?: "?",
-                                color = brandThemeColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = campaign.title,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = Color.Black,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = campaign.brand?.name ?: "Unknown Brand",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    Text(
-                        text = campaign.description,
-                        fontSize = 12.sp,
-                        color = Color.DarkGray,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    IconButton(onClick = { onWishlistToggle() }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                            contentDescription = "Wishlist",
-                            tint = if (isWishlisted) instagramColor else Color.Gray,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    
-                    val formatBudget = { amount: Int? ->
-                        when {
-                            amount == null -> "-"
-                            amount >= 1000000 -> "${String.format("%.1f", amount / 1000000.0)}M"
-                            amount >= 1000 -> "${amount / 1000}k"
-                            else -> amount.toString()
-                        }
-                    }
-                    
-                    val budgetRange = when {
-                        campaign.budgetMin != null && campaign.budgetMax != null -> "₹${formatBudget(campaign.budgetMin)} - ₹${formatBudget(campaign.budgetMax)}"
-                        campaign.budgetMin != null -> "₹${formatBudget(campaign.budgetMin)}+"
-                        else -> "N/A"
-                    }
-                    
-                    Text(text = budgetRange, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = brandThemeColor)
-                }
-            }
-        }
-    }
-}

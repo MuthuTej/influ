@@ -100,12 +100,19 @@ object GraphQLClient {
                     return Result.failure(MalformedResponseException("Server returned an unreadable response", e))
                 }
 
-                // Check for GraphQL errors even if HTTP status is 200
+                // GraphQL errors: if there is also a "data" field, treat as partial success
+                // so one bad field (e.g. invalid enum in a nested type) doesn't wipe
+                // out all the successfully-resolved data. Hard-fail only when there is
+                // no data at all (the query itself was rejected entirely).
                 val errors = jsonResponse.optJSONArray("errors")
                 if (errors != null && errors.length() > 0) {
                     val firstErrorMessage = errors.optJSONObject(0)?.optString("message") ?: "Unknown GraphQL Error"
-                    Log.e("GraphQLClient", "GraphQL Errors: $response")
-                    return Result.failure(Exception(firstErrorMessage))
+                    val hasData = !jsonResponse.isNull("data")
+                    Log.e("GraphQLClient", "GraphQL Errors (hasData=$hasData): $firstErrorMessage")
+                    if (!hasData) {
+                        return Result.failure(Exception(firstErrorMessage))
+                    }
+                    // Partial: data is present alongside errors — proceed with what we have
                 }
 
                 return Result.success(jsonResponse)

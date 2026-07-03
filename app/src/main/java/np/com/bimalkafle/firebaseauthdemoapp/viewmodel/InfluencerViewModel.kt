@@ -950,7 +950,11 @@ class InfluencerViewModel : ViewModel() {
                     }
                 } catch (e: Exception) {
                     Log.e("InfluencerViewModel", "Collab parsing error", e)
+                    _error.postValue("Failed to load collaborations: ${e.message}")
                 }
+            }.onFailure {
+                Log.e("InfluencerViewModel", "Collab fetch error", it)
+                _error.postValue(it.message)
             }
             _loading.postValue(false)
         }
