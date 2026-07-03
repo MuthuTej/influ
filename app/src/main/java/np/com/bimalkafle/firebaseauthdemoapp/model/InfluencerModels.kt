@@ -8,6 +8,8 @@ data class InfluencerProfile(
     val profileCompleted: Boolean?,
     val updatedAt: String?,
     val bio: String?,
+    val about: String? = null,
+    val creatorName: String? = null,
     val location: String?,
     val gender: String?,
     val motherTongue: String?,

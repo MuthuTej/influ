@@ -47,10 +47,11 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 private val influencerDetailThemeColor: Color
     @Composable get() = MaterialTheme.colorScheme.primary
 
-private val PageBg       = Color(0xFFF5F5F7)
+private val PageBg       = Color(0xFFF5F0EE)   // warm off-white matching design
 private val CardBg       = Color.White
-private val SubLabel     = Color(0xFF8E8E93)
-private val DividerColor = Color(0xFFEEEEEE)
+private val HeroCardBg   = Color(0xFFFDEAE6)   // warm peach from design
+private val SubLabel     = Color(0xFF9A8F8C)
+private val DividerColor = Color(0x14000000)   // rgba(0,0,0,0.08)
 
 private val platformsColors = mapOf(
     "INSTAGRAM" to Color(0xFFE1306C),
@@ -110,7 +111,7 @@ fun BrandInfluencerDetailContent(
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                 ) {
-                    ProfileHero(influencer, onBack, onCreateProposal, onConnect)
+                    ProfileHero(influencer, onBack, onCreateProposal)
 
                     Column(
                         modifier = Modifier
@@ -120,8 +121,12 @@ fun BrandInfluencerDetailContent(
                     ) {
                         Spacer(Modifier.height(4.dp))
 
-                        if (!influencer.bio.isNullOrBlank()) {
-                            AboutSection(influencer.bio!!)
+                        if (!influencer.bio.isNullOrBlank() || !influencer.about.isNullOrBlank() || !influencer.creatorName.isNullOrBlank()) {
+                            AboutSection(
+                                bio = influencer.bio,
+                                about = influencer.about,
+                                creatorName = influencer.creatorName
+                            )
                         }
 
                         influencer.aiInsights?.let { AiProfileSummarySection(it) }
@@ -130,7 +135,7 @@ fun BrandInfluencerDetailContent(
 
                         val igProfiles = influencer.instagramProfiles
                         if (!igProfiles.isNullOrEmpty()) {
-                            BrandInstagramProfilesSection(igProfiles)
+                            BrandInstagramProfilesSection(igProfiles, influencer.followers)
                         } else {
                             influencer.instagramMetrics?.let { InstagramInsightsSection(it) }
                         }
@@ -154,19 +159,48 @@ fun BrandInfluencerDetailContent(
 private fun ProfileHero(
     influencer: InfluencerProfile,
     onBack: () -> Unit,
-    onCreateProposal: () -> Unit,
-    onConnect: (String, String) -> Unit
+    onCreateProposal: () -> Unit
 ) {
     val themeColor = influencerDetailThemeColor
 
+    // Precompute all stats for the unified 4×2 grid
+    val totalFollowers = influencer.totalFollowers
+        ?: influencer.followers
+        ?: influencer.platforms?.sumOf { it.followers ?: 0 }
+        ?: 0
+    val engRate      = influencer.engagementRate
+    val avgViews     = influencer.instagramMetrics?.avgViews?.toLong()
+        ?: influencer.platforms?.firstOrNull()?.avgViews?.toLong()
+    val collabCount  = influencer.collaborationCount
+    val avgLikes     = influencer.instagramMetrics?.avgLikes?.toInt()
+    val avgComments  = influencer.instagramMetrics?.avgComments?.toInt()
+    val postFreq     = influencer.instagramMetrics?.postingFrequencyDays
+    val tier         = influencer.tier
+
+    data class HeroStat(val value: String, val label: String, val color: Color)
+    // Row 1: core reach   Row 2: engagement detail
+    val statRows: List<List<HeroStat>> = listOf(
+        listOf(
+            HeroStat(formatInfluencerCount(totalFollowers), "Followers",   Color(0xFF1976D2)),
+            HeroStat(engRate?.let { "${"%.1f".format(it)}%" } ?: "—",     "Engagement",    Color(0xFF388E3C)),
+            HeroStat(avgViews?.let { formatInfluencerCount(it.toInt()) } ?: "—", "Avg Views", Color(0xFF7B1FA2)),
+            HeroStat(collabCount?.toString() ?: "—",                       "Collabs",       Color(0xFFE65100))
+        ),
+        listOf(
+            HeroStat(avgLikes?.let { formatInfluencerCount(it) } ?: "—",  "Avg Likes",     Color(0xFFE91E63)),
+            HeroStat(avgComments?.let { formatInfluencerCount(it) } ?: "—", "Avg Comments", Color(0xFF0288D1)),
+            HeroStat(postFreq?.let { "${"%.0f".format(it)}d" } ?: "—",    "Post Freq",     Color(0xFF00897B)),
+            HeroStat(tier ?: "—",                                          "Tier",          Color(0xFFF57F17))
+        )
+    )
+
+    val handle = influencer.instagramProfiles?.firstOrNull()?.username
+
     Box(modifier = Modifier.fillMaxWidth()) {
 
-        // Thin pink strip — only for the back button
+        // Gradient header strip — back button lives here
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp)
-                .background(themeColor)
+            modifier = Modifier.fillMaxWidth().height(100.dp).background(themeColor)
         ) {
             Image(
                 painter      = painterResource(R.drawable.vector),
@@ -174,156 +208,129 @@ private fun ProfileHero(
                 modifier     = Modifier.fillMaxSize().alpha(0.13f),
                 contentScale = ContentScale.Crop
             )
-            IconButton(
-                onClick  = onBack,
-                modifier = Modifier.padding(top = 8.dp, start = 4.dp)
-            ) {
+            IconButton(onClick = onBack, modifier = Modifier.padding(top = 8.dp, start = 4.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
             }
         }
 
-        // Horizontal card overlapping the banner
+        // Hero card — vertical layout matches design
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 64.dp)
-                .padding(horizontal = 16.dp),
+            modifier  = Modifier.fillMaxWidth().padding(top = 64.dp).padding(horizontal = 16.dp),
             shape     = RoundedCornerShape(20.dp),
-            colors    = CardDefaults.cardColors(containerColor = CardBg),
+            colors    = CardDefaults.cardColors(containerColor = HeroCardBg),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
-            Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Column(modifier = Modifier.padding(16.dp)) {
 
-                // ── Left: large influencer image ───────────────────────────
-                Box(
-                    modifier = Modifier
-                        .width(130.dp)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp))
-                        .background(themeColor.copy(alpha = 0.10f))
-                ) {
-                    if (!influencer.logoUrl.isNullOrEmpty()) {
-                        AsyncImage(
-                            model        = influencer.logoUrl,
-                            contentDescription = null,
-                            modifier     = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Box(Modifier.fillMaxSize(), Alignment.Center) {
-                            Text(
-                                text       = influencer.name.firstOrNull()?.uppercase() ?: "?",
-                                fontSize   = 48.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color      = themeColor
+                // ── Identity row ────────────────────────────────────────────
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Square avatar 60×60
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(themeColor.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!influencer.logoUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model              = influencer.logoUrl,
+                                contentDescription = influencer.name,
+                                modifier           = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)),
+                                contentScale       = ContentScale.Crop
                             )
+                        } else {
+                            val initials = influencer.name.trim().split(Regex("\\s+")).let { p ->
+                                if (p.size >= 2) "${p[0].first()}${p[1].first()}".uppercase()
+                                else influencer.name.take(2).uppercase()
+                            }
+                            Text(initials, color = themeColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                        }
+                    }
+
+                    Spacer(Modifier.width(12.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        // Category dot label
+                        val category = influencer.categories?.firstOrNull()?.category
+                        if (!category.isNullOrBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Box(Modifier.size(6.dp).background(themeColor, CircleShape))
+                                Text(category.uppercase(), fontSize = 10.5.sp, fontWeight = FontWeight.ExtraBold,
+                                    color = themeColor, letterSpacing = 0.5.sp)
+                            }
+                            Spacer(Modifier.height(2.dp))
+                        }
+                        // Name + verified badge
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text       = influencer.name,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize   = 19.sp,
+                                color      = Color(0xFF1E1E1E),
+                                maxLines   = 1,
+                                overflow   = TextOverflow.Ellipsis,
+                                modifier   = Modifier.weight(1f, fill = false)
+                            )
+                            if (influencer.isVerified == true) {
+                                Spacer(Modifier.width(4.dp))
+                                Icon(Icons.Default.CheckCircle, "Verified", tint = Color(0xFF1976D2), modifier = Modifier.size(15.dp))
+                            }
+                        }
+                        if (!handle.isNullOrBlank()) {
+                            Text("@$handle", fontSize = 12.5.sp, color = SubLabel)
+                        }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    // Compact Proposal button — sits beside the avatar at card top
+                    Button(
+                        onClick  = onCreateProposal,
+                        modifier = Modifier.height(34.dp),
+                        shape    = RoundedCornerShape(10.dp),
+                        colors   = ButtonDefaults.buttonColors(containerColor = themeColor),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                    ) {
+                        Icon(Icons.Default.Send, null, modifier = Modifier.size(13.dp), tint = Color.White)
+                        Spacer(Modifier.width(5.dp))
+                        Text("Proposal", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                    }
+                }
+
+                // ── Divider ─────────────────────────────────────────────────
+                Spacer(Modifier.height(14.dp))
+                HorizontalDivider(color = DividerColor)
+                Spacer(Modifier.height(12.dp))
+
+                // ── Unified 4×2 stats grid ──────────────────────────────────
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    statRows.forEach { row ->
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            row.forEach { stat ->
+                                Column(
+                                    modifier            = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text       = stat.value,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize   = 14.sp,
+                                        color      = stat.color,
+                                        maxLines   = 1
+                                    )
+                                    Text(
+                                        text      = stat.label,
+                                        fontSize  = 9.5.sp,
+                                        color     = SubLabel,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
-                // ── Right: identity + stats + buttons ─────────────────────
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 14.dp, vertical = 14.dp)
-                ) {
-                    // • CATEGORY dot badge
-                    val category = influencer.categories?.firstOrNull()?.category
-                    if (category != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .background(themeColor, CircleShape)
-                            )
-                            Text(
-                                text       = category.uppercase(),
-                                fontSize   = 10.sp,
-                                color      = themeColor,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 0.8.sp
-                            )
-                        }
-                        Spacer(Modifier.height(5.dp))
-                    }
-
-                    // Name + verified
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text       = influencer.name,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize   = 18.sp,
-                            color      = Color.Black,
-                            maxLines   = 2,
-                            overflow   = TextOverflow.Ellipsis,
-                            lineHeight = 22.sp,
-                            modifier   = Modifier.weight(1f, fill = false)
-                        )
-                        if (influencer.isVerified == true) {
-                            Spacer(Modifier.width(4.dp))
-                            Icon(Icons.Default.CheckCircle, "Verified", tint = Color(0xFF1976D2), modifier = Modifier.size(16.dp))
-                        }
-                    }
-
-                    // @handle from primary Instagram profile
-                    val handle = influencer.instagramProfiles?.firstOrNull()?.username
-                    if (!handle.isNullOrBlank()) {
-                        Text(
-                            text     = "@$handle",
-                            fontSize = 12.sp,
-                            color    = SubLabel
-                        )
-                    }
-
-                    Spacer(Modifier.height(10.dp))
-
-                    // Stats — 2×2 grid
-                    val totalFollowers = influencer.platforms?.sumOf { it.followers ?: 0 } ?: 0
-                    val avgViews = influencer.instagramMetrics?.avgViews?.toLong()
-                        ?: influencer.platforms?.firstOrNull()?.avgViews?.toLong()
-                    val collabCount = influencer.collaborationCount
-
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            HeroStatItem(formatInfluencerCount(totalFollowers), "Followers", Modifier.weight(1f))
-                            Box(Modifier.width(1.dp).height(24.dp).background(DividerColor))
-                            HeroStatItem("48", "Engagement", Modifier.weight(1f))
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            HeroStatItem(avgViews?.let { formatInfluencerCount(it.toInt()) } ?: "—", "Avg Views", Modifier.weight(1f))
-                            Box(Modifier.width(1.dp).height(24.dp).background(DividerColor))
-                            HeroStatItem(collabCount?.toString() ?: "—", "Collabs", Modifier.weight(1f))
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    // Buttons — Proposal (filled) left, Connect (outlined) right
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick  = onCreateProposal,
-                            modifier = Modifier.weight(1f).height(34.dp),
-                            shape    = RoundedCornerShape(10.dp),
-                            colors   = ButtonDefaults.buttonColors(containerColor = themeColor),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                        ) {
-                            Text("Proposal", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        }
-                        OutlinedButton(
-                            onClick  = { onConnect(influencer.id, influencer.name) },
-                            modifier = Modifier.weight(1f).height(34.dp),
-                            shape    = RoundedCornerShape(10.dp),
-                            border   = BorderStroke(1.5.dp, Color(0xFF6C63FF)),
-                            colors   = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF6C63FF)),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                        ) {
-                            Text("Connect", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                    }
-                }
             }
         }
     }
@@ -339,11 +346,45 @@ private fun HeroStatItem(value: String, label: String, modifier: Modifier = Modi
 
 // ── About ─────────────────────────────────────────────────────────────────────
 @Composable
-private fun AboutSection(bio: String) {
+private fun AboutSection(
+    bio: String? = null,
+    about: String? = null,
+    creatorName: String? = null
+) {
     SectionCard {
-        SectionHeader(Icons.Default.Info, "About")
+        SectionHeader(Icons.Default.Info, "About the Creator")
         Spacer(Modifier.height(10.dp))
-        Text(bio, fontSize = 14.sp, color = Color(0xFF37474F), lineHeight = 22.sp)
+
+        // Creator name badge
+        if (!creatorName.isNullOrBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = null,
+                    tint = Color(0xFF7B1FA2),
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = creatorName,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF37474F)
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
+        // Short bio line
+        if (!bio.isNullOrBlank()) {
+            Text(bio, fontSize = 14.sp, color = Color(0xFF546E7A), lineHeight = 22.sp, fontWeight = FontWeight.Medium)
+        }
+
+        // Long about paragraph
+        if (!about.isNullOrBlank()) {
+            if (!bio.isNullOrBlank()) Spacer(Modifier.height(8.dp))
+            Text(about, fontSize = 13.sp, color = Color(0xFF78909C), lineHeight = 20.sp)
+        }
     }
 }
 
@@ -548,7 +589,7 @@ private fun PlatformStatCard(label: String, value: String, modifier: Modifier = 
 
 // ── Instagram Profiles ────────────────────────────────────────────────────────
 @Composable
-private fun BrandInstagramProfilesSection(profiles: List<InstagramProfile>) {
+private fun BrandInstagramProfilesSection(profiles: List<InstagramProfile>, primaryFollowers: Int? = null) {
     val instaColor = Color(0xFFE1306C)
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column {
@@ -584,8 +625,10 @@ private fun BrandInstagramProfilesSection(profiles: List<InstagramProfile>) {
                                     }
                                 }
                             }
-                            if (profile.followers != null) {
-                                Text("${formatInfluencerCount(profile.followers)} followers", color = SubLabel, fontSize = 12.sp)
+                            val displayFollowers = profile.followers
+                                ?: if (profile.isDefault) primaryFollowers else null
+                            if (displayFollowers != null) {
+                                Text("${formatInfluencerCount(displayFollowers)} followers", color = SubLabel, fontSize = 12.sp)
                             }
                         }
                     }
@@ -738,9 +781,25 @@ private fun PricingTable(influencer: InfluencerProfile) {
 }
 
 // ── YouTube Demographics ──────────────────────────────────────────────────────
-@OptIn(ExperimentalLayoutApi::class)
+// Replaces the space-hungry donut with a compact horizontal-bar-per-age-group
+// layout: all 6 age bands visible at once in roughly the same height as the
+// old donut alone used to need for just the dominant one.
 @Composable
 private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebaseauthdemoapp.model.YoutubeDemographics>) {
+    // Aggregate age and gender from the flat list
+    val ageData = demographics
+        .groupBy { it.ageGroup ?: "Other" }
+        .mapValues { e -> e.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
+        .entries.sortedByDescending { it.value }
+    val genderData = demographics
+        .groupBy { it.gender?.lowercase() ?: "other" }
+        .mapValues { e -> e.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
+    val femaleRaw = genderData["female"] ?: 0f
+    val maleRaw   = genderData["male"]   ?: 0f
+
+    val barColor  = MaterialTheme.colorScheme.primary
+    val maxAge    = ageData.firstOrNull()?.value ?: 1f
+
     Card(
         modifier  = Modifier.fillMaxWidth(),
         shape     = RoundedCornerShape(20.dp),
@@ -749,56 +808,82 @@ private fun YouTubeDemographicsCard(demographics: List<np.com.bimalkafle.firebas
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text("Audience Demographics", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Spacer(Modifier.height(20.dp))
-            Row(modifier = Modifier.fillMaxWidth()) {
-                // Age groups
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Age Groups", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SubLabel)
-                    Spacer(Modifier.height(12.dp))
-                    val ageData = demographics
-                        .groupBy { it.ageGroup ?: "Other" }
-                        .mapValues { e -> e.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
-                    val values = ageData.values.toList()
-                    val labels = ageData.keys.toList()
-                    val colors = listOf(Color(0xFF6C63FF), MaterialTheme.colorScheme.primary, Color(0xFF4CAF50), Color(0xFFFFC107), Color(0xFF2196F3), Color(0xFF9C27B0)).take(values.size)
-                    Box(Modifier.size(90.dp), Alignment.Center) {
-                        InfluencerDonutChart(values, colors, modifier = Modifier.fillMaxSize(), strokeWidth = 9.dp)
-                        Text("${values.sum().toInt()}%", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        labels.forEachIndexed { i, label ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(7.dp).background(colors[i], CircleShape))
-                                Spacer(Modifier.width(4.dp))
-                                Text(label.removePrefix("age"), fontSize = 10.sp, color = SubLabel)
+
+            // ── Age Distribution: compact bar rows ─────────────────────────
+            if (ageData.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Text("Age Distribution", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = SubLabel)
+                Spacer(Modifier.height(10.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    ageData.take(6).forEach { (rawLabel, pct) ->
+                        val label = rawLabel.removePrefix("age")
+                        val frac  = (pct / maxAge).coerceIn(0f, 1f)
+                        Row(
+                            verticalAlignment       = Alignment.CenterVertically,
+                            horizontalArrangement   = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Age label — fixed 38dp so all bars align
+                            Text(
+                                text     = label,
+                                fontSize = 11.sp,
+                                color    = Color(0xFF333333),
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.width(38.dp)
+                            )
+                            // Thin bar (6dp height, scaled to max, rounded caps)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(barColor.copy(alpha = 0.10f))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(frac)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(barColor)
+                                )
                             }
+                            // Percentage — fixed 38dp right-aligned
+                            Text(
+                                text      = "${"%.1f".format(pct)}%",
+                                fontSize  = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color     = SubLabel,
+                                modifier  = Modifier.width(38.dp),
+                                textAlign = TextAlign.End
+                            )
                         }
                     }
                 }
-                // Gender
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Gender", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SubLabel)
-                    Spacer(Modifier.height(12.dp))
-                    val genderData = demographics
-                        .groupBy { it.gender ?: "Other" }
-                        .mapValues { e -> e.value.sumOf { (it.percentage ?: 0f).toDouble() }.toFloat() }
-                    val values = genderData.values.toList()
-                    val labels = genderData.keys.toList()
-                    val colors = listOf(Color(0xFF64B5F6), Color(0xFFF06292), Color(0xFF9E9E9E)).take(values.size)
-                    Box(Modifier.size(90.dp), Alignment.Center) {
-                        InfluencerDonutChart(values, colors, modifier = Modifier.fillMaxSize(), strokeWidth = 9.dp)
-                        Text("${values.sum().toInt()}%", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            // ── Gender Split: two-segment bar ──────────────────────────────
+            val gTotal = femaleRaw + maleRaw
+            if (gTotal > 0f) {
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = DividerColor)
+                Spacer(Modifier.height(14.dp))
+                Text("Gender Split", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = SubLabel)
+                Spacer(Modifier.height(10.dp))
+                val femaleFrac = femaleRaw / gTotal
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(52.dp)) {
+                        Text("Female", fontSize = 11.sp, color = Color(0xFFF06292), fontWeight = FontWeight.SemiBold)
+                        Text("${"%.1f".format(femaleRaw)}%", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFF06292))
                     }
-                    Spacer(Modifier.height(12.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        labels.forEachIndexed { i, label ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(7.dp).background(colors[i], CircleShape))
-                                Spacer(Modifier.width(4.dp))
-                                Text(label.replaceFirstChar { it.uppercase() }, fontSize = 10.sp, color = SubLabel)
-                            }
-                        }
+                    Box(
+                        modifier = Modifier.weight(1f).height(12.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF64B5F6))
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxHeight().fillMaxWidth(femaleFrac).clip(RoundedCornerShape(6.dp)).background(Color(0xFFF06292))
+                        )
+                    }
+                    Column(modifier = Modifier.width(52.dp)) {
+                        Text("Male", fontSize = 11.sp, color = Color(0xFF64B5F6), fontWeight = FontWeight.SemiBold)
+                        Text("${"%.1f".format(maleRaw)}%", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF64B5F6))
                     }
                 }
             }
@@ -834,31 +919,6 @@ private fun SectionHeader(
     }
 }
 
-// ── Donut chart ───────────────────────────────────────────────────────────────
-@Composable
-private fun InfluencerDonutChart(
-    values: List<Float>,
-    colors: List<Color>,
-    modifier: Modifier = Modifier,
-    strokeWidth: Dp = 20.dp
-) {
-    val total = values.sum()
-    if (total == 0f) return
-    var startAngle = -90f
-    Canvas(modifier = modifier) {
-        values.forEachIndexed { index, value ->
-            val sweepAngle = (value / total) * 360f
-            drawArc(
-                color      = colors[index],
-                startAngle = startAngle,
-                sweepAngle = sweepAngle,
-                useCenter  = false,
-                style      = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round)
-            )
-            startAngle += sweepAngle
-        }
-    }
-}
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 fun formatInfluencerCount(count: Int): String = when {
