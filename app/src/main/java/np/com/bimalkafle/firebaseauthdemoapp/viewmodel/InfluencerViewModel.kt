@@ -450,6 +450,8 @@ class InfluencerViewModel : ViewModel() {
                     profileCompleted
                     updatedAt
                     bio
+                    about
+                    creatorName
                     location
                     gender
                     motherTongue
@@ -529,6 +531,11 @@ class InfluencerViewModel : ViewModel() {
                       primaryNiche secondaryNiche contentStyle tone audienceInterests
                       topics brandSuitability strengths weaknesses professionalSummary aiSummary
                     }
+                    followers
+                    totalFollowers
+                    engagementRate
+                    collaborationCount
+                    tier
                   }
                 }
             """.trimIndent()
@@ -783,7 +790,9 @@ class InfluencerViewModel : ViewModel() {
             role = obj.optString("role"),
             profileCompleted = if (obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
             updatedAt = obj.optString("updatedAt"),
-            bio = obj.optString("bio"),
+            bio = obj.optString("bio").takeIf { it.isNotBlank() },
+            about = obj.optString("about").takeIf { it.isNotBlank() },
+            creatorName = obj.optString("creatorName").takeIf { it.isNotBlank() },
             location = obj.optString("location"),
             gender = obj.optString("gender").takeIf { it.isNotBlank() },
             motherTongue = obj.optString("motherTongue").takeIf { it.isNotBlank() },
@@ -813,7 +822,6 @@ class InfluencerViewModel : ViewModel() {
             instagramMetrics = instagramMetrics,
             instagramProfiles = igProfilesList.ifEmpty { null },
             username = obj.optString("username"),
-            followers = if (obj.has("followers") && !obj.isNull("followers")) obj.optInt("followers") else null,
             following = if (obj.has("following") && !obj.isNull("following")) obj.optInt("following") else null,
             totalPosts = if (obj.has("totalPosts") && !obj.isNull("totalPosts")) obj.optInt("totalPosts") else null,
             website = obj.optString("website"),
@@ -848,7 +856,12 @@ class InfluencerViewModel : ViewModel() {
                     professionalSummary = ai.optString("professionalSummary").takeIf { it.isNotBlank() },
                     aiSummary = ai.optString("aiSummary").takeIf { it.isNotBlank() }
                 )
-            }
+            },
+            followers = if (obj.has("followers") && !obj.isNull("followers")) obj.optInt("followers") else null,
+            totalFollowers = if (obj.has("totalFollowers") && !obj.isNull("totalFollowers")) obj.optInt("totalFollowers") else null,
+            engagementRate = if (obj.has("engagementRate") && !obj.isNull("engagementRate")) obj.optDouble("engagementRate") else null,
+            collaborationCount = if (obj.has("collaborationCount") && !obj.isNull("collaborationCount")) obj.optInt("collaborationCount") else null,
+            tier = obj.optString("tier").takeIf { it.isNotBlank() }
         )
     }
 

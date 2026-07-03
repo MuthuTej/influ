@@ -1,6 +1,5 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -10,52 +9,104 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.CurrencyRupee
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Wc
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
-import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.components.ErrorState
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.model.Brand
 import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignDetail
+import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignAudienceResponse
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.math.abs
 
-private val themeColor: Color
-    @Composable get() = MaterialTheme.colorScheme.primary
-private val softGray = Color(0xFFF8F9FE)
-private val darkerGray = Color(0xFF6C757D)
-private val cardBg = Color(0xFFFFFFFF)
+// ─── Shared palette (same as campaign card) ──────────────────────────────────
+private val DetailAvatarPalette = listOf(
+    Color(0xFF5E4AE3), Color(0xFFE84393), Color(0xFF0EA5E9),
+    Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFFEF4444),
+)
+private fun detailAvatarColor(name: String) =
+    DetailAvatarPalette[abs(name.hashCode()) % DetailAvatarPalette.size]
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+private fun detailFmtDate(s: String?): String {
+    if (s.isNullOrEmpty()) return "Open"
+    val fmts = listOf("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd")
+    for (f in fmts) {
+        try {
+            val d = SimpleDateFormat(f, Locale.getDefault()).parse(s) ?: continue
+            return SimpleDateFormat("MMM d", Locale.getDefault()).format(d)
+        } catch (_: Exception) {}
+    }
+    return s
+}
+
+private fun detailPostedAgo(createdAt: String): String {
+    val fmts = listOf("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd")
+    for (f in fmts) {
+        try {
+            val d = SimpleDateFormat(f, Locale.getDefault()).parse(createdAt) ?: continue
+            val days = ((System.currentTimeMillis() - d.time) / 86_400_000).toInt()
+            return when {
+                days == 0  -> "Today"
+                days == 1  -> "Yesterday"
+                days < 30  -> "$days days ago"
+                days < 365 -> "${days / 30} mo ago"
+                else       -> "${days / 365} yr ago"
+            }
+        } catch (_: Exception) {}
+    }
+    return ""
+}
+
+private fun detailUpdatedAgo(updatedAt: String?): String? {
+    if (updatedAt.isNullOrEmpty()) return null
+    return detailPostedAgo(updatedAt).takeIf { it.isNotEmpty() }?.let { "Updated $it" }
+}
+
+private fun detailBudgetFmt(n: Int): String = when {
+    n >= 1_000_000 -> "₹${String.format("%.1f", n / 1_000_000.0).trimEnd('0').trimEnd('.')}M"
+    n >= 1_000     -> "₹${n / 1_000}k"
+    else           -> "₹$n"
+}
+
+// ─── Platform helpers ─────────────────────────────────────────────────────────
+private fun platformFullName(p: String) = when (p.uppercase()) {
+    "INSTAGRAM" -> "Instagram"; "YOUTUBE" -> "YouTube"
+    "FACEBOOK"  -> "Facebook";  "TIKTOK"  -> "TikTok"
+    else        -> p.replaceFirstChar { it.uppercase() }
+}
+
+private fun platformColor(p: String) = when (p.uppercase()) {
+    "INSTAGRAM" -> Color(0xFFE1306C); "YOUTUBE" -> Color(0xFFFF0000)
+    "FACEBOOK"  -> Color(0xFF1877F2); "TIKTOK"  -> Color(0xFF010101)
+    else        -> Color(0xFF6B7280)
+}
+
+private fun platformAbbr(p: String) = when (p.uppercase()) {
+    "INSTAGRAM" -> "IG"; "YOUTUBE" -> "YT"
+    "FACEBOOK"  -> "FB"; "TIKTOK"  -> "TT"
+    else        -> p.take(2).uppercase()
+}
+
+// ─── Screen ──────────────────────────────────────────────────────────────────
+
 @Composable
 fun InfluencerBrandDetailScreen(
     navController: NavController,
@@ -68,474 +119,386 @@ fun InfluencerBrandDetailScreen(
 
     LaunchedEffect(campaignId) {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener {
-            val token = it.token
-            if (token != null) {
-                campaignViewModel.fetchCampaignById(campaignId, token)
-            }
+            it.token?.let { tok -> campaignViewModel.fetchCampaignById(campaignId, tok) }
         }
     }
 
     Scaffold(
         bottomBar = {
             if (campaign != null) {
-                CollaborateButton(campaign = campaign!!, navController = navController)
+                DetailApplyBar(campaign = campaign!!, navController = navController)
             }
         }
     ) { padding ->
-        Box(modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = padding.calculateBottomPadding())
-            .background(softGray)) {
-            if (isLoading) {
-                LoadingState(modifier = Modifier.align(Alignment.Center), message = "Loading campaign…")
-            } else if (error != null) {
-                ErrorState(message = error ?: "Unknown error", modifier = Modifier.align(Alignment.Center))
-            } else if (campaign != null) {
-                InfluencerBrandDetailContent(campaign = campaign!!, navController = navController)
-            } else {
-                Text("Campaign not found.", modifier = Modifier.align(Alignment.Center), fontSize = 14.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun InfluencerBrandDetailContent(campaign: CampaignDetail, navController: NavController) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        HeaderSection(campaign = campaign, navController = navController)
-
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            DetailSectionTitle("ABOUT CAMPAIGN")
-            CampaignInfoSection(campaign = campaign)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            DetailSectionTitle("BUDGET & TIMELINE")
-            BudgetAndTimelineSection(campaign = campaign)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            DetailSectionTitle("REQUIREMENTS")
-            CampaignRequirementsSection(campaign = campaign)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            DetailSectionTitle("BRAND DETAILS")
-            BrandInfoSection(brand = campaign.brand)
-            
-            Spacer(modifier = Modifier.height(80.dp))
-        }
-    }
-}
-
-@Composable
-private fun DetailSectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = darkerGray,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(bottom = 6.dp, start = 4.dp),
-        letterSpacing = 0.5.sp
-    )
-}
-
-@Composable
-fun HeaderSection(campaign: CampaignDetail, navController: NavController) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(240.dp) // Reduced height
-            .background(themeColor)
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.vector),
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize()
-                .alpha(0.15f),
-            contentScale = ContentScale.Crop
-        )
-        
         Box(
             modifier = Modifier
-                .statusBarsPadding()
-                .padding(top = 8.dp)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            IconButton(
-                onClick = { navController.popBackStack() },
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 4.dp)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(22.dp))
-            }
-            
-            Text(
-                text = "Campaign Details",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            )
-        }
-
-        Column(
-            modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .padding(top = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(bottom = padding.calculateBottomPadding())
+                .background(Color(0xFFF8F9FE))
         ) {
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                modifier = Modifier
-                    .size(80.dp) // Smaller logo
-                    .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape),
-                shadowElevation = 6.dp
-            ) {
-                AsyncImage(
-                    model = campaign.brand?.logoUrl,
-                    contentDescription = "Brand Logo",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(3.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = campaign.brand?.name ?: "Brand Name",
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp, // Smaller text
-                color = Color.White
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RatingStars(rating = campaign.brand?.averageRating ?: 0.0)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "${"%.1f".format(campaign.brand?.averageRating ?: 0.0)} / 5.0",
-                    fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontWeight = FontWeight.Medium
-                )
+            when {
+                isLoading -> LoadingState(modifier = Modifier.align(Alignment.Center), message = "Loading campaign…")
+                error != null -> ErrorState(message = error ?: "Unknown error", modifier = Modifier.align(Alignment.Center))
+                campaign != null -> DetailContent(campaign = campaign!!, navController = navController)
+                else -> Text("Campaign not found.", modifier = Modifier.align(Alignment.Center), fontSize = 14.sp)
             }
         }
     }
 }
 
-@Composable
-fun RatingStars(rating: Double) {
-    Row {
-        repeat(5) { index ->
-            val color = if (index < rating.toInt()) Color(0xFFFFD700) else Color.White.copy(alpha = 0.4f)
-            Icon(
-                Icons.Default.Star,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(12.dp)
-            )
-        }
-    }
-}
+// ─── Main scrollable content ──────────────────────────────────────────────────
 
 @Composable
-fun CampaignInfoSection(campaign: CampaignDetail) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Surface(
-                color = themeColor.copy(alpha = 0.08f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Box(modifier = Modifier.size(6.dp).background(themeColor, CircleShape))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "ACTIVE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = themeColor,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(10.dp))
-            
-            Text(
-                text = campaign.title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = campaign.description,
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 20.sp,
-                color = darkerGray,
-                fontSize = 13.sp
-            )
-        }
-    }
-}
+private fun DetailContent(campaign: CampaignDetail, navController: NavController) {
+    val themeColor = MaterialTheme.colorScheme.primary
+    var wishlisted by remember { mutableStateOf(false) }
 
-@Composable
-fun BudgetAndTimelineSection(campaign: CampaignDetail) {
-    fun formatCampaignDate(dateString: String?): String {
-        if (dateString.isNullOrEmpty()) return "TBD"
-        return try {
-            val formats = listOf(
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()),
-                SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()),
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-            )
-            var date: java.util.Date? = null
-            for (format in formats) {
-                try {
-                    date = format.parse(dateString)
-                    if (date != null) break
-                } catch (e: Exception) { continue }
-            }
-            if (date != null) {
-                SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()).format(date)
-            } else dateString
-        } catch (e: Exception) { dateString }
-    }
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
 
-    val budgetText = when {
-        campaign.budgetMin != null && campaign.budgetMax != null -> "₹${campaign.budgetMin} - ₹${campaign.budgetMax}"
-        campaign.budgetMin != null -> "₹${campaign.budgetMin}"
-        campaign.budgetMax != null -> "₹${campaign.budgetMax}"
-        else -> "N/A"
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            InfoRow(
-                icon = Icons.Default.CurrencyRupee,
-                label = "Budget",
-                value = budgetText
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = softGray)
-            InfoRow(
-                icon = Icons.Default.CalendarMonth,
-                label = "Timeline",
-                value = "${formatCampaignDate(campaign.startDate)} - ${formatCampaignDate(campaign.endDate)}"
-            )
-        }
-    }
-}
-
-@Composable
-fun CampaignRequirementsSection(campaign: CampaignDetail) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            val categoryText = campaign.categories?.joinToString(", ") { "${it.category} (${it.subCategories.firstOrNull() ?: ""})" }
-                ?: campaign.brand?.brandCategories?.firstOrNull()?.let { "${it.category} (${it.subCategories.firstOrNull() ?: ""})" }
-                ?: "N/A"
-                
-            RequirementRow(
-                icon = Icons.Default.Category,
-                label = "Category",
-                value = categoryText
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = softGray)
-            RequirementRow(
-                icon = Icons.Default.People,
-                label = "Age Range",
-                value = if (campaign.targetAudience?.ageMin != null && campaign.targetAudience?.ageMax != null) 
-                    "${campaign.targetAudience.ageMin} - ${campaign.targetAudience.ageMax}" 
-                    else "Any"
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = softGray)
-            RequirementRow(
-                icon = Icons.Default.Wc,
-                label = "Gender Target",
-                value = campaign.targetAudience?.gender ?: "Any"
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = softGray)
-            RequirementRow(
-                icon = Icons.Default.Language,
-                label = "Platform",
-                value = campaign.platforms?.joinToString(", ") { it.platform } ?: "N/A"
-            )
-        }
-    }
-}
-
-@Composable
-fun BrandInfoSection(brand: Brand?) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Info, contentDescription = null, tint = themeColor, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Brand Bio",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = Color.Black
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = brand?.about ?: "No bio available.",
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 20.sp,
-                color = darkerGray,
-                fontSize = 13.sp
-            )
-            
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = softGray)
-            
-            // Brand Category
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Category, contentDescription = null, tint = darkerGray, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = brand?.brandCategories?.firstOrNull()?.let { "${it.category} - ${it.subCategories.firstOrNull() ?: ""}" } ?: "Not specified",
-                    fontSize = 13.sp,
-                    color = darkerGray
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Brand Target Audience
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.People, contentDescription = null, tint = darkerGray, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                val ageRange = if (brand?.targetAudience?.ageMin != null && brand.targetAudience.ageMax != null) {
-                    "${brand.targetAudience.ageMin} - ${brand.targetAudience.ageMax}"
-                } else "Any"
-                Text(
-                    text = "Targets: $ageRange, ${brand?.targetAudience?.gender ?: "Any"}",
-                    fontSize = 13.sp,
-                    color = darkerGray
-                )
-            }
-
-            if (brand?.profileUrl != null && brand.profileUrl.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Language, contentDescription = null, tint = darkerGray, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = brand.profileUrl, fontSize = 13.sp, color = darkerGray)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun InfoRow(icon: ImageVector, label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Surface(
-            color = themeColor.copy(alpha = 0.1f),
-            shape = CircleShape,
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = themeColor,
-                modifier = Modifier.padding(8.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(16.dp))
-        Column {
-            Text(text = label, fontSize = 12.sp, color = darkerGray)
-            Text(text = value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-        }
-    }
-}
-
-@Composable
-fun RequirementRow(icon: ImageVector, label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = null, tint = darkerGray.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(text = label, fontSize = 14.sp, color = darkerGray, modifier = Modifier.weight(1f))
-        Text(
-            text = value,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = themeColor
-        )
-    }
-}
-
-@Composable
-fun CollaborateButton(campaign: CampaignDetail, navController: NavController) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(12.dp),
-        color = Color.White
-    ) {
-        Button(
-            onClick = {
-                navController.navigate("influencer_apply_campaign/${campaign.id}")
-            },
+        // ── Top bar ───────────────────────────────────────────────────────────
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
-                .height(54.dp),
+                .background(themeColor)
+                .statusBarsPadding()
+                .padding(horizontal = 4.dp, vertical = 4.dp)
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(22.dp))
+            }
+            Text(
+                "Campaign Details",
+                color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                modifier = Modifier.align(Alignment.Center)
+            )
+            IconButton(onClick = { wishlisted = !wishlisted }, modifier = Modifier.align(Alignment.CenterEnd)) {
+                Icon(
+                    if (wishlisted) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                    "Wishlist",
+                    tint = if (wishlisted) Color(0xFFEF4444) else Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        // ── Brand identity row ────────────────────────────────────────────────
+        Surface(color = themeColor) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp, bottom = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val brandName = campaign.brand?.name ?: "Brand"
+                val avatarBg = remember(brandName) { detailAvatarColor(brandName) }
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!campaign.brand?.logoUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = campaign.brand?.logoUrl,
+                            contentDescription = brandName,
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)).background(avatarBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(brandName.firstOrNull()?.uppercase() ?: "B",
+                                color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                        }
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(brandName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        if (campaign.brand?.isVerified == true) {
+                            Spacer(Modifier.width(5.dp))
+                            Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(15.dp))
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val rating = campaign.brand?.averageRating ?: 0.0
+                        Icon(Icons.Default.Star, null, tint = Color(0xFFFCD34D), modifier = Modifier.size(13.dp))
+                        Spacer(Modifier.width(3.dp))
+                        Text("${"%.1f".format(rating)}", color = Color.White.copy(0.9f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Spacer(Modifier.width(6.dp))
+                        Text("·", color = Color.White.copy(0.5f), fontSize = 13.sp)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Brand", color = Color.White.copy(0.75f), fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            Spacer(Modifier.height((-16).dp)) // pull up into the theme color band
+
+            // ── Campaign summary card ──────────────────────────────────────────
+            DetailCard {
+                val (statusBg, statusFg) = when (campaign.status.uppercase()) {
+                    "ACTIVE" -> Color(0xFFDCFCE7) to Color(0xFF15803D)
+                    "PAUSED" -> Color(0xFFFEF9C3) to Color(0xFFB45309)
+                    else     -> Color(0xFFF1F5F9) to Color(0xFF64748B)
+                }
+                Surface(shape = RoundedCornerShape(6.dp), color = statusBg) {
+                    Text(campaign.status.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                        color = statusFg, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(campaign.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                Spacer(Modifier.height(6.dp))
+                Text(campaign.description, fontSize = 13.sp, color = Color(0xFF64748B), lineHeight = 20.sp)
+                val ago = detailPostedAgo(campaign.createdAt)
+                if (ago.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Posted $ago", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // ── Campaign details ───────────────────────────────────────────────
+            DetailSectionLabel("CAMPAIGN DETAILS")
+            Spacer(Modifier.height(6.dp))
+            DetailCard {
+                val budgetText = when {
+                    campaign.budgetMin != null && campaign.budgetMax != null ->
+                        "${detailBudgetFmt(campaign.budgetMin)} - ${detailBudgetFmt(campaign.budgetMax)}"
+                    campaign.budgetMin != null -> "${detailBudgetFmt(campaign.budgetMin)}+"
+                    else -> null
+                }
+                val timelineText = when {
+                    campaign.startDate != null && campaign.endDate != null ->
+                        "${detailFmtDate(campaign.startDate)} - ${detailFmtDate(campaign.endDate)}"
+                    campaign.startDate != null -> "${detailFmtDate(campaign.startDate)} - Open"
+                    else -> "Flexible"
+                }
+                val categories = campaign.categories
+                    ?.flatMap { listOf(it.category) + it.subCategories.take(2) }
+                    ?.joinToString(", ") ?: campaign.brand?.brandCategories
+                    ?.flatMap { listOf(it.category) + it.subCategories.take(1) }
+                    ?.joinToString(", ")
+
+                if (budgetText != null) {
+                    DetailRow(Icons.Default.CurrencyRupee, "Budget", budgetText, themeColor)
+                    DetailDivider()
+                }
+                DetailRow(Icons.Default.CalendarMonth, "Timeline", timelineText, Color(0xFF0F172A))
+                if (!categories.isNullOrBlank()) {
+                    DetailDivider()
+                    DetailRow(Icons.Default.Category, "Category", categories, themeColor)
+                }
+                val aud = campaign.targetAudience
+                if (aud != null) {
+                    val ageStr = if (aud.ageMin != null && aud.ageMax != null) "${aud.ageMin} - ${aud.ageMax}" else "Any"
+                    val gStr = aud.gender?.let {
+                        if (it.equals("BOTH", true)) "Both" else it.replaceFirstChar { c -> c.uppercase() }
+                    } ?: "Any"
+                    DetailDivider()
+                    DetailRow(Icons.Default.People, "Age & Gender", "$ageStr · $gStr", Color(0xFF0F172A))
+                    val locs = aud.locations?.filterNot { it.isBlank() }?.joinToString(", ")
+                    if (!locs.isNullOrBlank()) {
+                        DetailDivider()
+                        DetailRow(Icons.Default.LocationOn, "Locations", locs, Color(0xFF0F172A))
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // ── Platforms & formats ────────────────────────────────────────────
+            val platforms = campaign.platforms
+            if (!platforms.isNullOrEmpty()) {
+                DetailSectionLabel("PLATFORMS & FORMATS")
+                Spacer(Modifier.height(6.dp))
+                DetailCard {
+                    platforms.forEachIndexed { idx, plat ->
+                        if (idx > 0) DetailDivider()
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            val pColor = platformColor(plat.platform)
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = pColor.copy(alpha = 0.12f)
+                            ) {
+                                Text(platformAbbr(plat.platform), fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                                    color = pColor, modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp))
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(platformFullName(plat.platform), fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+                            if (!plat.formats.isNullOrEmpty()) {
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    plat.formats.joinToString(", "),
+                                    fontSize = 13.sp, color = Color(0xFF64748B),
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+
+            // ── Brand section ─────────────────────────────────────────────────
+            DetailSectionLabel("BRAND")
+            Spacer(Modifier.height(6.dp))
+            DetailCard {
+                val brand = campaign.brand
+                val brandName = brand?.name ?: "Brand"
+                val avatarBg = remember(brandName) { detailAvatarColor(brandName) }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(avatarBg),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!brand?.logoUrl.isNullOrEmpty()) {
+                            AsyncImage(brand?.logoUrl, brandName,
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Crop)
+                        } else {
+                            Text(brandName.firstOrNull()?.uppercase() ?: "B",
+                                color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(brandName, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF0F172A))
+                            if (brand?.isVerified == true) {
+                                Spacer(Modifier.width(4.dp))
+                                Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF2196F3), modifier = Modifier.size(14.dp))
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(3.dp))
+                            val rating = brand?.averageRating ?: 0.0
+                            val ratingLabel = if (rating > 0) "${"%.1f".format(rating)}" else "New"
+                            Text(ratingLabel, fontSize = 12.sp, color = Color(0xFF64748B))
+                            if (brand?.profileCompleted == true) {
+                                Text(" · Profile 100%", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                            }
+                        }
+                    }
+                }
+
+                if (!brand?.about.isNullOrBlank()) {
+                    DetailDivider()
+                    Text(brand?.about ?: "", fontSize = 13.sp, color = Color(0xFF64748B), lineHeight = 20.sp)
+                }
+
+                val cats = brand?.brandCategories
+                    ?.flatMap { listOf(it.category) + it.subCategories.take(1) }
+                    ?.joinToString(" · ")
+                if (!cats.isNullOrBlank()) {
+                    DetailDivider()
+                    DetailRow(Icons.Default.Category, "Brand categories", cats, themeColor)
+                }
+
+                val taud = brand?.targetAudience
+                if (taud != null) {
+                    val ageStr = if (taud.ageMin != null && taud.ageMax != null) "${taud.ageMin}-${taud.ageMax}" else "Any"
+                    val gStr = taud.gender?.let {
+                        if (it.equals("BOTH", true)) "Any" else it.replaceFirstChar { c -> c.uppercase() }
+                    } ?: "Any"
+                    DetailDivider()
+                    DetailRow(Icons.Default.People, "Usual audience", "$ageStr · $gStr", Color(0xFF0F172A))
+                    val locs = taud.locations?.filterNot { it.isBlank() }?.joinToString(", ")
+                    if (!locs.isNullOrBlank()) {
+                        DetailDivider()
+                        DetailRow(Icons.Default.LocationOn, "Usual locations", locs, Color(0xFF0F172A))
+                    }
+                }
+
+                val updatedStr = detailUpdatedAgo(brand?.updatedAt)
+                if (updatedStr != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(updatedStr, fontSize = 11.sp, color = Color(0xFFCBD5E1))
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+// ─── Reusable detail components ───────────────────────────────────────────────
+
+@Composable
+private fun DetailCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), content = content)
+    }
+}
+
+@Composable
+private fun DetailSectionLabel(text: String) {
+    Text(text, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+        color = Color(0xFF94A3B8), letterSpacing = 0.8.sp)
+}
+
+@Composable
+private fun DetailDivider() {
+    HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color(0xFFF1F5F9), thickness = 1.dp)
+}
+
+@Composable
+private fun DetailRow(icon: ImageVector, label: String, value: String, valueColor: Color) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(label, fontSize = 13.sp, color = Color(0xFF64748B), modifier = Modifier.weight(1f))
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = valueColor,
+            maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1.2f))
+    }
+}
+
+// ─── Apply Now bottom bar ─────────────────────────────────────────────────────
+
+@Composable
+fun DetailApplyBar(campaign: CampaignDetail, navController: NavController) {
+    val themeColor = MaterialTheme.colorScheme.primary
+    Surface(
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+        color = Color.White,
+        shadowElevation = 12.dp
+    ) {
+        Button(
+            onClick = { navController.navigate("influencer_apply_campaign/${campaign.id}") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .height(52.dp),
             colors = ButtonDefaults.buttonColors(containerColor = themeColor),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(14.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
         ) {
-            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "Apply Now",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp
-            )
+            Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Apply Now", fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp)
         }
     }
 }

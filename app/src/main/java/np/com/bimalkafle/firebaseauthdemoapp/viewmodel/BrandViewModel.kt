@@ -116,7 +116,7 @@ class BrandViewModel : ViewModel() {
             query HomeRecs {
               searchInfluencers(${filterArg}page: 0, limit: 10) {
                 influencers {
-                  id email name bio location gender availability logoUrl isVerified averageRating
+                  id email name bio about creatorName location gender availability logoUrl isVerified averageRating
                   tier totalFollowers engagementRate collaborationCount
                   categories { category subCategories }
                   platforms { platform profileUrl followers avgViews engagement formats connected }
@@ -175,6 +175,8 @@ class BrandViewModel : ViewModel() {
                     profileCompleted
                     updatedAt
                     bio
+                    about
+                    creatorName
                     location
                     gender
                     motherTongue
@@ -374,7 +376,9 @@ class BrandViewModel : ViewModel() {
             role = obj.optString("role"),
             profileCompleted = if (obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
             updatedAt = obj.optString("updatedAt"),
-            bio = obj.optString("bio"),
+            bio = obj.optString("bio").takeIf { it.isNotBlank() },
+            about = obj.optString("about").takeIf { it.isNotBlank() },
+            creatorName = obj.optString("creatorName").takeIf { it.isNotBlank() },
             location = obj.optString("location"),
             gender = obj.optString("gender").takeIf { it.isNotBlank() },
             motherTongue = obj.optString("motherTongue").takeIf { it.isNotBlank() },
