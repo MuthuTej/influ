@@ -679,11 +679,12 @@ private fun MetricItem(
     label: String,
     color: Color
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.height(4.dp))
-        Text(value, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        Text(label, fontSize = 10.sp, color = SubLabel)
+        Column {
+            Text(value, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(label, fontSize = 9.sp, color = SubLabel, lineHeight = 11.sp)
+        }
     }
 }
 
@@ -755,46 +756,40 @@ private fun PrioritiesSection(strengths: List<String>) {
 @Composable
 private fun PricingTable(influencer: InfluencerProfile) {
     val themeColor = influencerDetailThemeColor
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(Icons.Default.CreditCard, "Payments & Deliverables")
         Card(
             modifier  = Modifier.fillMaxWidth(),
-            shape     = RoundedCornerShape(20.dp),
+            shape     = RoundedCornerShape(16.dp),
             colors    = CardDefaults.cardColors(containerColor = CardBg),
             elevation = CardDefaults.cardElevation(2.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
                 influencer.pricing?.forEachIndexed { index, pricing ->
                     val platformType  = pricing.platform.uppercase()
                     val platformColor = platformsColors[platformType] ?: themeColor
                     Row(
-                        modifier  = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        modifier  = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Surface(color = platformColor.copy(alpha = 0.10f), shape = RoundedCornerShape(12.dp), modifier = Modifier.size(44.dp)) {
+                            Surface(color = platformColor.copy(alpha = 0.10f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(36.dp)) {
                                 Box(Modifier.fillMaxSize(), Alignment.Center) {
                                     when (platformType) {
-                                        "YOUTUBE"   -> Image(painterResource(R.drawable.youtube_logo),   null, modifier = Modifier.size(22.dp))
-                                        "INSTAGRAM" -> Image(painterResource(R.drawable.instagram_logo), null, modifier = Modifier.size(22.dp))
-                                        else        -> Icon(getDeliverableIcon(pricing.deliverable), null, tint = platformColor, modifier = Modifier.size(22.dp))
+                                        "YOUTUBE"   -> Image(painterResource(R.drawable.youtube_logo),   null, modifier = Modifier.size(18.dp))
+                                        "INSTAGRAM" -> Image(painterResource(R.drawable.instagram_logo), null, modifier = Modifier.size(18.dp))
+                                        else        -> Icon(getDeliverableIcon(pricing.deliverable), null, tint = platformColor, modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }
-                            Spacer(Modifier.width(14.dp))
-                            Column {
-                                Text(pricing.deliverable, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text(pricing.platform, fontSize = 12.sp, color = SubLabel, fontWeight = FontWeight.Medium)
-                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(pricing.deliverable, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("₹${formatInfluencerCount(pricing.price)}", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-                            Text("Negotiable", fontSize = 11.sp, color = Color(0xFF43A047), fontWeight = FontWeight.SemiBold)
-                        }
+                        Text("~ ₹${formatInfluencerCount(pricing.price)}", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
                     }
                     if (index < (influencer.pricing?.size ?: 0) - 1) {
-                        HorizontalDivider(color = DividerColor, thickness = 1.dp)
+                        HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
                     }
                 }
             }
