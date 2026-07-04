@@ -491,6 +491,12 @@ fun CollaborationTimeline(
     // most recently submitted script, not the original rejected one.
     val scriptMessage = remember(messages) { messages.lastOrNull { it.type == "SCRIPT" } }
     val rejectionMessage = remember(messages) { messages.lastOrNull { it.type == "SCRIPT_REJECTED" } }
+    // Whichever of these two happened most recently tells us whether content
+    // is sitting with the brand for review, or was just kicked back to the
+    // influencer to resubmit.
+    val latestContentEvent = remember(messages) {
+        messages.lastOrNull { it.type == "CONTENT_SUBMITTED" || it.type == "CONTENT_REJECTED" }
+    }
     val negotiationMessages = remember(messages) { messages.filter { it.type == "NEGOTIATION" }.sortedBy { it.timestamp } }
 
     var showBriefDialog by remember { mutableStateOf(false) }
@@ -499,6 +505,7 @@ fun CollaborationTimeline(
     var showFeedbackDialog by remember { mutableStateOf(false) }
     var showNegotiationDialog by remember { mutableStateOf(false) }
     var showUploadDialog by remember { mutableStateOf(false) }
+    var showRejectContentDialog by remember { mutableStateOf(false) }
 
     // Step state flags
     val briefStepShown  = statusIndex >= STATUS_ORDER.indexOf("ACCEPTED")
@@ -517,6 +524,12 @@ fun CollaborationTimeline(
     val paymentDone      = statusIndex >= STATUS_ORDER.indexOf("IN_PROGRESS")
     val contentDeliveryActive = status == "IN_PROGRESS"
     val contentDeliveryDone   = status == "COMPLETED"
+    // Content stays IN_PROGRESS through the whole review cycle (so the
+    // analytics-sync cron, which only polls IN_PROGRESS collaborations, never
+    // stalls while the brand is reviewing) — these two flags branch the UI
+    // on top of that single status rather than needing extra status values.
+    val contentAwaitingReview = status == "IN_PROGRESS" && latestContentEvent?.type == "CONTENT_SUBMITTED"
+    val contentRejectedPendingResubmit = status == "IN_PROGRESS" && latestContentEvent?.type == "CONTENT_REJECTED"
 
     Column(
         modifier = modifier
@@ -1030,7 +1043,12 @@ fun CollaborationTimeline(
             isDone = contentDeliveryDone,
             isLocked = !contentDeliveryActive && !contentDeliveryDone,
             isLast = true,
-            badge = if (contentDeliveryDone) "DONE" else null
+            badge = when {
+                contentDeliveryDone -> "DONE"
+                contentAwaitingReview -> "IN REVIEW"
+                contentRejectedPendingResubmit -> "REJECTED"
+                else -> null
+            }
         ) {
             when {
                 contentDeliveryDone -> Text(
@@ -1038,6 +1056,95 @@ fun CollaborationTimeline(
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFF555555)
                 )
+                contentAwaitingReview -> {
+                    Text(
+                        text = "CONTENT SUBMITTED",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    if (isBrand) {
+                        Text(
+                            "Review the submitted content above and accept or reject it.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF333333)
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = { onStatusUpdate("COMPLETED") },
+                                enabled = !isActionLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                if (isActionLoading) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Accept", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Button(
+                                onClick = { showRejectContentDialog = true },
+                                enabled = !isActionLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Reject", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Text("Waiting for brand to review your submission.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                }
+                contentRejectedPendingResubmit -> {
+                    Text(
+                        text = "CONTENT REJECTED",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF5252),
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    val reason = latestContentEvent?.metadata?.get("reason")?.toString() ?: latestContentEvent?.text ?: ""
+                    if (reason.isNotBlank()) {
+                        Text(
+                            text = reason,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF333333)
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    if (!isBrand) {
+                        Button(
+                            onClick = { showUploadDialog = true },
+                            enabled = !isActionLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isActionLoading) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Resubmit Content", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Text("Waiting for influencer to resubmit content.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                }
                 contentDeliveryActive -> {
                     if (!isBrand) {
                         Button(
@@ -1155,14 +1262,30 @@ fun CollaborationTimeline(
             onDismiss = { showUploadDialog = false },
             onSend = { links, platform ->
                 showUploadDialog = false
-                // Only mark COMPLETED once every link has been saved to the backend,
-                // so the analytics page always sees the video/post data when it loads.
+                // Only mark it submitted-for-review once every link has been saved to
+                // the backend, so the analytics page already sees the video/post data
+                // by the time the brand opens it. Status stays IN_PROGRESS — the brand's
+                // own Accept action is what actually completes the collaboration.
                 val pending = java.util.concurrent.atomic.AtomicInteger(links.size)
                 links.forEach { link ->
                     onSendUpload(link, platform) {
-                        if (pending.decrementAndGet() == 0) onStatusUpdate("COMPLETED")
+                        if (pending.decrementAndGet() == 0) {
+                            onSend("Content Submitted for Review", "CONTENT_SUBMITTED", emptyMap())
+                        }
                     }
                 }
+            }
+        )
+    }
+    if (showRejectContentDialog) {
+        TextInputDialog(
+            title = "Reject Content",
+            label = "Reason for rejection",
+            multiline = true,
+            onDismiss = { showRejectContentDialog = false },
+            onSend = { reason ->
+                onSend("Content Rejected", "CONTENT_REJECTED", mapOf("reason" to reason))
+                showRejectContentDialog = false
             }
         )
     }
