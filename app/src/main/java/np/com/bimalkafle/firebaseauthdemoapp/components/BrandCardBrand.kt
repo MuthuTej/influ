@@ -56,11 +56,13 @@ private fun avatarColorFor(name: String) =
     AvatarPalette[abs(name.hashCode()) % AvatarPalette.size]
 
 private fun initialsFor(name: String): String {
-    val parts = name.trim().split(Regex("\\s+"))
-    return if (parts.size >= 2)
-        "${parts[0].first()}${parts[1].first()}".uppercase()
-    else
-        name.take(2).uppercase()
+    val words = name.trim().split("\\s+".toRegex())
+
+    return when {
+        words.isEmpty() -> ""
+        words.size == 1 -> words[0].take(1).uppercase()
+        else -> (words.first().take(1) + words.last().take(1)).uppercase()
+    }
 }
 
 // ─── Main card ──────────────────────────────────────────────────────────────
@@ -99,17 +101,16 @@ fun BrandCardBrand(
     val topLocation  = influencer.audienceInsights?.topLocations?.maxByOrNull { it.percentage }
     val hasDemographics = genderSplit != null || topAgeGroup != null || topLocation != null
 
-    // Analytics extras (avg likes / comments from Instagram metrics)
+    // Analytics extras
     val avgLikes    = influencer.instagramMetrics?.avgLikes?.let { formatCount(it.toLong()) }
-    val avgComments = influencer.instagramMetrics?.avgComments?.let { formatCount(it.toLong()) }
 
-    // Stat items built up-front so the middle column can render them inline
+    // Stat items: Followers replaced Comments, now includes all key metrics
     val statItems = buildList<Pair<ImageVector, String>> {
         effectiveAvgViews?.let { add(Icons.Default.Visibility to formatCount(it)) }
         influencer.collaborationCount?.let { add(Icons.Default.Handshake to it.toString()) }
         effectiveEr?.let { add(Icons.Default.Insights to String.format("%.1f%%", it)) }
         avgLikes?.let { add(Icons.Default.ThumbUp to it) }
-        avgComments?.let { add(Icons.Default.ChatBubbleOutline to it) }
+        totalFollowers?.let { if (it > 0) add(Icons.Default.Groups to formatCount(it.toLong())) }
     }
 
     Card(
@@ -119,27 +120,26 @@ fun BrandCardBrand(
         modifier = modifier.clickable { onCardClick() }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-
-            // ── Main row ─────────────────────────────────────────────────────
-            // IntrinsicSize.Min makes the Row adopt the Column's natural height.
-            // SuppressIntrinsicHeight on the image Box prevents AsyncImage from
-            // reporting its loaded pixel dimensions as the intrinsic height
-            // (which would make the Row enormous). The image fills the Row height
-            // via fillMaxHeight(), cropping to fit without forcing a square.
+            // Parent Row: Avatar + Info (Header + Stats)
             Row(
-                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
                 verticalAlignment = Alignment.Top
             ) {
+                // Avatar Box: Fills height to match Info Column
                 Box(
                     modifier = Modifier
-                        .width(56.dp)
+                        .width(64.dp)
                         .fillMaxHeight()
                         .then(SuppressIntrinsicHeight)
                         .clip(RoundedCornerShape(12.dp))
                         .background(avatarBg),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (!influencer.logoUrl.isNullOrEmpty()) {
+                    val hasImage = influencer.logoUrl?.startsWith("http", ignoreCase = true) == true
+
+                    if (hasImage) {
                         AsyncImage(
                             model = influencer.logoUrl,
                             contentDescription = influencer.name,
@@ -153,160 +153,147 @@ fun BrandCardBrand(
                             text = initials,
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 19.sp
+                            fontSize = 24.sp
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                // Middle column — 3 compact rows totalling ~53dp to match image
+                // Info Column (Header + Stats)
                 Column(modifier = Modifier.weight(1f)) {
-
-                    // Row 1: Name + verified icon
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = influencer.name,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color(0xFF0F172A),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        if (influencer.isVerified == true) {
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Icon(
-                                Icons.Default.CheckCircle, "Verified",
-                                tint = Color(0xFF2196F3),
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
-                    }
-
-                    // Row 2: location · category  |  [MACRO][Available] right-pinned
-                    Spacer(modifier = Modifier.height(3.dp))
+                    // Header Row: Name/Location/Badges on left, Wishlist on right
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Row(
-                            modifier = Modifier.weight(1f, fill = false),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (!influencer.location.isNullOrBlank()) {
-                                Icon(
-                                    Icons.Default.LocationOn, null,
-                                    tint = Color(0xFF94A3B8),
-                                    modifier = Modifier.size(10.dp)
-                                )
-                                Spacer(Modifier.width(2.dp))
+                        // Left Column: Name, Location/Category, Badges
+                        Column(modifier = Modifier.weight(1f)) {
+                            // Name + verified
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = influencer.location,
-                                    fontSize = 10.sp,
-                                    color = Color(0xFF64748B),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                            }
-                            val cat = influencer.categories?.firstOrNull()?.category
-                            if (!cat.isNullOrBlank()) {
-                                if (!influencer.location.isNullOrBlank()) {
-                                    Text(" · ", fontSize = 10.sp, color = Color(0xFF94A3B8))
-                                }
-                                Text(
-                                    text = cat,
-                                    fontSize = 10.sp,
-                                    color = themeColor,
-                                    fontWeight = FontWeight.SemiBold,
+                                    text = influencer.name,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = Color(0xFF0F172A),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                                if (influencer.isVerified == true) {
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Icon(
+                                        Icons.Default.CheckCircle, "Verified",
+                                        tint = Color(0xFF2196F3),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+                            }
+
+                            // Location & Category + Badges
+                            Spacer(modifier = Modifier.height(1.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    modifier = Modifier.weight(1f, fill = false),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (!influencer.location.isNullOrBlank()) {
+                                        Icon(Icons.Default.LocationOn, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(9.dp))
+                                        Spacer(Modifier.width(1.dp))
+                                        Text(
+                                            text = influencer.location,
+                                            fontSize = 8.sp,
+                                            color = Color(0xFF64748B),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    val cat = influencer.categories?.firstOrNull()?.category
+                                    if (!cat.isNullOrBlank()) {
+                                        if (!influencer.location.isNullOrBlank()) {
+                                            Text(" · ", fontSize = 8.sp, color = Color(0xFF94A3B8))
+                                        }
+                                        Text(
+                                            text = cat,
+                                            fontSize = 8.sp,
+                                            color = themeColor,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.width(5.dp))
+                                
+                                // Badges
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val tier = influencer.tier?.takeIf { it.isNotBlank() }
+                                    if (tier != null) TierBadge(tier)
+                                    AvailabilityBadge(available = influencer.availability == true)
+                                }
                             }
                         }
-                        Spacer(Modifier.width(5.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val tier = influencer.tier?.takeIf { it.isNotBlank() }
-                            if (tier != null) TierBadge(tier)
-                            AvailabilityBadge(available = influencer.availability == true)
+
+                        // Right Column: Wishlist
+                        Column(horizontalAlignment = Alignment.End) {
+                            Box(
+                                modifier = Modifier.size(32.dp).offset(y = (-6).dp, x = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                IconButton(onClick = { onWishlistToggle() }) {
+                                    Icon(
+                                        imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                        contentDescription = null,
+                                        tint = if (isWishlisted) Color(0xFFEF4444) else Color(0xFFCBD5E1),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    // Row 3: all stats — full width, no badges competing for space
+                    // Stats Row: Occupies entire width below header, now closely spaced
                     if (statItems.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            statItems.forEachIndexed { idx, (icon, value) ->
-                                if (idx > 0) {
-                                    Text("·", fontSize = 8.sp, color = Color(0xFFCBD5E1),
-                                        modifier = Modifier.padding(horizontal = 3.dp))
-                                }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            statItems.forEach { (icon, value) ->
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    Icon(icon, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(10.dp))
-                                    Text(value, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF475569))
+                                    Icon(icon, null, tint = Color(0xFF64748B), modifier = Modifier.size(11.dp))
+                                    Text(
+                                        text = value,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF334155)
+                                    )
                                 }
                             }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                // Followers count
-                if (totalFollowers != null && totalFollowers > 0) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = formatCount(totalFollowers.toLong()),
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 16.sp,
-                            color = Color(0xFF0F172A)
-                        )
-                        Text(
-                            text = "followers",
-                            fontSize = 9.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-
-                // Wishlist heart — 40dp touch target
-                Box(
-                    modifier = Modifier.size(40.dp),
-                    contentAlignment = Alignment.TopCenter
-                ) {
-                    IconButton(onClick = { onWishlistToggle() }) {
-                        Icon(
-                            imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                            contentDescription = if (isWishlisted) "Remove from wishlist" else "Add to wishlist",
-                            tint = if (isWishlisted) Color(0xFFEF4444) else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
             }
 
-            // ── Bio — appears after the avatar row ────────────────────────────
+            // Bio & Demographics - Outside the top Row so Image ends at Stats level
             if (!influencer.bio.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = influencer.bio,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
+                    fontSize = 11.5.sp,
+                    lineHeight = 16.sp,
                     color = Color(0xFF64748B),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            // ── Audience demographics ─────────────────────────────────────────
             if (hasDemographics) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
@@ -319,24 +306,22 @@ fun BrandCardBrand(
                             "♀ ${genderSplit.female.toInt()}%" to Color(0xFFDB2777)
                         else
                             "♂ ${genderSplit.male.toInt()}%" to Color(0xFF2563EB)
-                        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
+                        Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = color)
                     }
                     if (topAgeGroup != null) {
-                        Text("·", fontSize = 11.sp, color = Color(0xFFCBD5E1))
+                        Text("·", fontSize = 10.sp, color = Color(0xFFCBD5E1))
                         Text(
                             text = "${topAgeGroup.range} (${topAgeGroup.percentage.toInt()}%)",
-                            fontSize = 11.sp,
-                            color = Color(0xFF64748B),
-                            fontWeight = FontWeight.Medium
+                            fontSize = 10.sp,
+                            color = Color(0xFF64748B)
                         )
                     }
                     if (topLocation != null) {
-                        Text("·", fontSize = 11.sp, color = Color(0xFFCBD5E1))
+                        Text("·", fontSize = 10.sp, color = Color(0xFFCBD5E1))
                         Text(
                             text = topLocation.city,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             color = Color(0xFF64748B),
-                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -360,7 +345,7 @@ private fun TierBadge(tier: String) {
     Surface(shape = RoundedCornerShape(4.dp), color = bg) {
         Text(
             text = tier.uppercase(),
-            fontSize = 8.5.sp,
+            fontSize = 8.sp,
             fontWeight = FontWeight.Bold,
             color = fg,
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
@@ -376,7 +361,7 @@ private fun AvailabilityBadge(available: Boolean) {
     Surface(shape = RoundedCornerShape(4.dp), color = bg) {
         Text(
             text = label,
-            fontSize = 8.5.sp,
+            fontSize = 8.sp,
             fontWeight = FontWeight.SemiBold,
             color = fg,
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)

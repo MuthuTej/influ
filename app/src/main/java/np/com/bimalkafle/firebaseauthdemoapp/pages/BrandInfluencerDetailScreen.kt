@@ -42,6 +42,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramProfile
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
+import kotlin.math.abs
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 private val influencerDetailThemeColor: Color
@@ -59,6 +60,28 @@ private val platformsColors = mapOf(
     "X"         to Color(0xFF000000),
     "TWITTER"   to Color(0xFF1DA1F2)
 )
+
+// ─── Avatar colour palette (hash-based, stable per influencer name) ─────────
+private val AvatarPalette = listOf(
+    Color(0xFF5E4AE3),
+    Color(0xFFE84393),
+    Color(0xFF0EA5E9),
+    Color(0xFF10B981),
+    Color(0xFFF59E0B),
+    Color(0xFFEF4444),
+)
+
+private fun avatarColorFor(name: String) =
+    AvatarPalette[abs(name.hashCode()) % AvatarPalette.size]
+
+private fun initialsFor(name: String): String {
+    val words = name.trim().split("\\s+".toRegex())
+    return when {
+        words.isEmpty() -> ""
+        words.size == 1 -> words[0].take(1).uppercase()
+        else -> (words.first().take(1) + words.last().take(1)).uppercase()
+    }
+}
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -195,6 +218,8 @@ private fun ProfileHero(
     )
 
     val handle = influencer.instagramProfiles?.firstOrNull()?.username
+    val initials = remember(influencer.name) { initialsFor(influencer.name) }
+    val avatarBg = remember(influencer.name) { avatarColorFor(influencer.name) }
 
     Box(modifier = Modifier.fillMaxWidth()) {
 
@@ -229,10 +254,11 @@ private fun ProfileHero(
                         modifier = Modifier
                             .size(60.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(themeColor.copy(alpha = 0.15f)),
+                            .background(avatarBg),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!influencer.logoUrl.isNullOrEmpty()) {
+                        val hasImage = influencer.logoUrl?.startsWith("http", ignoreCase = true) == true
+                        if (hasImage) {
                             AsyncImage(
                                 model              = influencer.logoUrl,
                                 contentDescription = influencer.name,
@@ -240,11 +266,7 @@ private fun ProfileHero(
                                 contentScale       = ContentScale.Crop
                             )
                         } else {
-                            val initials = influencer.name.trim().split(Regex("\\s+")).let { p ->
-                                if (p.size >= 2) "${p[0].first()}${p[1].first()}".uppercase()
-                                else influencer.name.take(2).uppercase()
-                            }
-                            Text(initials, color = themeColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                            Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
                         }
                     }
 
