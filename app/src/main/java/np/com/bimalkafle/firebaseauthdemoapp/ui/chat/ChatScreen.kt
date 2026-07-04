@@ -486,11 +486,16 @@ fun CollaborationTimeline(
     val statusIndex = STATUS_ORDER.indexOf(status).coerceAtLeast(0)
 
     val briefMessage = remember(messages) { messages.firstOrNull { it.type == "BRIEF" } }
-    val scriptMessage = remember(messages) { messages.firstOrNull { it.type == "SCRIPT" } }
+    // lastOrNull, not firstOrNull: after a rejection + resubmission there can be
+    // more than one SCRIPT message, and the timeline should always show the
+    // most recently submitted script, not the original rejected one.
+    val scriptMessage = remember(messages) { messages.lastOrNull { it.type == "SCRIPT" } }
+    val rejectionMessage = remember(messages) { messages.lastOrNull { it.type == "SCRIPT_REJECTED" } }
     val negotiationMessages = remember(messages) { messages.filter { it.type == "NEGOTIATION" }.sortedBy { it.timestamp } }
 
     var showBriefDialog by remember { mutableStateOf(false) }
     var showScriptDialog by remember { mutableStateOf(false) }
+    var showRejectScriptDialog by remember { mutableStateOf(false) }
     var showFeedbackDialog by remember { mutableStateOf(false) }
     var showNegotiationDialog by remember { mutableStateOf(false) }
     var showUploadDialog by remember { mutableStateOf(false) }
@@ -502,6 +507,12 @@ fun CollaborationTimeline(
     val scriptStepShown  = statusIndex >= STATUS_ORDER.indexOf("BRIEF_FINALIZED")
     val scriptContentAvail = scriptMessage != null || statusIndex >= STATUS_ORDER.indexOf("SCRIPT_SENT")
     val scriptDone       = statusIndex >= STATUS_ORDER.indexOf("WAITING_FOR_PAYMENT")
+    // True while the brand's most recent action on this script was a rejection
+    // that the influencer hasn't resubmitted for yet (status is back to
+    // BRIEF_FINALIZED and no newer SCRIPT message exists than the rejection).
+    val rejectionPendingResubmit = status == "BRIEF_FINALIZED" &&
+        rejectionMessage != null &&
+        (scriptMessage == null || rejectionMessage.timestamp > scriptMessage.timestamp)
     val paymentActive    = status == "WAITING_FOR_PAYMENT"
     val paymentDone      = statusIndex >= STATUS_ORDER.indexOf("IN_PROGRESS")
     val contentDeliveryActive = status == "IN_PROGRESS"
@@ -802,14 +813,51 @@ fun CollaborationTimeline(
         val canSubmitScript = status == "BRIEF_FINALIZED" && !isBrand
         TimelineStepCard(
             title = "Script Revision",
-            time = scriptMessage?.timeFormatted ?: "",
+            time = (if (rejectionPendingResubmit) rejectionMessage else scriptMessage)?.timeFormatted ?: "",
             isActive = scriptStepShown && !scriptDone,
             isDone = scriptDone,
             isLocked = !scriptStepShown && !canSubmitScript,
             isLast = false,
-            badge = null
+            badge = if (rejectionPendingResubmit) "REJECTED" else null
         ) {
-            if (scriptContentAvail) {
+            if (rejectionPendingResubmit) {
+                Text(
+                    text = "SCRIPT REJECTED",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF5252),
+                    letterSpacing = 1.sp
+                )
+                Spacer(Modifier.height(6.dp))
+                val reason = rejectionMessage?.metadata?.get("reason")?.toString() ?: rejectionMessage?.text ?: ""
+                if (reason.isNotBlank()) {
+                    Text(
+                        text = reason,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF333333)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                if (!isBrand) {
+                    Button(
+                        onClick = { showScriptDialog = true },
+                        enabled = !isActionLoading,
+                        colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isActionLoading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.EditNote, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Resubmit Script", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    Text("Waiting for influencer to resubmit the script.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                }
+            } else if (scriptContentAvail) {
                 val scriptContent = scriptMessage?.metadata?.get("content")?.toString()
                     ?: scriptMessage?.text
                     ?: ""
@@ -856,7 +904,7 @@ fun CollaborationTimeline(
                             }
                         }
                         Button(
-                            onClick = { onStatusUpdate("BRIEF_FINALIZED") },
+                            onClick = { showRejectScriptDialog = true },
                             enabled = !isActionLoading,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
                             shape = RoundedCornerShape(20.dp),
@@ -1058,6 +1106,19 @@ fun CollaborationTimeline(
                 onSend("Script Submitted", "SCRIPT", mapOf("content" to content))
                 onStatusUpdate("SCRIPT_SENT")
                 showScriptDialog = false
+            }
+        )
+    }
+    if (showRejectScriptDialog) {
+        TextInputDialog(
+            title = "Reject Script",
+            label = "Reason for rejection",
+            multiline = true,
+            onDismiss = { showRejectScriptDialog = false },
+            onSend = { reason ->
+                onSend("Script Rejected", "SCRIPT_REJECTED", mapOf("reason" to reason))
+                onStatusUpdate("BRIEF_FINALIZED")
+                showRejectScriptDialog = false
             }
         )
     }
