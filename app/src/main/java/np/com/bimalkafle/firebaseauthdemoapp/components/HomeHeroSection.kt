@@ -247,24 +247,39 @@ fun PerformanceStatsSection(
             Text("· last 30 days", fontSize = 13.sp, color = Color.Gray)
         }
         Spacer(modifier = Modifier.height(Dimens.space12))
-        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.space12)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.space8)) {
             PerformanceStatCard(Icons.Default.Visibility, formatCompactCount(views), "Views", Modifier.weight(1f))
-            PerformanceStatCard(Icons.Default.Insights, "${String.format("%.1f", engagementRatePercent)}%", "Engagement", Modifier.weight(1f))
-            PerformanceStatCard(Icons.Default.BarChart, formatCompactCount(impressions), "Impressions", Modifier.weight(1f))
+            PerformanceStatCard(Icons.Default.Insights, "${String.format("%.1f", engagementRatePercent)}%", "Engagement", Modifier.weight(1.2f))
+            PerformanceStatCard(Icons.Default.BarChart, formatCompactCount(impressions), "Impressions", Modifier.weight(1.1f))
         }
     }
 }
 
 @Composable
 private fun PerformanceStatCard(icon: ImageVector, value: String, label: String, modifier: Modifier = Modifier) {
-    AppCard(modifier = modifier, contentPadding = PaddingValues(Dimens.space12)) {
-        Surface(shape = CircleShape, color = performanceIconBg, modifier = Modifier.size(36.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = performanceIconTint, modifier = Modifier.size(18.dp))
+    AppCard(modifier = modifier, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = CircleShape, color = performanceIconBg, modifier = Modifier.size(24.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = performanceIconTint, modifier = Modifier.size(12.dp))
+                }
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Column {
+                Text(
+                    text = value,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    lineHeight = 14.sp
+                )
+                Text(
+                    text = label,
+                    fontSize = 10.sp,
+                    color = Color.Gray,
+                    lineHeight = 11.sp
+                )
             }
         }
-        Spacer(modifier = Modifier.height(Dimens.space8))
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(label, fontSize = 12.sp, color = Color.Gray)
     }
 }
