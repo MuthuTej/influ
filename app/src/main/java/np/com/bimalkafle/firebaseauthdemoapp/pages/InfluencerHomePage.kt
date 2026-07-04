@@ -689,14 +689,15 @@ fun CampaignCardInfluencer(
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(brandName, fontSize = 12.sp, color = Color(0xFF64748B))
-                        val rating = campaign.brand?.averageRating
-                        if (rating != null && rating > 0) {
-                            Spacer(Modifier.width(4.dp))
-                            Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(11.dp))
-                            Spacer(Modifier.width(2.dp))
-                            Text("${"%.1f".format(rating)}", fontSize = 11.sp, color = Color(0xFFF59E0B), fontWeight = FontWeight.SemiBold)
-                        }
                     }
+                }
+
+                // Rating + Wishlist grouped together
+                val rating = campaign.brand?.averageRating
+                if (rating != null && rating > 0) {
+                    Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(2.dp))
+                    Text("${"%.1f".format(rating)}", fontSize = 12.sp, color = Color(0xFFF59E0B), fontWeight = FontWeight.SemiBold)
                 }
 
                 IconButton(onClick = onWishlistToggle, modifier = Modifier.size(36.dp)) {

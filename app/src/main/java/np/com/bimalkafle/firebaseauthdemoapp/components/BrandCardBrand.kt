@@ -163,7 +163,7 @@ fun BrandCardBrand(
                 // Info Column (Header + Stats)
                 Column(modifier = Modifier.weight(1f)) {
 
-                    // Row 1: Name + verified icon + rating + Wishlist
+                    // Row 1: Name + verified icon  |  rating + Wishlist
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.Top
@@ -186,27 +186,28 @@ fun BrandCardBrand(
                                         modifier = Modifier.size(13.dp)
                                     )
                                 }
-                                if (influencer.averageRating != null && influencer.averageRating > 0f) {
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
-                                    Spacer(modifier = Modifier.width(2.dp))
-                                    Text(String.format("%.1f", influencer.averageRating), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                                }
                             }
                         }
 
-                        // Wishlist button at top right
-                        Box(
-                            modifier = Modifier.size(32.dp).offset(y = (-12).dp, x = 12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            IconButton(onClick = { onWishlistToggle() }) {
-                                Icon(
-                                    imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                    contentDescription = null,
-                                    tint = if (isWishlisted) Color(0xFFEF4444) else Color(0xFFCBD5E1),
-                                    modifier = Modifier.size(18.dp)
-                                )
+                        // Rating + Wishlist grouped together at top right
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (influencer.averageRating != null && influencer.averageRating > 0f) {
+                                Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(String.format("%.1f", influencer.averageRating), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                            }
+                            Box(
+                                modifier = Modifier.size(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                IconButton(onClick = { onWishlistToggle() }, modifier = Modifier.size(32.dp)) {
+                                    Icon(
+                                        imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                        contentDescription = null,
+                                        tint = if (isWishlisted) Color(0xFFEF4444) else Color(0xFFCBD5E1),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
