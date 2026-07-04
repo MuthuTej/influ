@@ -44,6 +44,15 @@ import java.time.format.DateTimeFormatter
 private val brandThemeColor: Color
     @Composable get() = MaterialTheme.colorScheme.primary
 
+private fun formatBudget(amount: Int?): String {
+    if (amount == null) return "—"
+    return when {
+        amount >= 100_000 -> "${"%.1f".format(amount / 100_000.0)}L"
+        amount >= 1_000 -> "${"%.1f".format(amount / 1_000.0)}K"
+        else -> "$amount"
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AllCampaignPage(
@@ -264,7 +273,9 @@ fun CampaignDetailCard(campaign: Campaign, onClick: () -> Unit = {}) {
                 fontSize = 12.sp,
                 color = Color.Gray,
                 lineHeight = 16.sp,
-                modifier = Modifier.padding(top = 2.dp)
+                modifier = Modifier.padding(top = 2.dp),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -303,13 +314,6 @@ fun CampaignDetailCard(campaign: Campaign, onClick: () -> Unit = {}) {
                             )
                         }
                         
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = platform.platform, 
-                            fontWeight = FontWeight.Bold, 
-                            fontSize = 12.sp, 
-                            color = if (platformType == "INSTAGRAM" || platformType == "YOUTUBE") Color.Black else brandThemeColor
-                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         
                         FlowRow(
@@ -339,17 +343,15 @@ fun CampaignDetailCard(campaign: Campaign, onClick: () -> Unit = {}) {
 
             // Info Grid
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val budgetValue = if (campaign.budgetMin != null || campaign.budgetMax != null) {
+                    "${formatBudget(campaign.budgetMin)} - ${formatBudget(campaign.budgetMax)}"
+                } else "TBD"
+
                 CampaignInfoRow(
                     modifier = Modifier.weight(1.1f),
                     icon = Icons.Default.CurrencyRupee,
                     label = "Budget",
-                    value = if (campaign.budgetMin != null && campaign.budgetMax != null) {
-                        "₹${campaign.budgetMin} - ₹${campaign.budgetMax}"
-                    } else if (campaign.budgetMin != null) {
-                        "₹${campaign.budgetMin}+"
-                    } else if (campaign.budgetMax != null) {
-                        "Up to ₹${campaign.budgetMax}"
-                    } else "TBD"
+                    value = budgetValue
                 )
                 CampaignInfoRow(
                     modifier = Modifier.weight(0.9f),

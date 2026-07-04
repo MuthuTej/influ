@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -43,9 +44,9 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 private fun formatBudget(amount: Int?): String {
     if (amount == null) return "—"
     return when {
-        amount >= 100_000 -> "₹${"%.1f".format(amount / 100_000.0)}L"
-        amount >= 1_000 -> "₹${"%.1f".format(amount / 1_000.0)}K"
-        else -> "₹$amount"
+        amount >= 100_000 -> "${"%.1f".format(amount / 100_000.0)}L"
+        amount >= 1_000 -> "${"%.1f".format(amount / 1_000.0)}K"
+        else -> "$amount"
     }
 }
 
@@ -98,7 +99,7 @@ fun BrandCampaignDetailScreen(
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -135,10 +136,14 @@ private fun CampaignDetailBody(campaign: CampaignDetail, navController: NavHostC
         Spacer(modifier = Modifier.height(Dimens.space24))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.space12)) {
+            val budgetValue = if (campaign.budgetMin != null || campaign.budgetMax != null) {
+                "${formatBudget(campaign.budgetMin)} – ${formatBudget(campaign.budgetMax)}"
+            } else "—"
+
             DetailInfoCard(
                 icon = Icons.Default.CurrencyRupee,
                 label = "Budget",
-                value = "${formatBudget(campaign.budgetMin)} – ${formatBudget(campaign.budgetMax)}",
+                value = budgetValue,
                 modifier = Modifier.weight(1f)
             )
             DetailInfoCard(
@@ -352,19 +357,28 @@ private fun DetailInfoCard(icon: ImageVector, label: String, value: String, modi
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(Dimens.space12)) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(appColors.brandPrimary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = appColors.brandPrimary, modifier = Modifier.size(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(appColors.brandPrimary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = null, tint = appColors.brandPrimary, modifier = Modifier.size(14.dp))
+                }
+                Spacer(modifier = Modifier.width(Dimens.space8))
+                Text(
+                    text = value,
+                    fontSize = 13.sp,
+                    color = appColors.textPrimary,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            Spacer(modifier = Modifier.height(Dimens.space8))
-            Text(label, fontSize = 11.sp, color = appColors.textSecondary, fontWeight = FontWeight.Medium)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(value, fontSize = 14.sp, color = appColors.textPrimary, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(Dimens.space4))
+            Text(label, fontSize = 10.sp, color = appColors.textSecondary, fontWeight = FontWeight.Medium)
         }
     }
 }
