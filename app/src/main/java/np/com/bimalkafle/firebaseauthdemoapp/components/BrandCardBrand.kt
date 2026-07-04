@@ -162,7 +162,36 @@ fun BrandCardBrand(
 
                 // Info Column (Header + Stats)
                 Column(modifier = Modifier.weight(1f)) {
-                    // Header Row: Name/Location/Badges on left, Wishlist on right
+
+                    // Row 1: Name + verified icon
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = influencer.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = Color(0xFF0F172A),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (influencer.isVerified == true) {
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Icon(
+                                Icons.Default.CheckCircle, "Verified",
+                                tint = Color(0xFF2196F3),
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                        if (influencer.averageRating != null && influencer.averageRating > 0f) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(String.format("%.1f", influencer.averageRating), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                        }
+                    }
+
+                    // Row 2: location · category  |  [MACRO][Available] right-pinned
+                    Spacer(modifier = Modifier.height(3.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.Top

@@ -172,7 +172,10 @@ data class Collaboration(
     // Brand-only — always null when this collaboration was fetched by the
     // InfluencerViewModel (the backend won't return them for that role).
     val performanceTargets: PerformanceTargets? = null,
-    val performanceTracking: PerformanceTracking? = null
+    val performanceTracking: PerformanceTracking? = null,
+    // Whether the current user has already reviewed this collaboration —
+    // used to decide whether to prompt the post-collaboration rating dialog.
+    val hasReviewed: Boolean? = null
 )
 
 data class Campaign(
