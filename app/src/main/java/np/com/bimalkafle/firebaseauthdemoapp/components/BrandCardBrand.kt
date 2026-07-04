@@ -182,6 +182,12 @@ fun BrandCardBrand(
                                 modifier = Modifier.size(13.dp)
                             )
                         }
+                        if (influencer.averageRating != null && influencer.averageRating > 0f) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(String.format("%.1f", influencer.averageRating), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                        }
                     }
 
                     // Row 2: location · category  |  [MACRO][Available] right-pinned

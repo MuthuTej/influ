@@ -706,6 +706,7 @@ class BrandViewModel : ViewModel() {
                     totalViewsDelivered
                     viewsGrowthSincePosting
                     selectedInstagramProfileId
+                    hasReviewed
                   }
                 }
             """.trimIndent()
@@ -956,7 +957,8 @@ class BrandViewModel : ViewModel() {
                     viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting"),
                     selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() },
                     performanceTargets = performanceTargets,
-                    performanceTracking = performanceTracking
+                    performanceTracking = performanceTracking,
+                    hasReviewed = if (obj.isNull("hasReviewed")) null else obj.optBoolean("hasReviewed")
                 )
             )
         }
@@ -1366,6 +1368,51 @@ class BrandViewModel : ViewModel() {
             },
             onFailure = {
                 Log.e("BrandViewModel", "Error setting collaboration targets", it)
+                Result.failure(it)
+            }
+        )
+    }
+
+    /**
+     * Submits the brand's post-collaboration rating of the influencer
+     * (addReview mutation, src/graphql/modules/review/index.js). The backend
+     * rejects this unless the collaboration's status is COMPLETED and blocks
+     * a second review from the same reviewer for the same collaboration.
+     * Re-fetches collaborations on success so hasReviewed flips to true and
+     * the rating prompt doesn't reappear.
+     */
+    suspend fun addReview(
+        collaborationId: String,
+        revieweeId: String,
+        rating: Int,
+        comment: String,
+        token: String
+    ): Result<Unit> {
+        val mutation = """
+            mutation AddReview(${'$'}input: AddReviewInput!) {
+              addReview(input: ${'$'}input) {
+                id
+              }
+            }
+        """.trimIndent()
+
+        val variables = mapOf(
+            "input" to mapOf(
+                "collaborationId" to collaborationId,
+                "revieweeId" to revieweeId,
+                "rating" to rating,
+                "comment" to comment
+            )
+        )
+
+        val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+        return result.fold(
+            onSuccess = {
+                fetchCollaborations(token, force = true)
+                Result.success(Unit)
+            },
+            onFailure = {
+                Log.e("BrandViewModel", "Error adding review", it)
                 Result.failure(it)
             }
         )
