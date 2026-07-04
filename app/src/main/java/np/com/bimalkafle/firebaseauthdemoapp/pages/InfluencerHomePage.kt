@@ -53,7 +53,6 @@ import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.FirebaseAuthDemoAppTheme
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
-import np.com.bimalkafle.firebaseauthdemoapp.components.RatingPromptDialog
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.computeInfluencerHeroStats
@@ -140,39 +139,6 @@ fun InfluencerHomePage(
                 popUpTo("influencer_home") { inclusive = true }
             }
         }
-    }
-
-    // Prompt the influencer to rate the brand once a collaboration completes.
-    // Captured once into stable state (rather than recomputed every recomposition)
-    // so a mid-rating refetch of collaborations can't swap out or dismiss the
-    // dialog before its own thank-you timer finishes.
-    var activeReviewCollaboration by remember { mutableStateOf<Collaboration?>(null) }
-    LaunchedEffect(collaborations) {
-        if (activeReviewCollaboration == null) {
-            activeReviewCollaboration = collaborations.firstOrNull {
-                it.status == "COMPLETED" && it.hasReviewed == false
-            }
-        }
-    }
-    activeReviewCollaboration?.let { collaboration ->
-        RatingPromptDialog(
-            revieweeName = collaboration.brand?.name ?: "the brand",
-            onSubmit = { rating, comment ->
-                val token = firebaseToken
-                if (token == null) {
-                    Result.failure(Exception("Not authenticated"))
-                } else {
-                    influencerViewModel.addReview(
-                        collaborationId = collaboration.id,
-                        revieweeId = collaboration.brandId,
-                        rating = rating,
-                        comment = comment,
-                        token = token
-                    )
-                }
-            },
-            onDismiss = { activeReviewCollaboration = null }
-        )
     }
 
     var selectedBottomNavItem by remember { mutableStateOf("Home") }

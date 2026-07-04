@@ -33,6 +33,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.network.CollaborationWebSocketClient
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
+import np.com.bimalkafle.firebaseauthdemoapp.components.RatingPromptDialog
 import np.com.bimalkafle.firebaseauthdemoapp.model.ChatMessage
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
@@ -52,6 +53,7 @@ private val STATUS_ORDER = listOf(
     "WAITING_FOR_PAYMENT", "IN_PROGRESS", "COMPLETED"
 )
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Composable
 fun ChatScreen(
     chatId: String?,
@@ -176,6 +178,58 @@ fun ChatScreen(
             android.widget.Toast.makeText(localContext, it, android.widget.Toast.LENGTH_LONG).show()
             influencerViewModel.clearError()
         }
+    }
+
+    // Prompt for a post-collaboration rating right here in the negotiation chat,
+    // where the WebSocket above already keeps currentCollaboration live — so this
+    // reacts to the COMPLETED transition in real time instead of depending on a
+    // stale home-page snapshot. Captured once into stable state so a mid-rating
+    // refetch can't swap out or dismiss the dialog before its thank-you timer ends.
+    var activeReviewCollaboration by remember { mutableStateOf<Collaboration?>(null) }
+    LaunchedEffect(currentCollaboration) {
+        if (activeReviewCollaboration == null &&
+            currentCollaboration?.status == "COMPLETED" &&
+            currentCollaboration.hasReviewed == false
+        ) {
+            activeReviewCollaboration = currentCollaboration
+        }
+    }
+    activeReviewCollaboration?.let { collaboration ->
+        RatingPromptDialog(
+            revieweeName = if (isBrand) collaboration.influencer.name else (collaboration.brand?.name ?: "the brand"),
+            onSubmit = { rating, comment ->
+                val idToken = kotlinx.coroutines.suspendCancellableCoroutine<String?> { cont ->
+                    val user = FirebaseAuth.getInstance().currentUser
+                    if (user == null) {
+                        cont.resume(null, onCancellation = null)
+                    } else {
+                        user.getIdToken(true)
+                            .addOnSuccessListener { cont.resume(it.token, onCancellation = null) }
+                            .addOnFailureListener { cont.resume(null, onCancellation = null) }
+                    }
+                }
+                if (idToken == null) {
+                    Result.failure(Exception("Not authenticated"))
+                } else if (isBrand) {
+                    brandViewModel.addReview(
+                        collaborationId = collaboration.id,
+                        revieweeId = collaboration.influencerId,
+                        rating = rating,
+                        comment = comment,
+                        token = idToken
+                    )
+                } else {
+                    influencerViewModel.addReview(
+                        collaborationId = collaboration.id,
+                        revieweeId = collaboration.brandId,
+                        rating = rating,
+                        comment = comment,
+                        token = idToken
+                    )
+                }
+            },
+            onDismiss = { activeReviewCollaboration = null }
+        )
     }
 
     var isActionLoading by remember { mutableStateOf(false) }

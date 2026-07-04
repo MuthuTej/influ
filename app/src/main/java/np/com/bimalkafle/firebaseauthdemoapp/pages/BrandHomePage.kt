@@ -59,7 +59,6 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.BrandCardBrand
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
-import np.com.bimalkafle.firebaseauthdemoapp.components.RatingPromptDialog
 
 private val brandThemeColor: Color
     @Composable get() = MaterialTheme.colorScheme.primary
@@ -115,39 +114,6 @@ fun BrandHomePage(
                 popUpTo("brand_home") { inclusive = true }
             }
         }
-    }
-
-    // Prompt the brand to rate the influencer once a collaboration completes.
-    // Captured once into stable state (rather than recomputed every recomposition)
-    // so a mid-rating refetch of collaborations can't swap out or dismiss the
-    // dialog before its own thank-you timer finishes.
-    var activeReviewCollaboration by remember { mutableStateOf<Collaboration?>(null) }
-    LaunchedEffect(collaborations) {
-        if (activeReviewCollaboration == null) {
-            activeReviewCollaboration = collaborations.firstOrNull {
-                it.status == "COMPLETED" && it.hasReviewed == false
-            }
-        }
-    }
-    activeReviewCollaboration?.let { collaboration ->
-        RatingPromptDialog(
-            revieweeName = collaboration.influencer.name,
-            onSubmit = { rating, comment ->
-                val token = firebaseToken
-                if (token == null) {
-                    Result.failure(Exception("Not authenticated"))
-                } else {
-                    brandViewModel.addReview(
-                        collaborationId = collaboration.id,
-                        revieweeId = collaboration.influencerId,
-                        rating = rating,
-                        comment = comment,
-                        token = token
-                    )
-                }
-            },
-            onDismiss = { activeReviewCollaboration = null }
-        )
     }
 
     var selectedBottomNavItem by remember { mutableStateOf("Home") }
