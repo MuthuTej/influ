@@ -163,42 +163,12 @@ fun BrandCardBrand(
                 // Info Column (Header + Stats)
                 Column(modifier = Modifier.weight(1f)) {
 
-                    // Row 1: Name + verified icon
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = influencer.name,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color(0xFF0F172A),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        if (influencer.isVerified == true) {
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Icon(
-                                Icons.Default.CheckCircle, "Verified",
-                                tint = Color(0xFF2196F3),
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
-                        if (influencer.averageRating != null && influencer.averageRating > 0f) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(String.format("%.1f", influencer.averageRating), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                        }
-                    }
-
-                    // Row 2: location · category  |  [MACRO][Available] right-pinned
-                    Spacer(modifier = Modifier.height(3.dp))
+                    // Row 1: Name + verified icon + rating + Wishlist
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.Top
                     ) {
-                        // Left Column: Name, Location/Category, Badges
                         Column(modifier = Modifier.weight(1f)) {
-                            // Name + verified
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = influencer.name,
@@ -216,78 +186,88 @@ fun BrandCardBrand(
                                         modifier = Modifier.size(13.dp)
                                     )
                                 }
+                                if (influencer.averageRating != null && influencer.averageRating > 0f) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text(String.format("%.1f", influencer.averageRating), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                                }
                             }
+                        }
 
-                            // Location & Category + Badges
-                            Spacer(modifier = Modifier.height(1.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Wishlist button at top right
+                        Box(
+                            modifier = Modifier.size(32.dp).offset(y = (-12).dp, x = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            IconButton(onClick = { onWishlistToggle() }) {
+                                Icon(
+                                    imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (isWishlisted) Color(0xFFEF4444) else Color(0xFFCBD5E1),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Row 2: location · category + tags
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .offset(y = (-5).dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // Location and Category part that can truncate
+                        Row(
+                            modifier = Modifier.weight(1f, fill = false),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (!influencer.location.isNullOrBlank()) {
                                 Row(
                                     modifier = Modifier.weight(1f, fill = false),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (!influencer.location.isNullOrBlank()) {
-                                        Icon(Icons.Default.LocationOn, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(9.dp))
-                                        Spacer(Modifier.width(1.dp))
-                                        Text(
-                                            text = influencer.location,
-                                            fontSize = 8.sp,
-                                            color = Color(0xFF64748B),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    val cat = influencer.categories?.firstOrNull()?.category
-                                    if (!cat.isNullOrBlank()) {
-                                        if (!influencer.location.isNullOrBlank()) {
-                                            Text(" · ", fontSize = 8.sp, color = Color(0xFF94A3B8))
-                                        }
-                                        Text(
-                                            text = cat,
-                                            fontSize = 8.sp,
-                                            color = themeColor,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                                
-                                Spacer(modifier = Modifier.width(5.dp))
-                                
-                                // Badges
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val tier = influencer.tier?.takeIf { it.isNotBlank() }
-                                    if (tier != null) TierBadge(tier)
-                                    AvailabilityBadge(available = influencer.availability == true)
-                                }
-                            }
-                        }
-
-                        // Right Column: Wishlist
-                        Column(horizontalAlignment = Alignment.End) {
-                            Box(
-                                modifier = Modifier.size(32.dp).offset(y = (-6).dp, x = 6.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                IconButton(onClick = { onWishlistToggle() }) {
-                                    Icon(
-                                        imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                        contentDescription = null,
-                                        tint = if (isWishlisted) Color(0xFFEF4444) else Color(0xFFCBD5E1),
-                                        modifier = Modifier.size(18.dp)
+                                    Icon(Icons.Default.LocationOn, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(11.dp))
+                                    Spacer(Modifier.width(1.dp))
+                                    Text(
+                                        text = influencer.location,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF64748B),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
+                            val cat = influencer.categories?.firstOrNull()?.category
+                            if (!cat.isNullOrBlank()) {
+                                if (!influencer.location.isNullOrBlank()) {
+                                    Text("·", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                }
+                                Text(
+                                    text = cat,
+                                    fontSize = 11.sp,
+                                    color = themeColor,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                            }
                         }
+                        
+                        // Badges immediately after category
+                        val tier = influencer.tier?.takeIf { it.isNotBlank() }
+                        if (tier != null) TierBadge(tier)
+                        AvailabilityBadge(available = influencer.availability == true)
                     }
 
                     // Stats Row: Occupies entire width below header, now closely spaced
                     if (statItems.isNotEmpty()) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().offset(y = (-3).dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -312,7 +292,7 @@ fun BrandCardBrand(
 
             // Bio & Demographics - Outside the top Row so Image ends at Stats level
             if (!influencer.bio.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = influencer.bio,
                     fontSize = 11.5.sp,
@@ -324,7 +304,7 @@ fun BrandCardBrand(
             }
 
             if (hasDemographics) {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -371,13 +351,13 @@ private fun TierBadge(tier: String) {
         "MICRO" -> Color(0xFFF3E5F5) to Color(0xFF6A1B9A)
         else    -> Color(0xFFE8F5E9) to Color(0xFF2E7D32) // NANO / MINI
     }
-    Surface(shape = RoundedCornerShape(4.dp), color = bg) {
+    Surface(shape = RoundedCornerShape(2.dp), color = bg) {
         Text(
             text = tier.uppercase(),
-            fontSize = 8.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             color = fg,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
         )
     }
 }
@@ -387,13 +367,13 @@ private fun AvailabilityBadge(available: Boolean) {
     val bg  = if (available) Color(0xFFDCFCE7) else Color(0xFFF1F5F9)
     val fg  = if (available) Color(0xFF15803D) else Color(0xFF94A3B8)
     val label = if (available) "Available" else "Busy"
-    Surface(shape = RoundedCornerShape(4.dp), color = bg) {
+    Surface(shape = RoundedCornerShape(2.dp), color = bg) {
         Text(
             text = label,
-            fontSize = 8.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.SemiBold,
             color = fg,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
         )
     }
 }
