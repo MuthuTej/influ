@@ -502,7 +502,6 @@ fun CollaborationTimeline(
     var showBriefDialog by remember { mutableStateOf(false) }
     var showScriptDialog by remember { mutableStateOf(false) }
     var showRejectScriptDialog by remember { mutableStateOf(false) }
-    var showFeedbackDialog by remember { mutableStateOf(false) }
     var showNegotiationDialog by remember { mutableStateOf(false) }
     var showUploadDialog by remember { mutableStateOf(false) }
     var showRejectContentDialog by remember { mutableStateOf(false) }
@@ -1170,24 +1169,6 @@ fun CollaborationTimeline(
             }
         }
 
-        // ── Feedback ─────────────────────────────────────────────────────────
-        if (status != "COMPLETED" && status != "REJECTED" && status != "REVOKED") {
-            Spacer(Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(
-                    onClick = { showFeedbackDialog = true },
-                    colors = ButtonDefaults.textButtonColors(contentColor = TlRed)
-                ) {
-                    Icon(
-                        Icons.Default.Feedback,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text("Give Feedback", fontSize = 13.sp)
-                }
-            }
-        }
     }
 
     // ── Dialogs ──────────────────────────────────────────────────────────────
@@ -1226,18 +1207,6 @@ fun CollaborationTimeline(
                 onSend("Script Rejected", "SCRIPT_REJECTED", mapOf("reason" to reason))
                 onStatusUpdate("BRIEF_FINALIZED")
                 showRejectScriptDialog = false
-            }
-        )
-    }
-    if (showFeedbackDialog) {
-        TextInputDialog(
-            title = "Feedback",
-            label = "Enter your feedback",
-            multiline = true,
-            onDismiss = { showFeedbackDialog = false },
-            onSend = { feedback ->
-                onSend("Feedback Provided", "FEEDBACK", mapOf("feedback" to feedback))
-                showFeedbackDialog = false
             }
         )
     }
