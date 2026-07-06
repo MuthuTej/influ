@@ -70,6 +70,7 @@ fun BrandSearchPage(
     var selectedMotherTongues by remember { mutableStateOf(setOf("All")) }
     var selectedLanguagesKnown by remember { mutableStateOf(setOf("All")) }
     var selectedLocations by remember { mutableStateOf(setOf("All")) }
+    var selectedMinRating by remember { mutableStateOf("All") }
 
     val searchResults by brandViewModel.searchResults.observeAsState(initial = emptyList())
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
@@ -82,10 +83,18 @@ fun BrandSearchPage(
     var isSearchFocused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
+    val minRatingThreshold = when (selectedMinRating) {
+        "4.5+ ★" -> 4.5
+        "4+ ★" -> 4.0
+        "3.5+ ★" -> 3.5
+        "3+ ★" -> 3.0
+        else -> null
+    }
+
     // Derive current filters from UI state
     val currentFilters = remember(
         searchQuery, selectedPlatforms, selectedCategories, selectedFollowerRanges,
-        selectedGenders, selectedMotherTongues, selectedLanguagesKnown, selectedLocations
+        selectedGenders, selectedMotherTongues, selectedLanguagesKnown, selectedLocations, minRatingThreshold
     ) {
         SearchFilters(
             query = searchQuery,
@@ -95,7 +104,8 @@ fun BrandSearchPage(
             gender = selectedGenders,
             motherTongue = selectedMotherTongues,
             languagesKnown = selectedLanguagesKnown,
-            location = selectedLocations
+            location = selectedLocations,
+            minRating = minRatingThreshold
         )
     }
 
@@ -297,10 +307,12 @@ fun BrandSearchPage(
                             "Odia", "Punjabi", "Sanskrit", "Santali", "Sindhi", "Tamil", "Telugu", "Urdu")
                         val hardcodedLocations = listOf("All", "Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem",
                             "Tirunelveli", "Tiruppur", "Erode", "Vellore", "Thoothukudi")
+                        val ratingOptions = listOf("All", "3+ ★", "3.5+ ★", "4+ ★", "4.5+ ★")
 
                         FilterDropdown("Category", selectedCategories, categoriesList.map { it to null }, { selectedCategories = toggleFilter(selectedCategories, it) }, Modifier.width(120.dp), searchable = true)
                         FilterDropdown("Platform", selectedPlatforms, platformsList.map { it to null }, { selectedPlatforms = toggleFilter(selectedPlatforms, it) }, Modifier.width(110.dp), searchable = false)
                         FilterDropdown("Followers", selectedFollowerRanges, followerRanges.map { it to null }, { selectedFollowerRanges = toggleFilter(selectedFollowerRanges, it) }, Modifier.width(110.dp), searchable = false)
+                        FilterDropdown("Rating", setOf(selectedMinRating), ratingOptions.map { it to null }, { selectedMinRating = it }, Modifier.width(100.dp), searchable = false)
                         FilterDropdown("Gender", selectedGenders, gendersList.map { it to null }, { selectedGenders = toggleFilter(selectedGenders, it) }, Modifier.width(100.dp), searchable = false)
                         FilterDropdown("Mother Tongue", selectedMotherTongues, languagesList.map { it to null }, { selectedMotherTongues = toggleFilter(selectedMotherTongues, it) }, Modifier.width(140.dp), searchable = true)
                         FilterDropdown("Languages", selectedLanguagesKnown, languagesList.map { it to null }, { selectedLanguagesKnown = toggleFilter(selectedLanguagesKnown, it) }, Modifier.width(120.dp), searchable = true)
@@ -315,7 +327,7 @@ fun BrandSearchPage(
                         val hasActiveFilter = !selectedPlatforms.contains("All") || !selectedCategories.contains("All") ||
                             !selectedFollowerRanges.contains("All") || !selectedGenders.contains("All") ||
                             !selectedMotherTongues.contains("All") || !selectedLanguagesKnown.contains("All") ||
-                            !selectedLocations.contains("All") || searchQuery.isNotEmpty()
+                            !selectedLocations.contains("All") || selectedMinRating != "All" || searchQuery.isNotEmpty()
                         val countLabel = if (searchMeta.total > 0) "${searchMeta.total} Influencers Found" else if (!isLoading) "No influencers found" else "Searching..."
                         Text(countLabel, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
                         if (hasActiveFilter) {
@@ -324,7 +336,7 @@ fun BrandSearchPage(
                                     searchQuery = ""; selectedPlatforms = setOf("All"); selectedCategories = setOf("All")
                                     selectedFollowerRanges = setOf("All"); selectedGenders = setOf("All")
                                     selectedMotherTongues = setOf("All"); selectedLanguagesKnown = setOf("All")
-                                    selectedLocations = setOf("All")
+                                    selectedLocations = setOf("All"); selectedMinRating = "All"
                                 })
                         }
                     }

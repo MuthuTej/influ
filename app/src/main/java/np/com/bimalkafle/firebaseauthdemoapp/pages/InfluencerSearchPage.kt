@@ -97,9 +97,18 @@ fun InfluencerSearchPage(
 
     var selectedPlatforms by remember { mutableStateOf(setOf("All")) }
     var selectedCategories by remember { mutableStateOf(setOf("All")) }
+    var selectedMinRating by remember { mutableStateOf("All") }
     var currentPage by remember { mutableIntStateOf(1) }
 
-    val filteredCampaigns = remember(searchQuery, selectedPlatforms, selectedCategories, campaigns) {
+    val minRatingThreshold = when (selectedMinRating) {
+        "4.5+ ★" -> 4.5
+        "4+ ★" -> 4.0
+        "3.5+ ★" -> 3.5
+        "3+ ★" -> 3.0
+        else -> null
+    }
+
+    val filteredCampaigns = remember(searchQuery, selectedPlatforms, selectedCategories, selectedMinRating, campaigns) {
         campaigns.filter { campaign ->
             val campaignCategories = campaign.categories?.map { it.category } ?: emptyList()
             val campaignPlatforms = campaign.platforms?.map { it.platform } ?: emptyList()
@@ -115,7 +124,10 @@ fun InfluencerSearchPage(
             val matchesCategory = selectedCategories.contains("All") ||
                     campaignCategories.any { cat -> selectedCategories.any { sel -> cat.equals(sel, ignoreCase = true) } }
 
-            matchesSearch && matchesPlatform && matchesCategory
+            val matchesRating = minRatingThreshold == null ||
+                    (campaign.brand?.averageRating ?: 0.0) >= minRatingThreshold
+
+            matchesSearch && matchesPlatform && matchesCategory && matchesRating
         }
     }
 
@@ -302,8 +314,11 @@ fun InfluencerSearchPage(
                             platform to count
                         }
 
+                        val ratingOptions = listOf("All", "3+ ★", "3.5+ ★", "4+ ★", "4.5+ ★").map { it to null as Int? }
+
                         FilterDropdown("Platform", selectedPlatforms, platformOptions, { selectedPlatforms = toggleFilter(selectedPlatforms, it); currentPage = 1 }, Modifier.weight(1f))
                         FilterDropdown("Category", selectedCategories, categoryOptions, { selectedCategories = toggleFilter(selectedCategories, it); currentPage = 1 }, Modifier.weight(1f))
+                        FilterDropdown("Rating", setOf(selectedMinRating), ratingOptions, { selectedMinRating = it; currentPage = 1 }, Modifier.weight(1f))
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -314,10 +329,11 @@ fun InfluencerSearchPage(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("${filteredCampaigns.size} Campaigns", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-                        if (!selectedPlatforms.contains("All") || !selectedCategories.contains("All") || searchQuery.isNotEmpty()) {
+                        if (!selectedPlatforms.contains("All") || !selectedCategories.contains("All") || selectedMinRating != "All" || searchQuery.isNotEmpty()) {
                             Text("Clear All", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
                                 selectedPlatforms = setOf("All")
                                 selectedCategories = setOf("All")
+                                selectedMinRating = "All"
                                 searchQuery = ""
                                 currentPage = 1
                             })
@@ -434,12 +450,31 @@ fun CampaignCardSearch(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = campaign.brand?.name ?: "Unknown Brand",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = campaign.brand?.name ?: "Unknown Brand",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                        val rating = campaign.brand?.averageRating
+                        if (rating != null && rating > 0.0) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFC107),
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = String.format("%.1f", rating),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.DarkGray
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(4.dp))
                     
                     Text(

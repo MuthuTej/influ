@@ -1657,6 +1657,7 @@ class BrandViewModel : ViewModel() {
         if (langs.isNotEmpty()) parts.add("languagesKnown: [${langs.joinToString(",") { "\"$it\"" }}]")
         val locations = f.location.filter { it != "All" }
         if (locations.isNotEmpty()) parts.add("locations: [${locations.joinToString(",") { "\"$it\"" }}]")
+        if (f.minRating != null) parts.add("minRating: ${f.minRating}")
         return if (parts.isEmpty()) "" else "{ ${parts.joinToString(", ")} }"
     }
 }
@@ -1669,7 +1670,8 @@ data class SearchFilters(
     val gender: Set<String> = setOf("All"),
     val motherTongue: Set<String> = setOf("All"),
     val languagesKnown: Set<String> = setOf("All"),
-    val location: Set<String> = setOf("All")
+    val location: Set<String> = setOf("All"),
+    val minRating: Double? = null
 )
 
 data class SearchMeta(
