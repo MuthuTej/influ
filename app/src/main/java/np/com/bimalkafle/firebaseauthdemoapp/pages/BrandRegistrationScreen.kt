@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,6 +57,8 @@ fun BrandRegistrationScreen(
         "YouTube" to listOf("reels/shorts", "post", "video")
     )
 
+    var hostingSelected by remember { mutableStateOf(false) }
+
     var ageMin by remember { mutableStateOf("18") }
     var ageMax by remember { mutableStateOf("25") }
     var gender by remember { mutableStateOf("Any") }
@@ -89,7 +92,7 @@ fun BrandRegistrationScreen(
             brandName.isNotBlank() &&
                     description.isNotBlank() &&
                     selectedCategories.isNotEmpty() &&
-                    selectedPlatforms.isNotEmpty() &&
+                    (selectedPlatforms.isNotEmpty() || hostingSelected) &&
                     selectedPlatforms.all { platformDeliverables[it]?.isNotEmpty() == true } &&
                     ageMin.toIntOrNull() != null &&
                     ageMax.toIntOrNull() != null
@@ -315,6 +318,35 @@ fun BrandRegistrationScreen(
                 }
             }
 
+            // Hosting Section
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (hostingSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFF5F5F5))
+                        .clickable {
+                            hostingSelected = !hostingSelected
+                        }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Hosting",
+                        modifier = Modifier.size(24.dp),
+                        tint = if (hostingSelected) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Hosting", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    Checkbox(
+                        checked = hostingSelected,
+                        onCheckedChange = null,
+                        colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
             Text("Target Audience", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
             Row(
@@ -381,6 +413,24 @@ fun BrandRegistrationScreen(
                             val firebaseToken = result.token ?: return@addOnSuccessListener
                             
                             coroutineScope.launch {
+                                val platformsData = selectedPlatforms.map { plat ->
+                                    mapOf(
+                                        "platform" to plat,
+                                        "formats" to (platformDeliverables[plat]?.toList() ?: emptyList<String>()),
+                                        "minFollowers" to 1000,
+                                        "minEngagement" to 2.5
+                                    )
+                                }.toMutableList()
+
+                                if (hostingSelected) {
+                                    platformsData.add(mapOf(
+                                        "platform" to "Hosting",
+                                        "formats" to listOf("Hosting"),
+                                        "minFollowers" to 0,
+                                        "minEngagement" to 0.0
+                                    ))
+                                }
+
                                 val success = BrandRepository.setupBrandProfile(
                                     token = firebaseToken,
                                     name = brandName,
@@ -391,14 +441,7 @@ fun BrandRegistrationScreen(
                                         )
                                     },
                                     about = description,
-                                    preferredPlatforms = selectedPlatforms.map { plat ->
-                                        mapOf(
-                                            "platform" to plat,
-                                            "formats" to (platformDeliverables[plat]?.toList() ?: emptyList<String>()),
-                                            "minFollowers" to 1000,
-                                            "minEngagement" to 2.5
-                                        )
-                                    },
+                                    preferredPlatforms = platformsData,
                                     ageMin = ageMin.toIntOrNull(),
                                     ageMax = ageMax.toIntOrNull(),
                                     gender = gender,
