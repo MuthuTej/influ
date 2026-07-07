@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -88,6 +89,9 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     var selectedPlatforms by remember { mutableStateOf(setOf<String>()) }
     var platformDeliverables by remember { mutableStateOf(mapOf<String, Set<String>>()) }
     var deliverablePricing by remember { mutableStateOf(mapOf<String, Map<String, String>>()) }
+
+    var hostingSelected by remember { mutableStateOf(false) }
+    var hostingPrice by remember { mutableStateOf("") }
 
     // --- YouTube Connection State ---
     var isYouTubeConnecting by remember { mutableStateOf(false) }
@@ -364,6 +368,43 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 }
             }
 
+            // Hosting Section
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (hostingSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFF5F5F5))
+                        .clickable {
+                            hostingSelected = !hostingSelected
+                        }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Hosting",
+                        modifier = Modifier.size(24.dp),
+                        tint = if (hostingSelected) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Hosting", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    Checkbox(checked = hostingSelected, onCheckedChange = null)
+                }
+
+                if (hostingSelected) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = hostingPrice,
+                        onValueChange = { hostingPrice = it },
+                        label = { Text("Hosting Price (INR)") },
+                        modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
             Text("Pricing", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.padding(bottom = 16.dp))
 
@@ -477,7 +518,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
 
             Button(
                 onClick = {
-                    if (name.isEmpty() || location.isEmpty() || bio.isEmpty() || logoUrl.isEmpty() || selectedCategories.isEmpty() || selectedPlatforms.isEmpty()) {
+                    if (name.isEmpty() || location.isEmpty() || bio.isEmpty() || logoUrl.isEmpty() || selectedCategories.isEmpty() || (selectedPlatforms.isEmpty() && !hostingSelected)) {
                         Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
@@ -521,6 +562,16 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                                 put("formats", JSONArray((platformDeliverables[plat] ?: emptySet()).toList()))
                                             })
                                         }
+                                        if (hostingSelected) {
+                                            platformsJson.put(JSONObject().apply {
+                                                put("platform", "Hosting")
+                                                put("profileUrl", "")
+                                                put("followers", 0)
+                                                put("avgViews", 0)
+                                                put("engagement", 0.0)
+                                                put("formats", JSONArray(listOf("Hosting")))
+                                            })
+                                        }
                                         put("platforms", platformsJson)
 
                                         val pricingJson = JSONArray()
@@ -535,6 +586,14 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                                     })
                                                 }
                                             }
+                                        }
+                                        if (hostingSelected && hostingPrice.isNotBlank()) {
+                                            pricingJson.put(JSONObject().apply {
+                                                put("platform", "Hosting")
+                                                put("deliverable", "Hosting")
+                                                put("price", hostingPrice.toIntOrNull() ?: 0)
+                                                put("currency", "INR")
+                                            })
                                         }
                                         put("pricing", pricingJson)
                                     }
