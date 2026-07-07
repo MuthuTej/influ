@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.utils.IndianLocations
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -37,8 +38,9 @@ fun CreateCampaignScreen2(
     onNext: () -> Unit = {},
     campaignViewModel: CampaignViewModel = CampaignViewModel()
 ) {
-    val locations = listOf("India", "USA", "Sri Lanka", "Maldives", "UK")
-    
+    var selectedState by remember { mutableStateOf("") }
+    var selectedCity by remember { mutableStateOf("") }
+
     val loading by campaignViewModel.loading.observeAsState(false)
     val error by campaignViewModel.error.observeAsState()
     val success by campaignViewModel.createCampaignSuccess.observeAsState(false)
@@ -152,18 +154,81 @@ fun CreateCampaignScreen2(
             // Target Location
             Text("Target Location *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+
+            var stateExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = stateExpanded, onExpandedChange = { stateExpanded = !stateExpanded }) {
+                OutlinedTextField(
+                    value = selectedState,
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("State") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = stateExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                ExposedDropdownMenu(expanded = stateExpanded, onDismissRequest = { stateExpanded = false }) {
+                    IndianLocations.states.forEach { state ->
+                        DropdownMenuItem(text = { Text(state) }, onClick = {
+                            selectedState = state
+                            selectedCity = ""
+                            stateExpanded = false
+                        })
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            var cityExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = cityExpanded, onExpandedChange = { if (selectedState.isNotEmpty()) cityExpanded = !cityExpanded }) {
+                OutlinedTextField(
+                    value = selectedCity,
+                    onValueChange = { },
+                    readOnly = true,
+                    enabled = selectedState.isNotEmpty(),
+                    label = { Text("City") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = cityExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                ExposedDropdownMenu(expanded = cityExpanded, onDismissRequest = { cityExpanded = false }) {
+                    IndianLocations.citiesFor(selectedState).forEach { city ->
+                        DropdownMenuItem(text = { Text(city) }, onClick = {
+                            selectedCity = city
+                            cityExpanded = false
+                        })
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = {
+                    if (selectedState.isNotEmpty() && selectedCity.isNotEmpty()) {
+                        val entry = "$selectedCity, $selectedState"
+                        if (!campaignViewModel.selectedLocations.contains(entry)) {
+                            campaignViewModel.selectedLocations = campaignViewModel.selectedLocations + entry
+                        }
+                        selectedCity = ""
+                    }
+                },
+                enabled = selectedState.isNotEmpty() && selectedCity.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                locations.forEach { location ->
-                    val isSelected = campaignViewModel.selectedLocations.contains(location)
-                    LocationChip(location, isSelected) {
-                        campaignViewModel.selectedLocations = if (isSelected) {
-                            campaignViewModel.selectedLocations - location
-                        } else {
-                            campaignViewModel.selectedLocations + location
+                Text("Add Location")
+            }
+
+            if (campaignViewModel.selectedLocations.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    campaignViewModel.selectedLocations.forEach { location ->
+                        LocationChip(location, isSelected = true) {
+                            campaignViewModel.selectedLocations = campaignViewModel.selectedLocations - location
                         }
                     }
                 }
