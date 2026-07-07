@@ -47,6 +47,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
+import np.com.bimalkafle.firebaseauthdemoapp.utils.IndianLocations
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -178,7 +179,13 @@ fun InfluencerProfileContent(
     var name by remember(influencerProfile) { mutableStateOf(influencerProfile?.name ?: "") }
     var email by remember(influencerProfile) { mutableStateOf(influencerProfile?.email ?: "") }
     var bio by remember(influencerProfile) { mutableStateOf(influencerProfile?.bio ?: "") }
-    var location by remember(influencerProfile) { mutableStateOf(influencerProfile?.location ?: "") }
+    var selectedState by remember(influencerProfile) {
+        mutableStateOf((influencerProfile?.location ?: "").split(", ").getOrNull(1) ?: "")
+    }
+    var selectedCity by remember(influencerProfile) {
+        mutableStateOf((influencerProfile?.location ?: "").split(", ").getOrNull(0) ?: "")
+    }
+    val location = if (selectedCity.isNotEmpty() && selectedState.isNotEmpty()) "$selectedCity, $selectedState" else ""
     var logoUrl by remember(influencerProfile) { mutableStateOf(influencerProfile?.logoUrl ?: "") }
     var availability by remember(influencerProfile) { mutableStateOf(influencerProfile?.availability ?: true) }
     
@@ -454,13 +461,49 @@ fun InfluencerProfileContent(
 
                     InfluencerDetailSection(icon = Icons.Default.LocationOn, title = "Location") {
                         if (isEditMode) {
-                            OutlinedTextField(
-                                value = location,
-                                onValueChange = { location = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                label = { Text("Location") }
-                            )
+                            var stateExpanded by remember { mutableStateOf(false) }
+                            ExposedDropdownMenuBox(expanded = stateExpanded, onExpandedChange = { stateExpanded = !stateExpanded }) {
+                                OutlinedTextField(
+                                    value = selectedState,
+                                    onValueChange = { },
+                                    readOnly = true,
+                                    label = { Text("State") },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = stateExpanded) },
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                ExposedDropdownMenu(expanded = stateExpanded, onDismissRequest = { stateExpanded = false }) {
+                                    IndianLocations.states.forEach { state ->
+                                        DropdownMenuItem(text = { Text(state) }, onClick = {
+                                            selectedState = state
+                                            selectedCity = ""
+                                            stateExpanded = false
+                                        })
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            var cityExpanded by remember { mutableStateOf(false) }
+                            ExposedDropdownMenuBox(expanded = cityExpanded, onExpandedChange = { if (selectedState.isNotEmpty()) cityExpanded = !cityExpanded }) {
+                                OutlinedTextField(
+                                    value = selectedCity,
+                                    onValueChange = { },
+                                    readOnly = true,
+                                    enabled = selectedState.isNotEmpty(),
+                                    label = { Text("City") },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = cityExpanded) },
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                ExposedDropdownMenu(expanded = cityExpanded, onDismissRequest = { cityExpanded = false }) {
+                                    IndianLocations.citiesFor(selectedState).forEach { city ->
+                                        DropdownMenuItem(text = { Text(city) }, onClick = {
+                                            selectedCity = city
+                                            cityExpanded = false
+                                        })
+                                    }
+                                }
+                            }
                         } else {
                             Text(text = location.ifEmpty { "N/A" }, color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                         }
