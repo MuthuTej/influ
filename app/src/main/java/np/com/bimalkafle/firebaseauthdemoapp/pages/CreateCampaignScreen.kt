@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -289,6 +292,30 @@ fun CreateCampaignScreen(
                 }
             }
 
+            // Hosting Section
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (campaignViewModel.hostingSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFF5F5F5))
+                        .clickable {
+                            campaignViewModel.hostingSelected = !campaignViewModel.hostingSelected
+                        }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PlatformIcon("hosting")
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Hosting", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    Checkbox(
+                        checked = campaignViewModel.hostingSelected,
+                        onCheckedChange = null,
+                        colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
             Text("Campaign Timeline", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
@@ -377,13 +404,22 @@ fun CreateCampaignScreen(
 
 @Composable
 fun PlatformIcon(name: String) {
-    val icon = when (name.lowercase()) {
-        "youtube" -> painterResource(id = R.drawable.youtube_logo)
-        "instagram" -> painterResource(id = R.drawable.instagram_logo)
-        "facebook" -> painterResource(id = R.drawable.ic_facebook)
-        else -> painterResource(id = R.drawable.splash1)
+    if (name.lowercase() == "hosting") {
+        Icon(
+            imageVector = Icons.Default.Mic,
+            contentDescription = "Hosting",
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+    } else {
+        val icon = when (name.lowercase()) {
+            "youtube" -> painterResource(id = R.drawable.youtube_logo)
+            "instagram" -> painterResource(id = R.drawable.instagram_logo)
+            "facebook" -> painterResource(id = R.drawable.ic_facebook)
+            else -> painterResource(id = R.drawable.splash1)
+        }
+        Image(painter = icon, contentDescription = name, modifier = Modifier.size(24.dp))
     }
-    Image(painter = icon, contentDescription = name, modifier = Modifier.size(24.dp))
 }
 
 @Composable
