@@ -66,6 +66,7 @@ fun BrandRegistrationScreen(
     var gender by remember { mutableStateOf("Any") }
     var profileUrl by remember { mutableStateOf("") }
     var logoUrl by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
 
     // --- Multi-select Categories Logic ---
     var availableCategories by remember { mutableStateOf(listOf<String>()) }
@@ -182,6 +183,18 @@ fun BrandRegistrationScreen(
                 value = brandName,
                 onValueChange = { brandName = it },
                 label = { Text("Brand Name *") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = location,
+                onValueChange = { location = it },
+                label = { Text("Brand Location") },
+                placeholder = { Text("City, Country") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
@@ -451,7 +464,8 @@ fun BrandRegistrationScreen(
                                     ageMax = ageMax.toIntOrNull(),
                                     gender = gender,
                                     profileUrl = profileUrl,
-                                    logoUrl = logoUrl
+                                    logoUrl = logoUrl,
+                                    location = location
                                 )
                                 isLoading = false
 

@@ -273,6 +273,7 @@ data class Brand(
     val about: String?,
     val profileUrl: String?,
     val logoUrl: String?,
+    val location: String? = null,
     val govtId: String? = null,
     val isVerified: Boolean? = null,
     val reviews: List<Review>? = null,
