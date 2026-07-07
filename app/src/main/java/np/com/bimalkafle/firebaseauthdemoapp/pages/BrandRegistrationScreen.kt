@@ -447,8 +447,10 @@ fun BrandRegistrationScreen(
                                     },
                                     about = description,
                                     preferredPlatforms = platformsData,
-                                    ageMin = ageMin.toIntOrNull(),
-                                    ageMax = ageMax.toIntOrNull(),
+                                    // isFormValid already requires both to parse before this button is enabled;
+                                    // the fallback values only guard against that invariant ever changing.
+                                    ageMin = ageMin.toIntOrNull() ?: 18,
+                                    ageMax = ageMax.toIntOrNull() ?: 25,
                                     gender = gender,
                                     profileUrl = profileUrl,
                                     logoUrl = logoUrl

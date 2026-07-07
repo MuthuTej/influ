@@ -14,8 +14,8 @@ object BrandRepository {
         categories: List<Map<String, Any>>,
         about: String,
         preferredPlatforms: List<Map<String, Any>>,
-        ageMin: Int?,
-        ageMax: Int?,
+        ageMin: Int,
+        ageMax: Int,
         gender: String,
         profileUrl: String?,
         logoUrl: String
@@ -31,23 +31,22 @@ object BrandRepository {
             }
         """.trimIndent()
 
-        val inputVariables = mutableMapOf<String, Any>(
+        // AudienceInput.ageMin/ageMax are required (Int!) server-side, so they must always
+        // be present here — the caller is responsible for validating both parse before calling.
+        val inputVariables = mapOf(
             "name" to name,
             "profileUrl" to (profileUrl ?: ""),
             "logoUrl" to logoUrl,
             "about" to about,
             "brandCategories" to categories,
             "preferredPlatforms" to preferredPlatforms,
-            "targetAudience" to mutableMapOf<String, Any>(
+            "targetAudience" to mapOf(
+                "ageMin" to ageMin,
+                "ageMax" to ageMax,
                 "gender" to gender,
                 "locations" to emptyList<String>()
             )
         )
-        
-        (inputVariables["targetAudience"] as MutableMap<String, Any>).apply {
-            if (ageMin != null) put("ageMin", ageMin)
-            if (ageMax != null) put("ageMax", ageMax)
-        }
 
         val variables = mapOf("input" to inputVariables)
 

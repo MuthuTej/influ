@@ -167,7 +167,7 @@ data class InfluencerProfileInput(
     val categories: List<CategoryInput>,
     val platforms: List<PlatformInput>,
     val pricing: List<PricingInput>,
-    val availability: String,
+    val availability: Boolean,
     val logoUrl: String? = null,
     val audienceInsights: AudienceInsightsInput? = null,
     val strengths: List<String>? = null
