@@ -18,7 +18,8 @@ object BrandRepository {
         ageMax: Int,
         gender: String,
         profileUrl: String?,
-        logoUrl: String
+        logoUrl: String,
+        location: String = ""
     ): Boolean = withContext(Dispatchers.IO) {
 
         val mutation = """
@@ -37,6 +38,7 @@ object BrandRepository {
             "name" to name,
             "profileUrl" to (profileUrl ?: ""),
             "logoUrl" to logoUrl,
+            "location" to location,
             "about" to about,
             "brandCategories" to categories,
             "preferredPlatforms" to preferredPlatforms,
