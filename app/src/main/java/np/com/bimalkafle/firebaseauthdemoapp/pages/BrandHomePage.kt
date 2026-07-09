@@ -1,6 +1,7 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import coil.compose.AsyncImage
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -204,7 +205,8 @@ fun BrandHomePage(
                                         brandViewModel.toggleWishlist(influencer, token)
                                     }
                                 },
-                                navController = navController
+                                navController = navController,
+                                brandCategories = brandProfile?.brandCategories?.map { it.category } ?: emptyList()
                             )
                         }
                     }
@@ -404,7 +406,8 @@ fun TopPicksSectionBrand(
     instagramTopInfluencers: List<InfluencerProfile>,
     wishlistedInfluencers: List<InfluencerProfile>,
     onWishlistToggle: (InfluencerProfile) -> Unit,
-    navController: NavController
+    navController: NavController,
+    brandCategories: List<String> = emptyList()
 ) {
     var selectedPlatform by remember { mutableStateOf("All") }
     val platforms = listOf("All", "YouTube", "Instagram", "Facebook")
@@ -434,7 +437,18 @@ fun TopPicksSectionBrand(
                 color = brandThemeColor,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
-                modifier = Modifier.clickable { navController.navigate("brand_search") }
+                modifier = Modifier.clickable {
+                    // Top Picks above is filtered to this brand's own category, so "See
+                    // All" should land on the full, paginated, same-category results
+                    // rather than an unfiltered search — pre-seed the search screen's
+                    // category filter the same way.
+                    if (brandCategories.isNotEmpty()) {
+                        val encoded = brandCategories.joinToString(",") { Uri.encode(it) }
+                        navController.navigate("brand_search?categories=$encoded")
+                    } else {
+                        navController.navigate("brand_search")
+                    }
+                }
             )
         }
         Spacer(modifier = Modifier.height(16.dp))

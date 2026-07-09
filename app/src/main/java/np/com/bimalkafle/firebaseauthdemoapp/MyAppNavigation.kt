@@ -165,13 +165,27 @@ fun MyAppNavigation(
                 influencerViewModel = influencerViewModel
             )
         }
-        composable("brand_search") {
+        composable(
+            route = "brand_search?categories={categories}",
+            arguments = listOf(
+                navArgument("categories") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val initialCategories = backStackEntry.arguments?.getString("categories")
+                ?.split(",")
+                ?.filter { it.isNotBlank() }
+                ?: emptyList()
             BrandSearchPage(
-                modifier = modifier, 
-                navController = navController, 
-                authViewModel = authViewModel, 
+                modifier = modifier,
+                navController = navController,
+                authViewModel = authViewModel,
                 brandViewModel = brandViewModel,
-                notificationViewModel = notificationViewModel
+                notificationViewModel = notificationViewModel,
+                initialCategories = initialCategories
             )
         }
         composable("brand_history") {

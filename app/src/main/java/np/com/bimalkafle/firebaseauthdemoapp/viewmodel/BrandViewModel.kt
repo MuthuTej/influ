@@ -100,9 +100,17 @@ class BrandViewModel : ViewModel() {
         _loading.value = true
         viewModelScope.launch {
             launch { fetchWishlist(token) }
-            val allDef   = async { runHomeSearchQuery(token, null) }
-            val ytDef    = async { runHomeSearchQuery(token, "YOUTUBE") }
-            val igDef    = async { runHomeSearchQuery(token, "INSTAGRAM") }
+            // Top Picks is meant to be relevant to this brand, so it has to know
+            // the brand's own category before it can filter on it — reuse
+            // _brandProfile if some earlier screen already loaded it, otherwise
+            // fetch just the category (not the whole profile) so this doesn't
+            // depend on fetchBrandDetails() having already run/finished first.
+            val brandCategories = _brandProfile.value?.brandCategories?.map { it.category }
+                ?.takeIf { it.isNotEmpty() }
+                ?: fetchBrandCategoriesForHome(token)
+            val allDef   = async { runHomeSearchQuery(token, null, brandCategories) }
+            val ytDef    = async { runHomeSearchQuery(token, "YOUTUBE", brandCategories) }
+            val igDef    = async { runHomeSearchQuery(token, "INSTAGRAM", brandCategories) }
             _overallTopInfluencers.postValue(allDef.await())
             _youtubeTopInfluencers.postValue(ytDef.await())
             _instagramTopInfluencers.postValue(igDef.await())
@@ -110,8 +118,42 @@ class BrandViewModel : ViewModel() {
         }
     }
 
-    private suspend fun runHomeSearchQuery(token: String, platform: String?): List<InfluencerProfile> {
-        val filterArg = if (platform != null) "filters: { platforms: [\"$platform\"] }, " else ""
+    private suspend fun fetchBrandCategoriesForHome(token: String): List<String> {
+        val query = """
+            query HomeBrandCategories {
+              me {
+                ... on Brand {
+                  brandCategories { category }
+                }
+              }
+            }
+        """.trimIndent()
+        return try {
+            val result = GraphQLClient.query(query = query, token = token)
+            val arr = result.getOrNull()
+                ?.optJSONObject("data")
+                ?.optJSONObject("me")
+                ?.optJSONArray("brandCategories")
+            val categories = mutableListOf<String>()
+            if (arr != null) {
+                for (i in 0 until arr.length()) {
+                    arr.optJSONObject(i)?.optString("category")?.let { if (it.isNotBlank()) categories.add(it) }
+                }
+            }
+            categories
+        } catch (e: Exception) {
+            Log.e("BrandViewModel", "fetchBrandCategoriesForHome error", e)
+            emptyList()
+        }
+    }
+
+    private suspend fun runHomeSearchQuery(token: String, platform: String?, categories: List<String> = emptyList()): List<InfluencerProfile> {
+        val filterParts = mutableListOf<String>()
+        if (platform != null) filterParts.add("platforms: [\"$platform\"]")
+        if (categories.isNotEmpty()) {
+            filterParts.add("categories: [${categories.joinToString(", ") { "\"$it\"" }}]")
+        }
+        val filterArg = if (filterParts.isNotEmpty()) "filters: { ${filterParts.joinToString(", ")} }, " else ""
         val query = """
             query HomeRecs {
               searchInfluencers(${filterArg}page: 0, limit: 10) {

@@ -60,11 +60,14 @@ fun BrandSearchPage(
     navController: NavController,
     authViewModel: AuthViewModel,
     brandViewModel: BrandViewModel,
-    notificationViewModel: NotificationViewModel
+    notificationViewModel: NotificationViewModel,
+    initialCategories: List<String> = emptyList()
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedPlatforms by remember { mutableStateOf(setOf("All")) }
-    var selectedCategories by remember { mutableStateOf(setOf("All")) }
+    var selectedCategories by remember {
+        mutableStateOf(if (initialCategories.isNotEmpty()) initialCategories.toSet() else setOf("All"))
+    }
     var selectedFollowerRanges by remember { mutableStateOf(setOf("All")) }
     var selectedGenders by remember { mutableStateOf(setOf("All")) }
     var selectedMotherTongues by remember { mutableStateOf(setOf("All")) }
