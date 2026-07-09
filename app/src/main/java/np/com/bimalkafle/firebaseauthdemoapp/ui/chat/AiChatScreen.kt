@@ -20,7 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,6 +34,41 @@ import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.Dimens
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.LocalAppColors
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.AiChatMessage
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.AiChatViewModel
+
+private val BOLD_MARKDOWN_REGEX = Regex("\\*\\*(.+?)\\*\\*")
+private val BULLET_LINE_REGEX = Regex("^\\s*[*-]\\s+(.*)$")
+
+// The AI's replies are Gemini-generated markdown (**bold**, "* " bullet
+// lists) but the chat bubble was rendering that raw — so users saw literal
+// asterisks instead of formatting. This is a small, dependency-free
+// markdown-lite renderer covering just the two constructs Gemini actually
+// produces here, not a general markdown parser.
+private fun formatChatMarkdown(raw: String): AnnotatedString = buildAnnotatedString {
+    val lines = raw.split("\n")
+    lines.forEachIndexed { index, line ->
+        val bulletMatch = BULLET_LINE_REGEX.find(line)
+        val content = if (bulletMatch != null) {
+            append("•  ")
+            bulletMatch.groupValues[1]
+        } else {
+            line
+        }
+        appendWithBoldSpans(content)
+        if (index != lines.lastIndex) append("\n")
+    }
+}
+
+private fun AnnotatedString.Builder.appendWithBoldSpans(text: String) {
+    var lastIndex = 0
+    for (match in BOLD_MARKDOWN_REGEX.findAll(text)) {
+        append(text.substring(lastIndex, match.range.first))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+            append(match.groupValues[1])
+        }
+        lastIndex = match.range.last + 1
+    }
+    append(text.substring(lastIndex))
+}
 
 private fun routeForEntity(entity: ChatEntity): String? = when (entity.type) {
     "influencer" -> "brand_influencer_detail/${entity.id}"
@@ -225,7 +264,7 @@ private fun AiChatBubble(message: AiChatMessage, onEntityClick: (ChatEntity) -> 
                 modifier = Modifier.widthIn(max = 280.dp)
             ) {
                 Text(
-                    text = message.text,
+                    text = if (isMe) AnnotatedString(message.text) else formatChatMarkdown(message.text),
                     color = onBubbleColor,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = Dimens.space12, vertical = Dimens.space8)
