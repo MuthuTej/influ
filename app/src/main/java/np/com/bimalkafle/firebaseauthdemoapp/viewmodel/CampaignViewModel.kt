@@ -40,15 +40,16 @@ class CampaignViewModel : ViewModel() {
     var ageMax by mutableStateOf(60)
     var selectedGender by mutableStateOf("Any")
 
+    // Hosting Fields
+    var hostingSelected by mutableStateOf(false)
+    var hostingPrice by mutableStateOf(0)
+
     private val _loading = MutableLiveData<Boolean>()
     val loading: LiveData<Boolean> = _loading
 
     private val _error = MutableLiveData<String?>()
     val error: LiveData<String?> = _error
 
-    // See FetchThrottle.kt — skips a refetch (and its loading flash) if the same
-    // data was fetched within the last minute, so switching tabs doesn't discard
-    // good cached data. Pass force = true (e.g. pull-to-refresh) to bypass it.
     private val fetchThrottle = FetchThrottle()
 
     private val _createCampaignSuccess = MutableLiveData<Boolean>()
@@ -213,6 +214,9 @@ class CampaignViewModel : ViewModel() {
                           locations
                         }
                       }
+                      hosting {
+                        price
+                      }
                     }
                   }
                 }
@@ -301,6 +305,9 @@ class CampaignViewModel : ViewModel() {
                         gender
                         locations
                       }
+                    }
+                    hosting {
+                      price
                     }
                   }
                 }
@@ -416,6 +423,9 @@ class CampaignViewModel : ViewModel() {
                       clicks
                       saves
                     }
+                    hosting {
+                      price
+                    }
                   }
                 }
             """.trimIndent()
@@ -508,6 +518,9 @@ class CampaignViewModel : ViewModel() {
                         locations
                       }
                     }
+                    hosting {
+                      price
+                    }
                   }
                 }
             """.trimIndent()
@@ -533,6 +546,12 @@ class CampaignViewModel : ViewModel() {
                 )
             }
 
+            val hostingJson = if (hostingSelected) {
+                mapOf(
+                    "price" to hostingPrice
+                )
+            } else null
+
             val input = mutableMapOf<String, Any>(
                 "title" to title,
                 "description" to description,
@@ -543,6 +562,7 @@ class CampaignViewModel : ViewModel() {
                 "targetAudience" to audienceJson
             )
 
+            hostingJson?.let { input["hosting"] = it }
             startDate?.let { input["startDate"] = dateFormatter.format(it) }
             endDate?.let { input["endDate"] = dateFormatter.format(it) }
 
@@ -736,6 +756,13 @@ class CampaignViewModel : ViewModel() {
             )
         }
 
+        val hostingObj = json.optJSONObject("hosting")
+        val hosting = hostingObj?.let {
+            HostingPricingResponse(
+                price = if (it.isNull("price")) null else it.optInt("price")
+            )
+        }
+
         return CampaignDetail(
             json.optString("id"),
             json.optString("title"),
@@ -751,7 +778,8 @@ class CampaignViewModel : ViewModel() {
             brand,
             categories,
             collaborations,
-            overallAnalytics
+            overallAnalytics,
+            hosting
         )
     }
     
@@ -770,6 +798,8 @@ class CampaignViewModel : ViewModel() {
         ageMin = 18
         ageMax = 60
         selectedGender = "Any"
+        hostingSelected = false
+        hostingPrice = 0
         _createCampaignSuccess.value = false
         _error.value = null
     }

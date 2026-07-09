@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import np.com.bimalkafle.firebaseauthdemoapp.network.BrandRepository
 import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
 
@@ -56,23 +59,18 @@ fun BrandRegistrationScreen(
         "YouTube" to listOf("reels/shorts", "post", "video")
     )
 
+    var hostingSelected by remember { mutableStateOf(false) }
+
     var ageMin by remember { mutableStateOf("18") }
     var ageMax by remember { mutableStateOf("25") }
     var gender by remember { mutableStateOf("Any") }
     var profileUrl by remember { mutableStateOf("") }
     var logoUrl by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
 
     // --- Multi-select Categories Logic ---
-    val categoriesMap = mapOf(
-        "Fashion" to listOf("Clothing", "Footwear", "Accessories"),
-        "Tech" to listOf("Gadgets", "Software", "Hardware"),
-        "Food" to listOf("Organic", "Fast Food", "Dining"),
-        "Beauty" to listOf("Skincare", "Makeup", "Haircare"),
-        "Health" to listOf("Fitness", "Supplements", "Wellness"),
-        "E-commerce" to listOf("Marketplace", "Logistics", "Customer Service")
-    )
+    var availableCategories by remember { mutableStateOf(listOf<String>()) }
     var selectedCategories by remember { mutableStateOf(setOf<String>()) }
-    var selectedSubCategories by remember { mutableStateOf(mapOf<String, Set<String>>()) }
 
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -84,12 +82,24 @@ fun BrandRegistrationScreen(
     val prefsManager = PrefsManager(context)
     var isLoading by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { res ->
+            res.token?.let { token ->
+                coroutineScope.launch {
+                    BackendRepository.getDistinctInfluencerCategories(token).onSuccess {
+                        availableCategories = it
+                    }
+                }
+            }
+        }
+    }
+
     val isFormValid by remember {
         derivedStateOf {
             brandName.isNotBlank() &&
                     description.isNotBlank() &&
                     selectedCategories.isNotEmpty() &&
-                    selectedPlatforms.isNotEmpty() &&
+                    (selectedPlatforms.isNotEmpty() || hostingSelected) &&
                     selectedPlatforms.all { platformDeliverables[it]?.isNotEmpty() == true } &&
                     ageMin.toIntOrNull() != null &&
                     ageMax.toIntOrNull() != null
@@ -178,56 +188,70 @@ fun BrandRegistrationScreen(
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
             )
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = location,
+                onValueChange = { location = it },
+                label = { Text("Brand Location") },
+                placeholder = { Text("City, Country") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Multiselect Category Chips
+            // Multiselect Category Dropdown
             Text("Industry Categories *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                categoriesMap.keys.forEach { category ->
-                    val isSelected = selectedCategories.contains(category)
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = {
-                            selectedCategories = if (isSelected) selectedCategories - category else selectedCategories + category
-                            if (isSelected) selectedSubCategories = selectedSubCategories - category
-                        },
-                        label = { Text(category) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = Color.White
+            Spacer(modifier = Modifier.height(8.dp))
+            var categoriesExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = categoriesExpanded, onExpandedChange = { categoriesExpanded = !categoriesExpanded }) {
+                OutlinedTextField(
+                    value = if (selectedCategories.isEmpty()) "" else "${selectedCategories.size} selected",
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("Categories") },
+                    placeholder = { Text("Choose categories") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoriesExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+                )
+                ExposedDropdownMenu(expanded = categoriesExpanded, onDismissRequest = { categoriesExpanded = false }) {
+                    availableCategories.forEach { category ->
+                        val isSelected = selectedCategories.contains(category)
+                        DropdownMenuItem(
+                            text = { Text(category) },
+                            leadingIcon = {
+                                Checkbox(checked = isSelected, onCheckedChange = null)
+                            },
+                            onClick = {
+                                selectedCategories = if (isSelected) selectedCategories - category else selectedCategories + category
+                            }
                         )
-                    )
+                    }
                 }
             }
 
             if (selectedCategories.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Select Focus Areas *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                selectedCategories.forEach { category ->
-                    Text(category, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        categoriesMap[category]?.forEach { subCat ->
-                            val currentSubCats = selectedSubCategories[category] ?: emptySet()
-                            val isSubSelected = currentSubCats.contains(subCat)
-                            FilterChip(
-                                selected = isSubSelected,
-                                onClick = {
-                                    val newSubCats = if (isSubSelected) currentSubCats - subCat else currentSubCats + subCat
-                                    selectedSubCategories = selectedSubCategories + (category to newSubCats)
-                                },
-                                label = { Text(subCat, fontSize = 12.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                    selectedLabelColor = Color.White
-                                )
+                Spacer(modifier = Modifier.height(12.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    selectedCategories.forEach { category ->
+                        FilterChip(
+                            selected = true,
+                            onClick = { selectedCategories = selectedCategories - category },
+                            label = { Text(category) },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp)) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = Color.White
                             )
-                        }
+                        )
                     }
                 }
             }
@@ -315,6 +339,35 @@ fun BrandRegistrationScreen(
                 }
             }
 
+            // Hosting Section
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (hostingSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFF5F5F5))
+                        .clickable {
+                            hostingSelected = !hostingSelected
+                        }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Hosting",
+                        modifier = Modifier.size(24.dp),
+                        tint = if (hostingSelected) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Hosting", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    Checkbox(
+                        checked = hostingSelected,
+                        onCheckedChange = null,
+                        colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
             Text("Target Audience", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
             Row(
@@ -381,29 +434,40 @@ fun BrandRegistrationScreen(
                             val firebaseToken = result.token ?: return@addOnSuccessListener
                             
                             coroutineScope.launch {
+                                val platformsData = selectedPlatforms.map { plat ->
+                                    mapOf(
+                                        "platform" to plat,
+                                        "formats" to (platformDeliverables[plat]?.toList() ?: emptyList<String>()),
+                                        "minFollowers" to 1000,
+                                        "minEngagement" to 2.5
+                                    )
+                                }.toMutableList()
+
+                                if (hostingSelected) {
+                                    platformsData.add(mapOf(
+                                        "platform" to "Hosting",
+                                        "formats" to listOf("Hosting"),
+                                        "minFollowers" to 0,
+                                        "minEngagement" to 0.0
+                                    ))
+                                }
+
                                 val success = BrandRepository.setupBrandProfile(
                                     token = firebaseToken,
                                     name = brandName,
                                     categories = selectedCategories.map { cat ->
-                                        mapOf(
-                                            "category" to cat,
-                                            "subCategories" to (selectedSubCategories[cat]?.toList() ?: listOf("General"))
-                                        )
+                                        mapOf("category" to cat)
                                     },
                                     about = description,
-                                    preferredPlatforms = selectedPlatforms.map { plat ->
-                                        mapOf(
-                                            "platform" to plat,
-                                            "formats" to (platformDeliverables[plat]?.toList() ?: emptyList<String>()),
-                                            "minFollowers" to 1000,
-                                            "minEngagement" to 2.5
-                                        )
-                                    },
-                                    ageMin = ageMin.toIntOrNull(),
-                                    ageMax = ageMax.toIntOrNull(),
+                                    preferredPlatforms = platformsData,
+                                    // isFormValid already requires both to parse before this button is enabled;
+                                    // the fallback values only guard against that invariant ever changing.
+                                    ageMin = ageMin.toIntOrNull() ?: 18,
+                                    ageMax = ageMax.toIntOrNull() ?: 25,
                                     gender = gender,
                                     profileUrl = profileUrl,
-                                    logoUrl = logoUrl
+                                    logoUrl = logoUrl,
+                                    location = location
                                 )
                                 isLoading = false
 

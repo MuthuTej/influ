@@ -1289,7 +1289,7 @@ class InfluencerViewModel : ViewModel() {
         _error.value = null
         viewModelScope.launch {
             val mutation = """
-                mutation UpdateInfluencer(${'$'}input: UpdateInfluencerInput!) {
+                mutation UpdateInfluencer(${'$'}input: InfluencerProfileInput!) {
                   updateInfluencer(input: ${'$'}input) {
                     id
                     name

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,15 +51,18 @@ import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import org.json.JSONArray
 import org.json.JSONObject
 import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
+import np.com.bimalkafle.firebaseauthdemoapp.utils.IndianLocations
+import np.com.bimalkafle.firebaseauthdemoapp.utils.IndianLanguages
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun InfluencerRegistrationScreen(navController: NavController) {
     var name by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
+    var selectedState by remember { mutableStateOf("") }
+    var selectedCity by remember { mutableStateOf("") }
     var gender by remember { mutableStateOf("") }
     var motherTongue by remember { mutableStateOf("") }
-    var languagesKnown by remember { mutableStateOf("") }
+    var selectedLanguages by remember { mutableStateOf(setOf<String>()) }
     var logoUrl by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -68,13 +72,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     val auth = FirebaseAuth.getInstance()
     val prefsManager = remember { PrefsManager(context) }
 
-    val categoriesMap = mapOf(
-        "Fashion" to listOf("Clothing", "Footwear", "Accessories"),
-        "Tech" to listOf("Gadgets", "Software", "Hardware"),
-        "Food" to listOf("Organic", "Fast Food", "Dining"),
-        "Beauty" to listOf("Skincare", "Makeup", "Haircare"),
-        "Health" to listOf("Fitness", "Supplements", "Wellness")
-    )
+    var availableCategories by remember { mutableStateOf(listOf<String>()) }
 
     val platformsList = listOf("YouTube", "Instagram", "Facebook")
     val platformFormatsMap = mapOf(
@@ -84,10 +82,12 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     )
 
     var selectedCategories by remember { mutableStateOf(setOf<String>()) }
-    var selectedSubCategories by remember { mutableStateOf(mapOf<String, Set<String>>()) }
     var selectedPlatforms by remember { mutableStateOf(setOf<String>()) }
     var platformDeliverables by remember { mutableStateOf(mapOf<String, Set<String>>()) }
     var deliverablePricing by remember { mutableStateOf(mapOf<String, Map<String, String>>()) }
+
+    var hostingSelected by remember { mutableStateOf(false) }
+    var hostingPrice by remember { mutableStateOf("") }
 
     // --- YouTube Connection State ---
     var isYouTubeConnecting by remember { mutableStateOf(false) }
@@ -137,6 +137,18 @@ fun InfluencerRegistrationScreen(navController: NavController) {
             }
         }
         isYouTubeConnecting = false
+    }
+
+    LaunchedEffect(Unit) {
+        auth.currentUser?.getIdToken(false)?.addOnSuccessListener { res ->
+            res.token?.let { token ->
+                coroutineScope.launch {
+                    BackendRepository.getDistinctInfluencerCategories(token).onSuccess {
+                        availableCategories = it
+                    }
+                }
+            }
+        }
     }
 
     val configuration = LocalConfiguration.current
@@ -203,41 +215,137 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 shape = RoundedCornerShape(12.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = location,
-                onValueChange = { location = it },
-                label = { Text("Location") },
-                trailingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            )
+            var stateExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = stateExpanded, onExpandedChange = { stateExpanded = !stateExpanded }) {
+                OutlinedTextField(
+                    value = selectedState,
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("State") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = stateExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                ExposedDropdownMenu(expanded = stateExpanded, onDismissRequest = { stateExpanded = false }) {
+                    IndianLocations.states.forEach { state ->
+                        DropdownMenuItem(text = { Text(state) }, onClick = {
+                            selectedState = state
+                            selectedCity = ""
+                            stateExpanded = false
+                        })
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = gender,
-                onValueChange = { gender = it },
-                label = { Text("Gender") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
-            )
+            var cityExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = cityExpanded, onExpandedChange = { if (selectedState.isNotEmpty()) cityExpanded = !cityExpanded }) {
+                OutlinedTextField(
+                    value = selectedCity,
+                    onValueChange = { },
+                    readOnly = true,
+                    enabled = selectedState.isNotEmpty(),
+                    label = { Text("City") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = cityExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                ExposedDropdownMenu(expanded = cityExpanded, onDismissRequest = { cityExpanded = false }) {
+                    IndianLocations.citiesFor(selectedState).forEach { city ->
+                        DropdownMenuItem(text = { Text(city) }, onClick = {
+                            selectedCity = city
+                            cityExpanded = false
+                        })
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = motherTongue,
-                onValueChange = { motherTongue = it },
-                label = { Text("Mother Tongue") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
-            )
+            var genderExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = genderExpanded, onExpandedChange = { genderExpanded = !genderExpanded }) {
+                OutlinedTextField(
+                    value = gender,
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("Gender") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = genderExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+                )
+                ExposedDropdownMenu(expanded = genderExpanded, onDismissRequest = { genderExpanded = false }) {
+                    IndianLanguages.genders.forEach { option ->
+                        DropdownMenuItem(text = { Text(option) }, onClick = {
+                            gender = option
+                            genderExpanded = false
+                        })
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = languagesKnown,
-                onValueChange = { languagesKnown = it },
-                label = { Text("Languages Known (comma separated)") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
-            )
+            var motherTongueExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = motherTongueExpanded, onExpandedChange = { motherTongueExpanded = !motherTongueExpanded }) {
+                OutlinedTextField(
+                    value = motherTongue,
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("Mother Tongue") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = motherTongueExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+                )
+                ExposedDropdownMenu(expanded = motherTongueExpanded, onDismissRequest = { motherTongueExpanded = false }) {
+                    IndianLanguages.languages.forEach { language ->
+                        DropdownMenuItem(text = { Text(language) }, onClick = {
+                            motherTongue = language
+                            motherTongueExpanded = false
+                        })
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            var languagesExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = languagesExpanded, onExpandedChange = { languagesExpanded = !languagesExpanded }) {
+                OutlinedTextField(
+                    value = if (selectedLanguages.isEmpty()) "" else "${selectedLanguages.size} selected",
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("Languages Known") },
+                    placeholder = { Text("Choose languages") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = languagesExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+                )
+                ExposedDropdownMenu(expanded = languagesExpanded, onDismissRequest = { languagesExpanded = false }) {
+                    IndianLanguages.languages.forEach { language ->
+                        val isSelected = selectedLanguages.contains(language)
+                        DropdownMenuItem(
+                            text = { Text(language) },
+                            leadingIcon = { Checkbox(checked = isSelected, onCheckedChange = null) },
+                            onClick = {
+                                selectedLanguages = if (isSelected) selectedLanguages - language else selectedLanguages + language
+                            }
+                        )
+                    }
+                }
+            }
+            if (selectedLanguages.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    selectedLanguages.forEach { language ->
+                        FilterChip(
+                            selected = true,
+                            onClick = { selectedLanguages = selectedLanguages - language },
+                            label = { Text(language) },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp)) }
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
                 value = bio,
@@ -258,44 +366,49 @@ fun InfluencerRegistrationScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(24.dp))
             
             Text("Select Categories *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                categoriesMap.keys.forEach { category ->
-                    val isSelected = selectedCategories.contains(category)
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = {
-                            selectedCategories = if (isSelected) selectedCategories - category else selectedCategories + category
-                            if (isSelected) selectedSubCategories = selectedSubCategories - category
-                        },
-                        label = { Text(category) }
-                    )
+            Spacer(modifier = Modifier.height(8.dp))
+            var categoriesExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = categoriesExpanded, onExpandedChange = { categoriesExpanded = !categoriesExpanded }) {
+                OutlinedTextField(
+                    value = if (selectedCategories.isEmpty()) "" else "${selectedCategories.size} selected",
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("Categories") },
+                    placeholder = { Text("Choose categories") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoriesExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                ExposedDropdownMenu(expanded = categoriesExpanded, onDismissRequest = { categoriesExpanded = false }) {
+                    availableCategories.forEach { category ->
+                        val isSelected = selectedCategories.contains(category)
+                        DropdownMenuItem(
+                            text = { Text(category) },
+                            leadingIcon = {
+                                Checkbox(checked = isSelected, onCheckedChange = null)
+                            },
+                            onClick = {
+                                selectedCategories = if (isSelected) selectedCategories - category else selectedCategories + category
+                            }
+                        )
+                    }
                 }
             }
 
             if (selectedCategories.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Select Sub-Categories *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                selectedCategories.forEach { category ->
-                    Text(category, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        categoriesMap[category]?.forEach { subCat ->
-                            val currentSubCats = selectedSubCategories[category] ?: emptySet()
-                            val isSubSelected = currentSubCats.contains(subCat)
-                            FilterChip(
-                                selected = isSubSelected,
-                                onClick = {
-                                    val newSubCats = if (isSubSelected) currentSubCats - subCat else currentSubCats + subCat
-                                    selectedSubCategories = selectedSubCategories + (category to newSubCats)
-                                },
-                                label = { Text(subCat, fontSize = 12.sp) }
-                            )
-                        }
+                Spacer(modifier = Modifier.height(12.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    selectedCategories.forEach { category ->
+                        FilterChip(
+                            selected = true,
+                            onClick = { selectedCategories = selectedCategories - category },
+                            label = { Text(category) },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp)) }
+                        )
                     }
                 }
             }
@@ -361,6 +474,43 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                             }
                         }
                     }
+                }
+            }
+
+            // Hosting Section
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (hostingSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFF5F5F5))
+                        .clickable {
+                            hostingSelected = !hostingSelected
+                        }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Hosting",
+                        modifier = Modifier.size(24.dp),
+                        tint = if (hostingSelected) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Hosting", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    Checkbox(checked = hostingSelected, onCheckedChange = null)
+                }
+
+                if (hostingSelected) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = hostingPrice,
+                        onValueChange = { hostingPrice = it },
+                        label = { Text("Hosting Price (INR)") },
+                        modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
                 }
             }
 
@@ -477,7 +627,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
 
             Button(
                 onClick = {
-                    if (name.isEmpty() || location.isEmpty() || bio.isEmpty() || logoUrl.isEmpty() || selectedCategories.isEmpty() || selectedPlatforms.isEmpty()) {
+                    if (name.isEmpty() || selectedState.isEmpty() || selectedCity.isEmpty() || bio.isEmpty() || logoUrl.isEmpty() || selectedCategories.isEmpty() || (selectedPlatforms.isEmpty() && !hostingSelected)) {
                         Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
@@ -492,20 +642,17 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                     val input = JSONObject().apply {
                                         put("name", name)
                                         put("bio", bio)
-                                        put("location", location)
+                                        put("location", "$selectedCity, $selectedState")
                                         put("gender", gender)
                                         put("motherTongue", motherTongue)
-                                        val langsArray = languagesKnown.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                                        put("languagesKnown", JSONArray(langsArray))
+                                        put("languagesKnown", JSONArray(selectedLanguages.toList()))
                                         put("availability", true)
                                         put("logoUrl", logoUrl)
 
                                         val categoriesJson = JSONArray()
                                         selectedCategories.forEach { cat ->
-                                            val subCats = selectedSubCategories[cat] ?: emptySet()
                                             categoriesJson.put(JSONObject().apply {
                                                 put("category", cat)
-                                                put("subCategories", JSONArray(if (subCats.isEmpty()) listOf("General") else subCats.toList()))
                                             })
                                         }
                                         put("categories", categoriesJson)
@@ -519,6 +666,16 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                                 put("avgViews", 0)
                                                 put("engagement", 0.0)
                                                 put("formats", JSONArray((platformDeliverables[plat] ?: emptySet()).toList()))
+                                            })
+                                        }
+                                        if (hostingSelected) {
+                                            platformsJson.put(JSONObject().apply {
+                                                put("platform", "Hosting")
+                                                put("profileUrl", "")
+                                                put("followers", 0)
+                                                put("avgViews", 0)
+                                                put("engagement", 0.0)
+                                                put("formats", JSONArray(listOf("Hosting")))
                                             })
                                         }
                                         put("platforms", platformsJson)
@@ -535,6 +692,14 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                                     })
                                                 }
                                             }
+                                        }
+                                        if (hostingSelected && hostingPrice.isNotBlank()) {
+                                            pricingJson.put(JSONObject().apply {
+                                                put("platform", "Hosting")
+                                                put("deliverable", "Hosting")
+                                                put("price", hostingPrice.toIntOrNull() ?: 0)
+                                                put("currency", "INR")
+                                            })
                                         }
                                         put("pricing", pricingJson)
                                     }

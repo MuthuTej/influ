@@ -74,9 +74,13 @@ class AuthViewModel : ViewModel() {
             }
     }
 
-    fun signup(email: String, password: String, name: String, role: String) {
+    fun signup(email: String, password: String, confirmPassword: String, name: String, role: String) {
         if (email.isEmpty() || password.isEmpty() || name.isEmpty() || role.isEmpty()) {
             _authState.value = AuthState.Error("All fields are required")
+            return
+        }
+        if (password != confirmPassword) {
+            _authState.value = AuthState.Error("Passwords do not match")
             return
         }
         _authState.value = AuthState.Loading

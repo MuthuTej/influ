@@ -914,6 +914,30 @@ object BackendRepository {
             }
         }
 
+    suspend fun getDistinctInfluencerCategories(token: String): Result<List<String>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val query = """
+                    query {
+                        distinctInfluencerCategories
+                    }
+                """.trimIndent()
+                val requestBody = JSONObject().apply { put("query", query) }.toString()
+                executeGraphQL(requestBody, token) { json ->
+                    val errs = json.optJSONArray("errors")
+                    if (errs != null && errs.length() > 0) {
+                        Result.failure(Exception(errs.getJSONObject(0).getString("message")))
+                    } else {
+                        val arr = json.getJSONObject("data").getJSONArray("distinctInfluencerCategories")
+                        Result.success((0 until arr.length()).map { arr.getString(it) })
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("BackendRepository", "getDistinctInfluencerCategories: ${e.message}", e)
+                Result.failure(e)
+            }
+        }
+
     private fun <T> executeGraphQL(requestBody: String, token: String, parse: (JSONObject) -> Result<T>): Result<T> {
         val url = URL(BACKEND_URL)
         val connection = url.openConnection() as HttpURLConnection

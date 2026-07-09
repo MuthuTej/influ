@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,11 +25,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -48,13 +54,20 @@ fun CreateCampaignScreen(
         "Youtube" to listOf("reels/shorts", "post", "video")
     )
 
-    val categoriesMap = mapOf(
-        "Fashion" to listOf("Clothing", "Footwear", "Accessories"),
-        "Tech" to listOf("Gadgets", "Software", "Hardware"),
-        "Food" to listOf("Organic", "Fast Food", "Dining"),
-        "Beauty" to listOf("Skincare", "Makeup", "Haircare"),
-        "Health" to listOf("Fitness", "Supplements", "Wellness")
-    )
+    var availableCategories by remember { mutableStateOf(listOf<String>()) }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { res ->
+            res.token?.let { token ->
+                coroutineScope.launch {
+                    BackendRepository.getDistinctInfluencerCategories(token).onSuccess {
+                        availableCategories = it
+                    }
+                }
+            }
+        }
+    }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var dateField by remember { mutableStateOf<String?>(null) }
@@ -68,7 +81,6 @@ fun CreateCampaignScreen(
     val isFormValid = campaignViewModel.title.isNotBlank() &&
             campaignViewModel.description.isNotBlank() &&
             campaignViewModel.selectedCategories.isNotEmpty() &&
-            campaignViewModel.selectedSubCategories.isNotEmpty() &&
             campaignViewModel.selectedPlatforms.isNotEmpty() &&
             campaignViewModel.selectedPlatforms.all { platform -> 
                 campaignViewModel.platformFormats[platform]?.isNotEmpty() == true 
@@ -162,61 +174,57 @@ fun CreateCampaignScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
             
-            // Multiselect Category Chips
+            // Multiselect Category Dropdown
             Text("Select Categories *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                categoriesMap.keys.forEach { category ->
-                    val isSelected = campaignViewModel.selectedCategories.contains(category)
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = {
-                            campaignViewModel.selectedCategories = if (isSelected) {
-                                campaignViewModel.selectedCategories - category
-                            } else {
-                                campaignViewModel.selectedCategories + category
+            Spacer(modifier = Modifier.height(8.dp))
+            var categoriesExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = categoriesExpanded, onExpandedChange = { categoriesExpanded = !categoriesExpanded }) {
+                OutlinedTextField(
+                    value = if (campaignViewModel.selectedCategories.isEmpty()) "" else "${campaignViewModel.selectedCategories.size} selected",
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("Categories") },
+                    placeholder = { Text("Choose categories") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoriesExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
+                )
+                ExposedDropdownMenu(expanded = categoriesExpanded, onDismissRequest = { categoriesExpanded = false }) {
+                    availableCategories.forEach { category ->
+                        val isSelected = campaignViewModel.selectedCategories.contains(category)
+                        DropdownMenuItem(
+                            text = { Text(category) },
+                            leadingIcon = { Checkbox(checked = isSelected, onCheckedChange = null) },
+                            onClick = {
+                                campaignViewModel.selectedCategories = if (isSelected) {
+                                    campaignViewModel.selectedCategories - category
+                                } else {
+                                    campaignViewModel.selectedCategories + category
+                                }
                             }
-                            // Cleanup subcategories if category unselected
-                            if (isSelected) {
-                                campaignViewModel.selectedSubCategories = campaignViewModel.selectedSubCategories - category
-                            }
-                        },
-                        label = { Text(category) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = Color.White
                         )
-                    )
+                    }
                 }
             }
 
             if (campaignViewModel.selectedCategories.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Select Sub-Categories *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                campaignViewModel.selectedCategories.forEach { category ->
-                    Text(category, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        categoriesMap[category]?.forEach { subCat ->
-                            val selectedSubCats = campaignViewModel.selectedSubCategories[category] ?: emptySet()
-                            val isSelected = selectedSubCats.contains(subCat)
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = {
-                                    val newSubCats = if (isSelected) selectedSubCats - subCat else selectedSubCats + subCat
-                                    campaignViewModel.selectedSubCategories = campaignViewModel.selectedSubCategories + (category to newSubCats)
-                                },
-                                label = { Text(subCat, fontSize = 12.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                    selectedLabelColor = Color.White
-                                )
+                Spacer(modifier = Modifier.height(12.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    campaignViewModel.selectedCategories.forEach { category ->
+                        FilterChip(
+                            selected = true,
+                            onClick = { campaignViewModel.selectedCategories = campaignViewModel.selectedCategories - category },
+                            label = { Text(category) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = Color.White
                             )
-                        }
+                        )
                     }
                 }
             }
@@ -281,6 +289,30 @@ fun CreateCampaignScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // Hosting Section
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (campaignViewModel.hostingSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFF5F5F5))
+                        .clickable {
+                            campaignViewModel.hostingSelected = !campaignViewModel.hostingSelected
+                        }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PlatformIcon("hosting")
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Hosting", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    Checkbox(
+                        checked = campaignViewModel.hostingSelected,
+                        onCheckedChange = null,
+                        colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                    )
                 }
             }
 
@@ -372,13 +404,22 @@ fun CreateCampaignScreen(
 
 @Composable
 fun PlatformIcon(name: String) {
-    val icon = when (name.lowercase()) {
-        "youtube" -> painterResource(id = R.drawable.youtube_logo)
-        "instagram" -> painterResource(id = R.drawable.instagram_logo)
-        "facebook" -> painterResource(id = R.drawable.ic_facebook)
-        else -> painterResource(id = R.drawable.splash1)
+    if (name.lowercase() == "hosting") {
+        Icon(
+            imageVector = Icons.Default.Mic,
+            contentDescription = "Hosting",
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+    } else {
+        val icon = when (name.lowercase()) {
+            "youtube" -> painterResource(id = R.drawable.youtube_logo)
+            "instagram" -> painterResource(id = R.drawable.instagram_logo)
+            "facebook" -> painterResource(id = R.drawable.ic_facebook)
+            else -> painterResource(id = R.drawable.splash1)
+        }
+        Image(painter = icon, contentDescription = name, modifier = Modifier.size(24.dp))
     }
-    Image(painter = icon, contentDescription = name, modifier = Modifier.size(24.dp))
 }
 
 @Composable

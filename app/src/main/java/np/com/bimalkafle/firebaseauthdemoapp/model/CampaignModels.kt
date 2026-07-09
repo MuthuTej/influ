@@ -9,7 +9,12 @@ data class CampaignInput(
     val budgetMax: Int,
     val startDate: String?,
     val endDate: String?,
-    val targetAudience: CampaignAudienceInput
+    val targetAudience: CampaignAudienceInput,
+    val hosting: HostingPricingInput? = null
+)
+
+data class HostingPricingInput(
+    val price: Int
 )
 
 data class CampaignPlatformInput(
@@ -48,7 +53,12 @@ data class CampaignDetail(
     val brand: Brand?,
     val categories: List<BrandCategory>? = null,
     val collaborations: List<CampaignCollaborationSummary>? = null,
-    val overallAnalytics: CampaignOverallAnalytics? = null
+    val overallAnalytics: CampaignOverallAnalytics? = null,
+    val hosting: HostingPricingResponse? = null
+)
+
+data class HostingPricingResponse(
+    val price: Int?
 )
 
 /** One collaboration as seen from the campaign's combined-analytics view — just

@@ -83,8 +83,10 @@ fun BrandProfilePage(
                         subCategory = firstCategory?.subCategories?.firstOrNull() ?: "",
                         about = updatedBrand.about ?: "",
                         preferredPlatforms = updatedBrand.preferredPlatforms?.map { it.platform } ?: emptyList(),
-                        ageMin = updatedBrand.targetAudience?.ageMin,
-                        ageMax = updatedBrand.targetAudience?.ageMax,
+                        // The edit screen already validates both fields parse before building updatedBrand;
+                        // the fallback values only guard against that invariant ever changing.
+                        ageMin = updatedBrand.targetAudience?.ageMin ?: 18,
+                        ageMax = updatedBrand.targetAudience?.ageMax ?: 25,
                         gender = updatedBrand.targetAudience?.gender ?: "Any",
                         profileUrl = updatedBrand.profileUrl,
                         logoUrl = updatedBrand.logoUrl ?: ""
@@ -134,6 +136,7 @@ fun BrandProfileContent(
     var ageMin by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.ageMin?.toString() ?: "") }
     var ageMax by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.ageMax?.toString() ?: "") }
     var gender by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.gender ?: "Any") }
+    var saveError by remember { mutableStateOf<String?>(null) }
 
 
     val platformOptions = listOf("Instagram", "YouTube", "Facebook")
@@ -403,7 +406,16 @@ fun BrandProfileContent(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    if (saveError != null) {
+                        Text(
+                            text = saveError ?: "",
+                            color = Color.Red,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(if (saveError != null) 0.dp else 32.dp))
 
                     // Redesigned Buttons
                     Row(
@@ -413,6 +425,13 @@ fun BrandProfileContent(
                         Button(
                             onClick = {
                                 if (isEditMode) {
+                                    val parsedAgeMin = ageMin.toIntOrNull()
+                                    val parsedAgeMax = ageMax.toIntOrNull()
+                                    if (parsedAgeMin == null || parsedAgeMax == null) {
+                                        saveError = "Enter a valid Min Age and Max Age (numbers only)."
+                                        return@Button
+                                    }
+                                    saveError = null
                                     val updatedBrand = brandProfile?.copy(
                                         name = name,
                                         email = email,
@@ -422,8 +441,8 @@ fun BrandProfileContent(
                                         profileUrl = profileUrl,
                                         logoUrl = logoUrl,
                                         targetAudience = TargetAudience(
-                                            ageMin = ageMin.toIntOrNull(),
-                                            ageMax = ageMax.toIntOrNull(),
+                                            ageMin = parsedAgeMin,
+                                            ageMax = parsedAgeMax,
                                             gender = gender,
                                             locations = brandProfile.targetAudience?.locations
                                         ),

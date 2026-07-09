@@ -3,42 +3,16 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RangeSlider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -49,14 +23,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.utils.IndianLocations
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -65,8 +38,9 @@ fun CreateCampaignScreen2(
     onNext: () -> Unit = {},
     campaignViewModel: CampaignViewModel = CampaignViewModel()
 ) {
-    val locations = listOf("India", "USA", "Sri Lanka", "Maldives", "UK")
-    
+    var selectedState by remember { mutableStateOf("") }
+    var selectedCity by remember { mutableStateOf("") }
+
     val loading by campaignViewModel.loading.observeAsState(false)
     val error by campaignViewModel.error.observeAsState()
     val success by campaignViewModel.createCampaignSuccess.observeAsState(false)
@@ -180,18 +154,81 @@ fun CreateCampaignScreen2(
             // Target Location
             Text("Target Location *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+
+            var stateExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = stateExpanded, onExpandedChange = { stateExpanded = !stateExpanded }) {
+                OutlinedTextField(
+                    value = selectedState,
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("State") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = stateExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                ExposedDropdownMenu(expanded = stateExpanded, onDismissRequest = { stateExpanded = false }) {
+                    IndianLocations.states.forEach { state ->
+                        DropdownMenuItem(text = { Text(state) }, onClick = {
+                            selectedState = state
+                            selectedCity = ""
+                            stateExpanded = false
+                        })
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            var cityExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = cityExpanded, onExpandedChange = { if (selectedState.isNotEmpty()) cityExpanded = !cityExpanded }) {
+                OutlinedTextField(
+                    value = selectedCity,
+                    onValueChange = { },
+                    readOnly = true,
+                    enabled = selectedState.isNotEmpty(),
+                    label = { Text("City") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = cityExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                ExposedDropdownMenu(expanded = cityExpanded, onDismissRequest = { cityExpanded = false }) {
+                    IndianLocations.citiesFor(selectedState).forEach { city ->
+                        DropdownMenuItem(text = { Text(city) }, onClick = {
+                            selectedCity = city
+                            cityExpanded = false
+                        })
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = {
+                    if (selectedState.isNotEmpty() && selectedCity.isNotEmpty()) {
+                        val entry = "$selectedCity, $selectedState"
+                        if (!campaignViewModel.selectedLocations.contains(entry)) {
+                            campaignViewModel.selectedLocations = campaignViewModel.selectedLocations + entry
+                        }
+                        selectedCity = ""
+                    }
+                },
+                enabled = selectedState.isNotEmpty() && selectedCity.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                locations.forEach { location ->
-                    val isSelected = campaignViewModel.selectedLocations.contains(location)
-                    LocationChip(location, isSelected) {
-                        campaignViewModel.selectedLocations = if (isSelected) {
-                            campaignViewModel.selectedLocations - location
-                        } else {
-                            campaignViewModel.selectedLocations + location
+                Text("Add Location")
+            }
+
+            if (campaignViewModel.selectedLocations.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    campaignViewModel.selectedLocations.forEach { location ->
+                        LocationChip(location, isSelected = true) {
+                            campaignViewModel.selectedLocations = campaignViewModel.selectedLocations - location
                         }
                     }
                 }

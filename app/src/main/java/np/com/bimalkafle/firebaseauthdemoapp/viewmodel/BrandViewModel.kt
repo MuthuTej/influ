@@ -1425,8 +1425,8 @@ class BrandViewModel : ViewModel() {
         subCategory: String,
         about: String,
         preferredPlatforms: List<String>,
-        ageMin: Int?,
-        ageMax: Int?,
+        ageMin: Int,
+        ageMax: Int,
         gender: String,
         profileUrl: String?,
         logoUrl: String,
@@ -1443,10 +1443,17 @@ class BrandViewModel : ViewModel() {
                 }
             """.trimIndent()
 
+            // BrandProfileInput.brandCategories is a required [CategoryInput!]! list server-side —
+            // it must be sent as "brandCategories": [{category, subCategories}], not a singular object.
             val variables = mapOf(
                 "input" to mapOf(
                     "name" to name,
-                    "brandCategory" to mapOf("category" to brandCategory, "subCategory" to subCategory),
+                    "brandCategories" to listOf(
+                        mapOf(
+                            "category" to brandCategory,
+                            "subCategories" to if (subCategory.isNotBlank()) listOf(subCategory) else emptyList<String>()
+                        )
+                    ),
                     "about" to about,
                     "preferredPlatforms" to preferredPlatforms.map { mapOf("platform" to it) },
                     "targetAudience" to mapOf(
