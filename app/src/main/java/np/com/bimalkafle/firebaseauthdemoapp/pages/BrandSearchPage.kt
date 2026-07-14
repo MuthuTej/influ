@@ -302,10 +302,10 @@ fun BrandSearchPage(
                             "Education", "Entertainment", "Fashion & Beauty", "Finance", "Fitness", "Food",
                             "Gaming", "Health & Wellness", "Lifestyle", "Music", "Parenting & Family",
                             "Spirituality & Religion", "Sports", "Technology", "Travel")
-                        val platformsList = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "TIKTOK")
+                        val platformsList = listOf("All", "INSTAGRAM", "YOUTUBE", "FACEBOOK")
                         val followerRanges = listOf("All", "0-10K", "10K-100K", "100K-1M", "1M+")
                         val gendersList = listOf("All", "Male", "Female", "Other")
-                        val languagesList = listOf("All", "Assamese", "Bengali", "Bodo", "Dogri", "Gujarati", "Hindi", "Kannada",
+                        val languagesList = listOf("All", "Assamese", "Bengali", "Bodo", "Dogri","English", "Gujarati", "Hindi", "Kannada",
                             "Kashmiri", "Konkani", "Maithili", "Malayalam", "Manipuri (Meitei)", "Marathi", "Nepali",
                             "Odia", "Punjabi", "Sanskrit", "Santali", "Sindhi", "Tamil", "Telugu", "Urdu")
                         val hardcodedLocations = listOf("All", "Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem",
