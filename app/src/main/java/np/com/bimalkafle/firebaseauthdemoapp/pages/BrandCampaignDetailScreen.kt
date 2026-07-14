@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -327,6 +328,14 @@ private fun CollaborationRow(collab: CampaignCollaborationSummary, onClick: () -
                 )
                 collab.influencerHandle?.let {
                     Text("@$it", fontSize = 12.sp, color = appColors.textSecondary)
+                }
+                collab.rating?.let { rating ->
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text("%.1f".format(rating), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = appColors.textSecondary)
+                    }
                 }
             }
             if (collab.totalPrice > 0) {

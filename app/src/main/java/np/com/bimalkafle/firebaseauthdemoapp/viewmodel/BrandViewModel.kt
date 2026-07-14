@@ -505,6 +505,16 @@ class BrandViewModel : ViewModel() {
                         gender
                         locations
                       }
+                      averageRating
+                      reviews {
+                        id
+                        rating
+                        comment
+                        createdAt
+                        reviewer {
+                          name
+                        }
+                      }
                     }
                   }
                 }
@@ -618,6 +628,43 @@ class BrandViewModel : ViewModel() {
             )
         } else null
 
+        val reviewsArray = obj.optJSONArray("reviews")
+        val reviews = if (reviewsArray != null) {
+            val list = mutableListOf<Review>()
+            for (i in 0 until reviewsArray.length()) {
+                val r = reviewsArray.getJSONObject(i)
+                val reviewerObj = r.optJSONObject("reviewer")
+                list.add(
+                    Review(
+                        id = r.optString("id", ""),
+                        collaborationId = null,
+                        reviewerId = "",
+                        revieweeId = "",
+                        reviewerRole = "",
+                        rating = r.optDouble("rating", 0.0),
+                        comment = if (r.isNull("comment")) null else r.optString("comment"),
+                        createdAt = r.optString("createdAt", ""),
+                        reviewer = if (reviewerObj != null) {
+                            Reviewer(
+                                id = "",
+                                email = "",
+                                name = reviewerObj.optString("name", ""),
+                                role = "",
+                                profileCompleted = null,
+                                updatedAt = null,
+                                govtId = null,
+                                isVerified = null,
+                                fcmToken = null,
+                                averageRating = null
+                            )
+                        } else null,
+                        reviewee = null
+                    )
+                )
+            }
+            list
+        } else null
+
         return Brand(
             id = obj.optString("id", ""),
             email = obj.optString("email", ""),
@@ -630,7 +677,9 @@ class BrandViewModel : ViewModel() {
             profileUrl = if (obj.isNull("profileUrl")) null else obj.optString("profileUrl"),
             logoUrl = if (obj.isNull("logoUrl")) null else obj.optString("logoUrl"),
             preferredPlatforms = preferredPlatforms,
-            targetAudience = targetAudience
+            targetAudience = targetAudience,
+            averageRating = if (obj.isNull("averageRating")) null else obj.optDouble("averageRating"),
+            reviews = reviews
         )
     }
 

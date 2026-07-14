@@ -69,7 +69,8 @@ data class CampaignCollaborationSummary(
     val status: String,
     val influencerName: String?,
     val influencerHandle: String?,
-    val totalPrice: Int
+    val totalPrice: Int,
+    val rating: Double? = null
 )
 
 /** Sum of OverallAnalytics across every collaboration in the campaign — same

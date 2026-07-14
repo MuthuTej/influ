@@ -411,6 +411,7 @@ class CampaignViewModel : ViewModel() {
                       status
                       influencer { name handle }
                       pricing { price currency }
+                      rating
                     }
                     overallAnalytics {
                       likes
@@ -734,7 +735,8 @@ class CampaignViewModel : ViewModel() {
                         status = c.optString("status"),
                         influencerName = influencerObj?.optString("name"),
                         influencerHandle = influencerObj?.optString("handle"),
-                        totalPrice = totalPrice
+                        totalPrice = totalPrice,
+                        rating = if (c.isNull("rating")) null else c.optDouble("rating")
                     )
                 )
             }
