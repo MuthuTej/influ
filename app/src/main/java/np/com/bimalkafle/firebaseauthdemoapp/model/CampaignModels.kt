@@ -70,8 +70,17 @@ data class CampaignCollaborationSummary(
     val influencerName: String?,
     val influencerHandle: String?,
     val totalPrice: Int,
-    val rating: Double? = null
-)
+    val rating: Double? = null,
+    val paymentStatus: String? = null,
+    val totalAmount: Double? = null
+) {
+    /** Amount actually paid, 0 until payment is confirmed. `totalAmount` is only
+     * persisted once the real Pay Now flow runs — older/manual collaborations can
+     * reach paymentStatus "paid" without it, so fall back to the negotiated price
+     * sum, same as HeroStats.bestKnownAmount(). */
+    val amountPaid: Int
+        get() = if (paymentStatus == "paid") (totalAmount?.toInt() ?: totalPrice) else 0
+}
 
 /** Sum of OverallAnalytics across every collaboration in the campaign — same
  * shape as a single collaboration's overallAnalytics, just aggregated. */

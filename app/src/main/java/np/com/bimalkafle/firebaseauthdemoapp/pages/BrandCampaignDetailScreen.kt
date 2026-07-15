@@ -35,11 +35,14 @@ import androidx.navigation.NavHostController
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.components.ErrorState
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
+import np.com.bimalkafle.firebaseauthdemoapp.components.ReportDownloadButton
 import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignCollaborationSummary
 import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignDetail
 import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignOverallAnalytics
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.Dimens
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.LocalAppColors
+import np.com.bimalkafle.firebaseauthdemoapp.utils.CampaignReportCsvGenerator
+import np.com.bimalkafle.firebaseauthdemoapp.utils.CampaignReportPdfGenerator
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 
 private fun formatBudget(amount: Int?): String {
@@ -92,7 +95,7 @@ fun BrandCampaignDetailScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                 }
                 Spacer(modifier = Modifier.width(Dimens.space12))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text("Campaign", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
                     Text(
                         campaign?.title ?: "Loading…",
@@ -101,6 +104,17 @@ fun BrandCampaignDetailScreen(
                         fontSize = 18.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+                campaign?.let { currentCampaign ->
+                    ReportDownloadButton(
+                        enabled = true,
+                        fileBaseName = CampaignReportPdfGenerator.fileBaseName(currentCampaign),
+                        generatePdf = { CampaignReportPdfGenerator.generate(currentCampaign) },
+                        generateCsv = { CampaignReportCsvGenerator.generate(currentCampaign) },
+                        modifier = Modifier
+                            .size(Dimens.minTouchTarget)
+                            .background(Color.White.copy(alpha = 0.18f), CircleShape)
                     )
                 }
             }

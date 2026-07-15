@@ -17,6 +17,37 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/** Shared by [CampaignViewModel.parseCampaignDetail] and [BrandViewModel.fetchMyCampaigns] —
+ * both queries select the same `collaborations { ... }` shape off a Campaign. */
+fun parseCampaignCollaborationSummaries(collaborationsArray: JSONArray?): List<CampaignCollaborationSummary>? {
+    if (collaborationsArray == null) return null
+    val list = mutableListOf<CampaignCollaborationSummary>()
+    for (i in 0 until collaborationsArray.length()) {
+        val c = collaborationsArray.getJSONObject(i)
+        val influencerObj = c.optJSONObject("influencer")
+        val pricingArray = c.optJSONArray("pricing")
+        var totalPrice = 0
+        if (pricingArray != null) {
+            for (j in 0 until pricingArray.length()) {
+                totalPrice += pricingArray.getJSONObject(j).optInt("price")
+            }
+        }
+        list.add(
+            CampaignCollaborationSummary(
+                id = c.optString("id"),
+                status = c.optString("status"),
+                influencerName = influencerObj?.optString("name"),
+                influencerHandle = influencerObj?.optString("handle"),
+                totalPrice = totalPrice,
+                rating = if (c.isNull("rating")) null else c.optDouble("rating"),
+                paymentStatus = if (c.isNull("paymentStatus")) null else c.optString("paymentStatus"),
+                totalAmount = if (c.isNull("totalAmount")) null else c.optDouble("totalAmount")
+            )
+        )
+    }
+    return list
+}
+
 class CampaignViewModel : ViewModel() {
 
     // Screen 1 Fields
@@ -412,6 +443,8 @@ class CampaignViewModel : ViewModel() {
                       influencer { name handle }
                       pricing { price currency }
                       rating
+                      paymentStatus
+                      totalAmount
                     }
                     overallAnalytics {
                       likes
@@ -716,32 +749,7 @@ class CampaignViewModel : ViewModel() {
             }
         }
 
-        val collaborationsArray = json.optJSONArray("collaborations")
-        val collaborations = if (collaborationsArray != null) {
-            val list = mutableListOf<CampaignCollaborationSummary>()
-            for (i in 0 until collaborationsArray.length()) {
-                val c = collaborationsArray.getJSONObject(i)
-                val influencerObj = c.optJSONObject("influencer")
-                val pricingArray = c.optJSONArray("pricing")
-                var totalPrice = 0
-                if (pricingArray != null) {
-                    for (j in 0 until pricingArray.length()) {
-                        totalPrice += pricingArray.getJSONObject(j).optInt("price")
-                    }
-                }
-                list.add(
-                    CampaignCollaborationSummary(
-                        id = c.optString("id"),
-                        status = c.optString("status"),
-                        influencerName = influencerObj?.optString("name"),
-                        influencerHandle = influencerObj?.optString("handle"),
-                        totalPrice = totalPrice,
-                        rating = if (c.isNull("rating")) null else c.optDouble("rating")
-                    )
-                )
-            }
-            list
-        } else null
+        val collaborations = parseCampaignCollaborationSummaries(json.optJSONArray("collaborations"))
 
         val overallAnalyticsObj = json.optJSONObject("overallAnalytics")
         val overallAnalytics = overallAnalyticsObj?.let {

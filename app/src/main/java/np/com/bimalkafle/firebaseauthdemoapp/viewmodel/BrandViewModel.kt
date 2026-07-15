@@ -1272,6 +1272,15 @@ class BrandViewModel : ViewModel() {
                       platform
                       formats
                     }
+                    collaborations {
+                      id
+                      status
+                      influencer { name handle }
+                      pricing { price currency }
+                      rating
+                      paymentStatus
+                      totalAmount
+                    }
                   }
                 }
             """.trimIndent()
@@ -1326,7 +1335,8 @@ class BrandViewModel : ViewModel() {
                                     status = if (obj.isNull("status")) null else obj.optString("status"),
                                     createdAt = if (obj.isNull("createdAt")) null else obj.optString("createdAt"),
                                     updatedAt = if (obj.isNull("updatedAt")) null else obj.optString("updatedAt"),
-                                    platforms = platforms
+                                    platforms = platforms,
+                                    collaborations = parseCampaignCollaborationSummaries(obj.optJSONArray("collaborations"))
                                 )
                             )
                         }
