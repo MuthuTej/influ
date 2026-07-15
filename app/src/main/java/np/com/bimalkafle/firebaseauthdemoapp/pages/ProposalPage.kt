@@ -17,6 +17,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.AppPullToRefreshBox
+import np.com.bimalkafle.firebaseauthdemoapp.components.ReportDownloadButton
+import np.com.bimalkafle.firebaseauthdemoapp.utils.InfluencerReportCsvGenerator
+import np.com.bimalkafle.firebaseauthdemoapp.utils.InfluencerReportPdfGenerator
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -140,6 +143,10 @@ fun ProposalPage(
     val brandCollaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
     val influencerCollaborations by influencerViewModel.filteredCollaborations.observeAsState(initial = emptyList())
     val collaborations = if (isBrand) brandCollaborations else influencerCollaborations
+
+    // Unfiltered by active Instagram profile — an earnings report should cover
+    // everything ever received, not just the currently selected profile's view.
+    val allInfluencerCollaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
 
     val brandLoading by brandViewModel.loading.observeAsState(initial = false)
     val influencerLoading by influencerViewModel.loading.observeAsState(initial = false)
@@ -288,6 +295,21 @@ fun ProposalPage(
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
+                }
+
+                if (!isBrand) {
+                    ReportDownloadButton(
+                        enabled = allInfluencerCollaborations.isNotEmpty(),
+                        fileBaseName = "earnings_report",
+                        generatePdf = { InfluencerReportPdfGenerator.generate(allInfluencerCollaborations) },
+                        generateCsv = { InfluencerReportCsvGenerator.generate(allInfluencerCollaborations) },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 16.dp)
+                            .size(36.dp)
+                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                    )
                 }
             }
 
