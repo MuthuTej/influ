@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,11 +35,14 @@ import androidx.navigation.NavHostController
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.components.ErrorState
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
+import np.com.bimalkafle.firebaseauthdemoapp.components.ReportDownloadButton
 import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignCollaborationSummary
 import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignDetail
 import np.com.bimalkafle.firebaseauthdemoapp.model.CampaignOverallAnalytics
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.Dimens
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.LocalAppColors
+import np.com.bimalkafle.firebaseauthdemoapp.utils.CampaignReportCsvGenerator
+import np.com.bimalkafle.firebaseauthdemoapp.utils.CampaignReportPdfGenerator
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
 
 private fun formatBudget(amount: Int?): String {
@@ -91,7 +95,7 @@ fun BrandCampaignDetailScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                 }
                 Spacer(modifier = Modifier.width(Dimens.space12))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text("Campaign", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
                     Text(
                         campaign?.title ?: "Loading…",
@@ -100,6 +104,17 @@ fun BrandCampaignDetailScreen(
                         fontSize = 18.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+                campaign?.let { currentCampaign ->
+                    ReportDownloadButton(
+                        enabled = true,
+                        fileBaseName = CampaignReportPdfGenerator.fileBaseName(currentCampaign),
+                        generatePdf = { CampaignReportPdfGenerator.generate(currentCampaign) },
+                        generateCsv = { CampaignReportCsvGenerator.generate(currentCampaign) },
+                        modifier = Modifier
+                            .size(Dimens.minTouchTarget)
+                            .background(Color.White.copy(alpha = 0.18f), CircleShape)
                     )
                 }
             }
@@ -327,6 +342,14 @@ private fun CollaborationRow(collab: CampaignCollaborationSummary, onClick: () -
                 )
                 collab.influencerHandle?.let {
                     Text("@$it", fontSize = 12.sp, color = appColors.textSecondary)
+                }
+                collab.rating?.let { rating ->
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text("%.1f".format(rating), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = appColors.textSecondary)
+                    }
                 }
             }
             if (collab.totalPrice > 0) {

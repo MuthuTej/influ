@@ -35,7 +35,10 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.ReportDownloadButton
 import np.com.bimalkafle.firebaseauthdemoapp.model.Campaign
+import np.com.bimalkafle.firebaseauthdemoapp.utils.CampaignReportCsvGenerator
+import np.com.bimalkafle.firebaseauthdemoapp.utils.CampaignReportPdfGenerator
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import java.time.Instant
 import java.time.ZoneId
@@ -109,6 +112,14 @@ fun AllCampaignPage(
                             tint = Color.White
                         )
                     }
+
+                    ReportDownloadButton(
+                        enabled = myCampaigns.isNotEmpty(),
+                        fileBaseName = "all_campaigns_report",
+                        generatePdf = { CampaignReportPdfGenerator.generateOverall(myCampaigns) },
+                        generateCsv = { CampaignReportCsvGenerator.generateOverall(myCampaigns) },
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    )
                 }
 
                 Surface(

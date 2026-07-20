@@ -40,6 +40,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.TargetAudience
 import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
+import np.com.bimalkafle.firebaseauthdemoapp.components.StarRatingDisplay
 
 @Composable
 fun BrandProfilePage(
@@ -406,6 +407,10 @@ fun BrandProfileContent(
                         }
                     }
 
+                    if (!isEditMode) {
+                        RatingsSection(brandProfile = brandProfile)
+                    }
+
                     if (saveError != null) {
                         Text(
                             text = saveError ?: "",
@@ -491,6 +496,37 @@ fun BrandProfileContent(
                     Spacer(modifier = Modifier.height(32.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun RatingsSection(brandProfile: Brand?) {
+    val reviewCount = brandProfile?.reviews?.size ?: 0
+    DetailInfoSection(icon = Icons.Default.Star, title = "Overall Rating") {
+        if (reviewCount > 0) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "%.1f".format(brandProfile?.averageRating ?: 0.0),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                StarRatingDisplay(rating = brandProfile?.averageRating ?: 0.0, starSize = 18.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "(from $reviewCount review${if (reviewCount == 1) "" else "s"})",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+        } else {
+            Text(
+                text = "No reviews yet — your rating appears here once influencers review completed collaborations.",
+                fontSize = 13.sp,
+                color = Color.Gray
+            )
         }
     }
 }

@@ -13,8 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
@@ -61,8 +59,6 @@ fun BrandRegistrationScreen(
 
     var hostingSelected by remember { mutableStateOf(false) }
 
-    var ageMin by remember { mutableStateOf("18") }
-    var ageMax by remember { mutableStateOf("25") }
     var gender by remember { mutableStateOf("Any") }
     var profileUrl by remember { mutableStateOf("") }
     var logoUrl by remember { mutableStateOf("") }
@@ -100,9 +96,7 @@ fun BrandRegistrationScreen(
                     description.isNotBlank() &&
                     selectedCategories.isNotEmpty() &&
                     (selectedPlatforms.isNotEmpty() || hostingSelected) &&
-                    selectedPlatforms.all { platformDeliverables[it]?.isNotEmpty() == true } &&
-                    ageMin.toIntOrNull() != null &&
-                    ageMax.toIntOrNull() != null
+                    selectedPlatforms.all { platformDeliverables[it]?.isNotEmpty() == true }
         }
     }
 
@@ -370,15 +364,7 @@ fun BrandRegistrationScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
             Text("Target Audience", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                AgeInput(label = "Min Age", value = ageMin, onValueChange = { ageMin = it }, modifier = Modifier.weight(1f))
-                AgeInput(label = "Max Age", value = ageMax, onValueChange = { ageMax = it }, modifier = Modifier.weight(1f))
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            
+
             var genderExpanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(expanded = genderExpanded, onExpandedChange = { genderExpanded = !genderExpanded }) {
                 OutlinedTextField(
@@ -460,10 +446,10 @@ fun BrandRegistrationScreen(
                                     },
                                     about = description,
                                     preferredPlatforms = platformsData,
-                                    // isFormValid already requires both to parse before this button is enabled;
-                                    // the fallback values only guard against that invariant ever changing.
-                                    ageMin = ageMin.toIntOrNull() ?: 18,
-                                    ageMax = ageMax.toIntOrNull() ?: 25,
+                                    // Age targeting is not collected in this form; the server requires
+                                    // ageMin/ageMax so a broad default range is sent instead.
+                                    ageMin = 13,
+                                    ageMax = 99,
                                     gender = gender,
                                     profileUrl = profileUrl,
                                     logoUrl = logoUrl,
@@ -516,33 +502,6 @@ fun BrandRegistrationScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
-}
-
-@Composable
-fun AgeInput(label: String, value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val currentValue = value.toIntOrNull() ?: 0
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
-        trailingIcon = {
-            Column {
-                Icon(
-                    imageVector = Icons.Default.ArrowDropUp,
-                    contentDescription = "Increment",
-                    modifier = Modifier.clickable { onValueChange((currentValue + 1).toString()) }
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Decrement",
-                    modifier = Modifier.clickable { onValueChange((currentValue - 1).toString()) }
-                )
-            }
-        }
-    )
 }
 
 @Preview(showBackground = true)

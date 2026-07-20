@@ -17,6 +17,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.AppPullToRefreshBox
+import np.com.bimalkafle.firebaseauthdemoapp.components.ReportDownloadButton
+import np.com.bimalkafle.firebaseauthdemoapp.utils.InfluencerReportCsvGenerator
+import np.com.bimalkafle.firebaseauthdemoapp.utils.InfluencerReportPdfGenerator
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -141,6 +144,10 @@ fun ProposalPage(
     val influencerCollaborations by influencerViewModel.filteredCollaborations.observeAsState(initial = emptyList())
     val collaborations = if (isBrand) brandCollaborations else influencerCollaborations
 
+    // Unfiltered by active Instagram profile — an earnings report should cover
+    // everything ever received, not just the currently selected profile's view.
+    val allInfluencerCollaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
+
     val brandLoading by brandViewModel.loading.observeAsState(initial = false)
     val influencerLoading by influencerViewModel.loading.observeAsState(initial = false)
     val isLoading = if (isBrand) brandLoading else influencerLoading
@@ -209,9 +216,8 @@ fun ProposalPage(
     val proposals = collaborations.map { it.toProposal(isBrand) }
         .filter { it.type == selectedTab && (selectedStatus == null || it.status == selectedStatus) }
 
-    val configuration = LocalConfiguration.current
     val headerColor = MaterialTheme.colorScheme.primary
-    val headerHeight = 120.dp
+    val headerHeight = 100.dp
     val contentPaddingTop = headerHeight - 20.dp
 
     Scaffold(
@@ -267,36 +273,52 @@ fun ProposalPage(
                     modifier = Modifier
                         .statusBarsPadding()
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 24.dp)
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = { navController.popBackStack() },
-                            modifier = Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape)
+                            modifier = Modifier.size(36.dp).background(Color.White.copy(alpha = 0.2f), CircleShape)
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",
-                                tint = Color.White
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "History & Proposals",
                             color = Color.White,
-                            fontSize = 24.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
+                }
+
+                if (!isBrand) {
+                    ReportDownloadButton(
+                        enabled = allInfluencerCollaborations.isNotEmpty(),
+                        fileBaseName = "earnings_report",
+                        generatePdf = { InfluencerReportPdfGenerator.generate(allInfluencerCollaborations) },
+                        generateCsv = { InfluencerReportCsvGenerator.generate(allInfluencerCollaborations) },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 16.dp)
+                            .size(36.dp)
+                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                    )
                 }
             }
 
             // Content Card
             Column(
                 modifier = Modifier
-                    .padding(top = contentPaddingTop + 40.dp) // Adjust for status bar
+                    .padding(top = contentPaddingTop + 30.dp) // Adjust for status bar
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(Color.White)
                     .padding(bottom = paddingValues.calculateBottomPadding())
             ) {
@@ -341,7 +363,7 @@ fun ProposalPage(
                             }
                         } else {
                             LazyColumn(
-                                contentPadding = PaddingValues(bottom = 16.dp),
+                                contentPadding = PaddingValues(vertical = 8.dp),
                                 modifier = Modifier.fillMaxSize()
                             ) {
                                 items(proposals) { proposal ->
@@ -386,11 +408,11 @@ fun ProposalToggle(selectedTab: ProposalType, onTabSelected: (ProposalType) -> U
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(20.dp)
-            .height(54.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .height(44.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(Color(0xFFF5F5F7))
-            .padding(4.dp),
+            .padding(2.dp),
     ) {
         val tabs = listOf(ProposalType.RECEIVED to "Received", ProposalType.SENT to "Sent")
         tabs.forEach { (tab, label) ->
@@ -399,7 +421,7 @@ fun ProposalToggle(selectedTab: ProposalType, onTabSelected: (ProposalType) -> U
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(if (isSelected) Color.White else Color.Transparent)
                     .clickable { onTabSelected(tab) },
                 contentAlignment = Alignment.Center
@@ -408,7 +430,7 @@ fun ProposalToggle(selectedTab: ProposalType, onTabSelected: (ProposalType) -> U
                     text = label,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
-                    fontSize = 15.sp
+                    fontSize = 14.sp
                 )
             }
         }
@@ -417,17 +439,17 @@ fun ProposalToggle(selectedTab: ProposalType, onTabSelected: (ProposalType) -> U
 
 @Composable
 fun StatusFilterRow(selectedStatus: ProposalStatus?, onStatusSelected: (ProposalStatus) -> Unit) {
-    Box(modifier = Modifier.padding(bottom = 8.dp)) {
+    Box(modifier = Modifier.padding(bottom = 4.dp)) {
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(ProposalStatus.entries.toTypedArray()) { status ->
                 val isSelected = selectedStatus == status
                 FilterChip(
                     selected = isSelected,
                     onClick = { onStatusSelected(status) },
-                    label = { Text(status.displayName, fontSize = 12.sp) },
+                    label = { Text(status.displayName, fontSize = 11.sp) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = status.color.copy(alpha = 0.15f),
                         selectedLabelColor = status.color,
@@ -437,7 +459,7 @@ fun StatusFilterRow(selectedStatus: ProposalStatus?, onStatusSelected: (Proposal
                         borderColor = if (isSelected) status.color else Color.LightGray,
                         selectedBorderColor = status.color,
                         borderWidth = 1.dp,
-                        selectedBorderWidth = 1.5.dp,
+                        selectedBorderWidth = 1.2.dp,
                         enabled = true,
                         selected = isSelected
                     )
@@ -467,19 +489,19 @@ fun PremiumProposalCard(
     }
 
     Card(
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
             .clickable { onClick() }
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(54.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFF8F9FA))
                 ) {
@@ -495,43 +517,43 @@ fun PremiumProposalCard(
                         Image(
                             painter = painterResource(id = R.drawable.brand_profile),
                             contentDescription = null,
-                            modifier = Modifier.padding(8.dp)
+                            modifier = Modifier.padding(6.dp)
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = proposal.otherPartyName,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
+                        fontSize = 15.sp,
                         color = Color(0xFF1D1D1F)
                     )
                     Text(
                         text = proposal.campaignTitle,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         color = Color.Gray
                     )
                     if (!isBrand && igProfileUsername != null) {
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(2.dp))
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
+                            shape = RoundedCornerShape(4.dp),
                             color = Color(0xFFE1306C).copy(alpha = 0.10f)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     Icons.Default.AccountCircle,
                                     contentDescription = null,
                                     tint = Color(0xFFE1306C),
-                                    modifier = Modifier.size(11.dp)
+                                    modifier = Modifier.size(10.dp)
                                 )
-                                Spacer(Modifier.width(3.dp))
+                                Spacer(Modifier.width(2.dp))
                                 Text(
                                     "@$igProfileUsername",
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
                                     color = Color(0xFFE1306C),
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -542,52 +564,55 @@ fun PremiumProposalCard(
                 PremiumStatusBadge(status = proposal.status)
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-            Divider(color = Color(0xFFF2F2F7))
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Divider(color = Color(0xFFF2F2F7), thickness = 0.5.dp)
+            Spacer(modifier = Modifier.height(10.dp))
 
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                InfoItem("Total Amount", proposal.totalAmount, Icons.Default.CurrencyRupee)
+                InfoItem("Budget", proposal.totalAmount, Icons.Default.CurrencyRupee)
                 InfoItem("Platform", proposal.platform, Icons.Default.Public)
                 InfoItem("Date", proposal.date, Icons.Default.CalendarToday)
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Chat Button is always available for active/pending collaborations
                 OutlinedButton(
                     onClick = { onChat() },
-                    modifier = Modifier.weight(1f).height(48.dp),
+                    modifier = Modifier.weight(1f).height(40.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
-                    Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Chat", fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Chat", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
 
                 if (proposal.type == ProposalType.RECEIVED && proposal.status == ProposalStatus.PENDING) {
                     Button(
                         onClick = { onAction("ACCEPTED") },
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        modifier = Modifier.weight(1f).height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(0.dp)
                     ) {
-                        Text("Accept", fontWeight = FontWeight.Bold)
+                        Text("Accept", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 } else if (proposal.type == ProposalType.SENT && proposal.status == ProposalStatus.PENDING) {
                     Button(
                         onClick = { onAction("REVOKED") },
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        modifier = Modifier.weight(1f).height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D1D1F)),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(0.dp)
                     ) {
-                        Text("Revoke", fontWeight = FontWeight.Bold)
+                        Text("Revoke", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 } else if (isBrand && (proposal.status == ProposalStatus.ACCEPTED || proposal.status == ProposalStatus.WAITING_FOR_PAYMENT)) {
                     Button(
@@ -608,13 +633,14 @@ fun PremiumProposalCard(
                                 }
                             }
                         },
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        modifier = Modifier.weight(1f).height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(0.dp)
                     ) {
-                        Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Pay Now", fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Pay Now", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
@@ -626,45 +652,35 @@ fun PremiumProposalCard(
 fun InfoItem(label: String, value: String, icon: ImageVector) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, size = 12.dp, tint = Color.Gray)
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(label, fontSize = 11.sp, color = Color.Gray)
+            Icon(icon, contentDescription = null, modifier = Modifier.size(10.dp), tint = Color.Gray)
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(label, fontSize = 10.sp, color = Color.Gray)
         }
         Text(
             value,
-            fontSize = 14.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = Color(0xFF1D1D1F),
-            modifier = Modifier.padding(top = 2.dp)
+            modifier = Modifier.padding(top = 1.dp)
         )
     }
-}
-
-@Composable
-private fun Icon(icon: ImageVector, contentDescription: String?, size: Dp, tint: Color) {
-    Icon(
-        imageVector = icon,
-        contentDescription = contentDescription,
-        modifier = Modifier.size(size),
-        tint = tint
-    )
 }
 
 @Composable
 fun PremiumStatusBadge(status: ProposalStatus) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(6.dp))
             .background(status.color.copy(alpha = 0.1f))
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(status.icon, contentDescription = null, size = 14.dp, tint = status.color)
-            Spacer(modifier = Modifier.width(6.dp))
+            Icon(status.icon, contentDescription = null, modifier = Modifier.size(12.dp), tint = status.color)
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = status.displayName,
                 color = status.color,
-                fontSize = 12.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold
             )
         }

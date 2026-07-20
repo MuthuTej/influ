@@ -202,7 +202,7 @@ fun SignupPageContent(
                 value = name,
                 onValueChange = onNameChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Name") },
+                label = { Text(if (role == "BRAND") "Brand Name" else "Name") },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
             )
