@@ -138,6 +138,7 @@ private fun encodeMessages(messages: List<AiChatMessage>): String {
                 put("type", entity.type)
                 put("id", entity.id)
                 put("label", entity.label)
+                put("aliases", JSONArray(entity.aliases))
             })
         }
         array.put(JSONObject().apply {
@@ -157,7 +158,14 @@ private fun decodeMessages(json: String): List<AiChatMessage> {
         val entities = entitiesJson?.let { arr ->
             (0 until arr.length()).map { j ->
                 val e = arr.getJSONObject(j)
-                ChatEntity(e.getString("type"), e.getString("id"), e.optString("label", e.getString("id")))
+                val label = e.optString("label", e.getString("id"))
+                val aliasesJson = e.optJSONArray("aliases")
+                val aliases = if (aliasesJson != null) {
+                    (0 until aliasesJson.length()).map { aliasesJson.getString(it) }
+                } else {
+                    listOf(label)
+                }
+                ChatEntity(e.getString("type"), e.getString("id"), label, aliases)
             }
         } ?: emptyList()
         AiChatMessage(text = obj.getString("text"), isUser = obj.getBoolean("isUser"), entities = entities)
