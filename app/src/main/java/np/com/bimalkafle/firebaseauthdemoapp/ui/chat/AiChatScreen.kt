@@ -1,5 +1,13 @@
 package np.com.bimalkafle.firebaseauthdemoapp.ui.chat
 
+import android.Manifest
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
+import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +30,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -30,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import np.com.bimalkafle.firebaseauthdemoapp.network.ChatEntity
@@ -524,6 +534,47 @@ private fun AiInputBar(
     onSend: (String) -> Unit
 ) {
     var text by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spoken = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+            if (!spoken.isNullOrBlank()) text = spoken
+        }
+    }
+
+    fun launchVoiceSearch() {
+        val intent = android.content.Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Ask anything…")
+        }
+        try {
+            speechLauncher.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, "Speech recognition isn't available on this device", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchVoiceSearch()
+        } else {
+            Toast.makeText(context, "Microphone permission is needed for voice search", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun onMicClick() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) launchVoiceSearch() else micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    }
 
     Surface(
         shadowElevation = 12.dp,
@@ -570,16 +621,31 @@ private fun AiInputBar(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(if (canSend) brandColor else Color(0xFFE0E0E0), CircleShape)
-                    .then(if (canSend) Modifier.clickable { onSend(text); text = "" } else Modifier),
+                    .background(if (canSend) brandColor else Color(0xFFF2F2F7), CircleShape)
+                    .then(
+                        when {
+                            canSend -> Modifier.clickable { onSend(text); text = "" }
+                            enabled -> Modifier.clickable { onMicClick() }
+                            else    -> Modifier
+                        }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    "Send",
-                    tint     = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
+                if (canSend) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        "Send",
+                        tint     = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Mic,
+                        "Voice search",
+                        tint     = brandColor.copy(alpha = if (enabled) 1f else 0.4f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
