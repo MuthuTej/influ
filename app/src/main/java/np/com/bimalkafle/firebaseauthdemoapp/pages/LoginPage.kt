@@ -1,6 +1,9 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +32,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
@@ -41,30 +47,45 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     val context = LocalContext.current
     val prefsManager = PrefsManager(context)
 
+    // Google Sign In configuration
+    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        .requestIdToken(context.getString(R.string.default_web_client_id))
+        .requestEmail()
+        .build()
+    val googleSignInClient = GoogleSignIn.getClient(context, gso)
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            account.idToken?.let { authViewModel.signInWithGoogle(it) }
+        } catch (e: ApiException) {
+            Toast.makeText(context, "Google sign in failed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     LaunchedEffect(authState.value) {
         when (val state = authState.value) {
             is AuthState.Authenticated -> {
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
                 if (uid != null) {
-                    val isBrand = state.role.equals("BRAND", ignoreCase = true)
-                    val isProfileCompleted =
-                        if (state.isProfileCompleted) {
-                            prefsManager.saveProfileCompleted(uid, true)
-                            true
-                        } else {
-                            false
-                        }
-
-                    if (isProfileCompleted) {
+                    if (state.isProfileCompleted) {
+                        prefsManager.saveProfileCompleted(uid, true)
+                        val isBrand = state.role.equals("BRAND", ignoreCase = true)
                         val route = if (isBrand) "brand_home" else "influencer_home"
                         navController.navigate(route) {
                             popUpTo("login") { inclusive = true }
                         }
                     } else {
-                        val route = if (isBrand) "brand_registration" else "influencer_registration"
-                        navController.navigate(route)
+                        // Profile incomplete - Redirect to signup page as requested
+                        // This allows user to pick role/name if they haven't finished the detailed registration
+                        navController.navigate("signup")
                     }
                 }
+            }
+            is AuthState.GoogleNewUser -> {
+                // If user is new from Google, redirect to signup to choose role
+                navController.navigate("signup")
             }
             is AuthState.Error -> {
                 Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
@@ -89,6 +110,12 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 onLoginClicked = { email, password ->
                     authViewModel.login(email, password)
                 },
+                onGoogleLoginClicked = {
+                    // Force account picker by signing out first
+                    googleSignInClient.signOut().addOnCompleteListener {
+                        launcher.launch(googleSignInClient.signInIntent)
+                    }
+                },
                 onSignUpClicked = {
                     navController.navigate("signup")
                 },
@@ -105,6 +132,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 fun LoginPageContent(
     authState: AuthState?,
     onLoginClicked: (String, String) -> Unit,
+    onGoogleLoginClicked: () -> Unit,
     onSignUpClicked: () -> Unit,
     onForgotPasswordClicked: () -> Unit
 ) {
@@ -221,6 +249,33 @@ fun LoginPageContent(
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Google Login Button
+            OutlinedButton(
+                onClick = onGoogleLoginClicked,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color.LightGray)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                        contentDescription = "Google Logo",
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Continue with Google",
+                        color = Color.Black,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }

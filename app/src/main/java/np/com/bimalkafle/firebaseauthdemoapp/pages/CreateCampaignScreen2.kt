@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,6 +23,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -58,6 +60,10 @@ fun CreateCampaignScreen2(
     val formPaddingTop = headerHeight - 40.dp
 
     // Validation
+    val budgetError = campaignViewModel.budgetMin > 0 && 
+                      campaignViewModel.budgetMax > 0 && 
+                      campaignViewModel.budgetMin > campaignViewModel.budgetMax
+
     val isFormValid = campaignViewModel.budgetMin > 0 && 
                       campaignViewModel.budgetMax >= campaignViewModel.budgetMin &&
                       campaignViewModel.selectedLocations.isNotEmpty() &&
@@ -126,28 +132,55 @@ fun CreateCampaignScreen2(
         ) {
             // Budget Range
             Text("Budget Range *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "${campaignViewModel.budgetMin} - ${campaignViewModel.budgetMax}",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary
-            )
-            RangeSlider(
-                value = campaignViewModel.budgetMin.toFloat()..campaignViewModel.budgetMax.toFloat(),
-                onValueChange = { 
-                    campaignViewModel.budgetMin = it.start.toInt()
-                    campaignViewModel.budgetMax = it.endInclusive.toInt()
-                },
-                valueRange = 0f..1000000f,
-                modifier = Modifier.fillMaxWidth(),
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                OutlinedTextField(
+                    value = if (campaignViewModel.budgetMin == 0) "" else campaignViewModel.budgetMin.toString(),
+                    onValueChange = { 
+                        val newVal = it.filter { char -> char.isDigit() }.toIntOrNull() ?: 0
+                        campaignViewModel.budgetMin = newVal
+                    },
+                    label = { Text("Min Budget") },
+                    isError = budgetError,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        errorBorderColor = Color.Red
+                    )
                 )
-            )
+                OutlinedTextField(
+                    value = if (campaignViewModel.budgetMax == 0) "" else campaignViewModel.budgetMax.toString(),
+                    onValueChange = { 
+                        val newVal = it.filter { char -> char.isDigit() }.toIntOrNull() ?: 0
+                        campaignViewModel.budgetMax = newVal
+                    },
+                    label = { Text("Max Budget") },
+                    isError = budgetError,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        errorBorderColor = Color.Red
+                    )
+                )
+            }
+            if (budgetError) {
+                Text(
+                    text = "Min budget must be less than Max budget",
+                    color = Color.Red,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 

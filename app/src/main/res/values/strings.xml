@@ -2,4 +2,5 @@
     <string name="app_name">FirebaseAuthDemoApp</string>
     <string name="btn_save">Save Changes</string>
     <string name="btn_edit">Edit Profile</string>
+    <string name="default_web_client_id">61884125308-s3uiiss031jvqaje7thsu58027dckp8b.apps.googleusercontent.com</string>
 </resources>
