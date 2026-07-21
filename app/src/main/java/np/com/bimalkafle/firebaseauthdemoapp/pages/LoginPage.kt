@@ -266,7 +266,7 @@ fun LoginPageContent(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Image(
-                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                        painter = painterResource(id = R.drawable.google_logo),
                         contentDescription = "Google Logo",
                         modifier = Modifier.size(24.dp)
                     )
