@@ -110,15 +110,20 @@ object BackendRepository {
                     val message = errors.getJSONObject(0).getString("message")
                     Result.failure(Exception(message))
                 } else {
-                    val data = jsonResponse.getJSONObject("data").getJSONObject("me")
-                    val role = data.getString("role")
-                    val isProfileCompleted = data.optBoolean("profileCompleted", false)
+                    val data = jsonResponse.optJSONObject("data")
+                    if (data == null || data.isNull("me")) {
+                        return@withContext Result.failure(Exception("User not found"))
+                    }
+                    val me = data.getJSONObject("me")
+                    val role = me.getString("role")
+                    val isProfileCompleted = me.optBoolean("profileCompleted", false)
                     Result.success("$role|$isProfileCompleted")
                 }
             } else {
                 Result.failure(Exception("Server returned code $responseCode"))
             }
         } catch (e: Exception) {
+            Log.e("BackendRepository", "getUserRole error", e)
             Result.failure(e)
         }
     }
@@ -445,7 +450,6 @@ object BackendRepository {
             val url = URL(BACKEND_URL)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
 
             val query = """
@@ -768,7 +772,6 @@ object BackendRepository {
                 }
             } else {
                 val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
-                Log.e("BackendRepository", "scrapeInstagramPost Error Response: $errorResponse")
                 Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
             }
         } catch (e: Exception) {
