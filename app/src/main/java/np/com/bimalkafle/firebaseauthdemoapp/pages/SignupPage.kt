@@ -71,7 +71,7 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
             val account = task.getResult(ApiException::class.java)
             account.idToken?.let { authViewModel.signInWithGoogle(it) }
         } catch (e: ApiException) {
-            Toast.makeText(context, "Google sign in failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Google sign in failed", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -89,7 +89,7 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                             popUpTo("signup") { inclusive = true }
                         }
                     } else {
-                        // User exists but profile is incomplete
+                        // User exists but profile is incomplete - Go to registration
                         val route = if (isBrand) "brand_registration" else "influencer_registration"
                         navController.navigate(route) {
                             popUpTo("login") { inclusive = true }
@@ -168,7 +168,13 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                     }
                 }
             },
-            onLoginClick = { navController.navigate("login") },
+            onLoginClick = { 
+                if (!navController.popBackStack("login", inclusive = false)) {
+                    navController.navigate("login") {
+                        popUpTo("signup") { inclusive = true }
+                    }
+                }
+            },
             headerTopPadding = topPadding
         )
     }
