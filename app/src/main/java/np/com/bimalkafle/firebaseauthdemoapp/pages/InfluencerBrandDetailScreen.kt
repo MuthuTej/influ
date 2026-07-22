@@ -227,13 +227,6 @@ private fun DetailContent(campaign: CampaignDetail, navController: NavController
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val rating = campaign.brand?.averageRating ?: 0.0
-                        Icon(Icons.Default.Star, null, tint = Color(0xFFFCD34D), modifier = Modifier.size(13.dp))
-                        Spacer(Modifier.width(3.dp))
-                        Text("${"%.1f".format(rating)}", color = Color.White.copy(0.9f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.width(6.dp))
-                        Text("·", color = Color.White.copy(0.5f), fontSize = 13.sp)
-                        Spacer(Modifier.width(6.dp))
                         Text("Brand", color = Color.White.copy(0.75f), fontSize = 12.sp)
                     }
                 }
@@ -387,13 +380,8 @@ private fun DetailContent(campaign: CampaignDetail, navController: NavController
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
-                            Spacer(Modifier.width(3.dp))
-                            val rating = brand?.averageRating ?: 0.0
-                            val ratingLabel = if (rating > 0) "${"%.1f".format(rating)}" else "New"
-                            Text(ratingLabel, fontSize = 12.sp, color = Color(0xFF64748B))
                             if (brand?.profileCompleted == true) {
-                                Text(" · Profile 100%", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                                Text("Profile 100%", fontSize = 12.sp, color = Color(0xFF94A3B8))
                             }
                         }
                     }
