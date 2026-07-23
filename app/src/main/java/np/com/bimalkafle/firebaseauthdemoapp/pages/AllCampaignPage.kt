@@ -56,16 +56,51 @@ private fun formatBudget(amount: Int?): String {
     }
 }
 
+/** Collaboration statuses that indicate real work is underway on a campaign —
+ * anything past the applicant/negotiation stage. Mirrors the admin
+ * dashboard's "Active" collaboration group. */
+private val ONGOING_COLLABORATION_STATUSES = setOf(
+    "ACCEPTED", "BRIEF_SENT", "BRIEF_FINALIZED", "SCRIPT_SENT", "IN_PROGRESS", "WAITING_FOR_PAYMENT", "COMPLETED"
+)
+
+private enum class CampaignFilter(val label: String) {
+    ALL("All"), PENDING("Pending"), ONGOING("Ongoing"), COMPLETED("Completed")
+}
+
+/** Campaigns only ever carry status OPEN/CLOSED on the backend, so the
+ * Pending/Ongoing split for an OPEN campaign is derived from whether any of
+ * its collaborations have progressed past the applicant stage. CLOSED always
+ * means Completed. */
+private fun campaignFilterBucket(campaign: Campaign): CampaignFilter {
+    if (campaign.status?.uppercase() == "CLOSED") return CampaignFilter.COMPLETED
+    val hasOngoingCollaboration = campaign.collaborations?.any {
+        it.status.uppercase() in ONGOING_COLLABORATION_STATUSES
+    } ?: false
+    return if (hasOngoingCollaboration) CampaignFilter.ONGOING else CampaignFilter.PENDING
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AllCampaignPage(
     navController: NavController,
-    brandViewModel: BrandViewModel
+    brandViewModel: BrandViewModel,
+    initialFilter: String? = null
 ) {
     val myCampaigns by brandViewModel.myCampaigns.observeAsState(emptyList())
     val isLoading by brandViewModel.loading.observeAsState(false)
     val error by brandViewModel.error.observeAsState()
     val brandProfile by brandViewModel.brandProfile.observeAsState()
+
+    var selectedFilter by remember {
+        mutableStateOf(
+            CampaignFilter.values().firstOrNull { it.name.equals(initialFilter, ignoreCase = true) }
+                ?: CampaignFilter.ALL
+        )
+    }
+    val filteredCampaigns = remember(myCampaigns, selectedFilter) {
+        if (selectedFilter == CampaignFilter.ALL) myCampaigns
+        else myCampaigns.filter { campaignFilterBucket(it) == selectedFilter }
+    }
 
     LaunchedEffect(Unit) {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
@@ -191,6 +226,23 @@ fun AllCampaignPage(
                         textAlign = TextAlign.Center
                     )
 
+                    if (!isLoading && error == null && myCampaigns.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CampaignFilter.values().forEach { filter ->
+                                LocationChip(
+                                    name = filter.label,
+                                    isSelected = selectedFilter == filter,
+                                    onSelected = { selectedFilter = filter }
+                                )
+                            }
+                        }
+                    }
+
                     if (isLoading) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(color = brandThemeColor)
@@ -230,13 +282,26 @@ fun AllCampaignPage(
                                 )
                             }
                         }
+                    } else if (filteredCampaigns.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "No ${selectedFilter.label.lowercase()} campaigns.",
+                                    fontSize = 16.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(myCampaigns) { campaign ->
+                            items(filteredCampaigns) { campaign ->
                                 CampaignDetailCard(campaign, onClick = {
                                     navController.navigate("brand_campaign_detail/${campaign.id}")
                                 })

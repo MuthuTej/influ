@@ -152,8 +152,18 @@ fun MyAppNavigation(
                 notificationViewModel = notificationViewModel
             )
         }
-        composable("all_campaigns") {
-            AllCampaignPage(navController, brandViewModel)
+        composable(
+            route = "all_campaigns?filter={filter}",
+            arguments = listOf(
+                navArgument("filter") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val initialFilter = backStackEntry.arguments?.getString("filter")
+            AllCampaignPage(navController, brandViewModel, initialFilter = initialFilter)
         }
         composable("brand_influencer_detail/{influencerId}") { backStackEntry ->
             val influencerId = backStackEntry.arguments?.getString("influencerId") ?: ""

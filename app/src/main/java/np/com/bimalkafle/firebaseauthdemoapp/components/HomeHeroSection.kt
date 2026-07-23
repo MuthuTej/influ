@@ -47,7 +47,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.utils.formatCompactCurrency
 private val performanceIconBg = Color(0xFFFFE4E1)
 private val performanceIconTint = Color(0xFFE11D48)
 
-data class HeroStatColumnData(val label: String, val value: String)
+data class HeroStatColumnData(val label: String, val value: String, val onClick: (() -> Unit)? = null)
 
 @Composable
 fun HomeHeroCard(
@@ -183,7 +183,12 @@ fun HomeHeroCard(
             // Awaiting / Active / Completed
             Row(modifier = Modifier.fillMaxWidth()) {
                 statColumns.forEach { col ->
-                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .let { if (col.onClick != null) it.clickable(onClick = col.onClick) else it },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text(col.label, fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f))
                         Spacer(modifier = Modifier.height(Dimens.space4))
                         Text(col.value, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
