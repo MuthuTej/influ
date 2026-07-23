@@ -354,7 +354,7 @@ private fun TierBadge(tier: String) {
     }
     Surface(shape = RoundedCornerShape(2.dp), color = bg) {
         Text(
-            text = tier.uppercase(),
+            text = tier.lowercase().replaceFirstChar { it.uppercase() },
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             color = fg,

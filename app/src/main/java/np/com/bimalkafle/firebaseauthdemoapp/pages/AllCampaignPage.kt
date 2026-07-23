@@ -180,7 +180,7 @@ fun AllCampaignPage(
                         .padding(horizontal = 16.dp)
                 ) {
                     Text(
-                        "MY CAMPAIGNS",
+                        "My campaigns",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.sp,
@@ -404,7 +404,7 @@ fun StatusBadge(status: String) {
         shape = RoundedCornerShape(6.dp)
     ) {
         Text(
-            text = status.uppercase(),
+            text = status.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             fontSize = 9.sp,
             fontWeight = FontWeight.Black,

@@ -278,7 +278,7 @@ private fun ProfileHero(
                         if (!category.isNullOrBlank()) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Box(Modifier.size(6.dp).background(themeColor, CircleShape))
-                                Text(category.uppercase(), fontSize = 10.5.sp, fontWeight = FontWeight.ExtraBold,
+                                Text(category.lowercase().replaceFirstChar { it.uppercase() }, fontSize = 10.5.sp, fontWeight = FontWeight.ExtraBold,
                                     color = themeColor, letterSpacing = 0.5.sp)
                             }
                             Spacer(Modifier.height(2.dp))
@@ -643,7 +643,7 @@ private fun BrandInstagramProfilesSection(profiles: List<InstagramProfile>, prim
                                 if (profile.isDefault) {
                                     Spacer(Modifier.width(6.dp))
                                     Surface(shape = RoundedCornerShape(4.dp), color = instaColor) {
-                                        Text("PRIMARY", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
+                                        Text("Primary", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
                                     }
                                 }
                             }

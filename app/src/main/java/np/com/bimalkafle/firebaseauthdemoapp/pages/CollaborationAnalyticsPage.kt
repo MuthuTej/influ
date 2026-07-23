@@ -293,7 +293,7 @@ fun CollaborationAnalyticsPage(
                     if (collaboration.overallAnalytics != null) {
                         item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                SectionTitle("OVERALL PERFORMANCE")
+                                SectionTitle("Overall performance")
                             }
                         }
 
@@ -326,7 +326,7 @@ fun CollaborationAnalyticsPage(
                     if (collaboration.yt != null && collaboration.yt.isNotEmpty()) {
                         item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                SectionTitle("YOUTUBE VIDEO PERFORMANCE")
+                                SectionTitle("YouTube video performance")
                                 Spacer(modifier = Modifier.height(8.dp))
                                 collaboration.yt.forEach { video ->
                                     YouTubeVideoCard(video)
@@ -340,7 +340,7 @@ fun CollaborationAnalyticsPage(
                     if (!collaboration.performanceMilestones.isNullOrEmpty()) {
                         item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                SectionTitle("PERFORMANCE TIMELINE")
+                                SectionTitle("Performance timeline")
                                 Spacer(modifier = Modifier.height(8.dp))
                                 PerformanceTimelineCard(collaboration.performanceMilestones)
                             }
@@ -351,7 +351,7 @@ fun CollaborationAnalyticsPage(
                     if (collaboration.ig != null && collaboration.ig.isNotEmpty()) {
                         item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                SectionTitle("INSTAGRAM PERFORMANCE")
+                                SectionTitle("Instagram performance")
                                 Spacer(modifier = Modifier.height(8.dp))
                                 collaboration.ig.forEach { post ->
                                     InstagramPostCard(post)
@@ -365,7 +365,7 @@ fun CollaborationAnalyticsPage(
                     if (collaboration.platformAnalytics != null && collaboration.platformAnalytics.isNotEmpty()) {
                         item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                SectionTitle("PLATFORM BREAKDOWN")
+                                SectionTitle("Platform breakdown")
                             }
                         }
 
@@ -940,7 +940,7 @@ fun InfluencerProfileCard(collaboration: Collaboration) {
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(12.dp))
                         Spacer(modifier = Modifier.width(3.dp))
-                        Text("DONE", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                        Text("Done", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 9.sp)
                     }
                 }
             }
@@ -1005,7 +1005,7 @@ fun OverallPerformanceCard(stats: np.com.bimalkafle.firebaseauthdemoapp.model.Ov
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "TOTAL IMPRESSIONS",
+                        "Total impressions",
                         color = Color.White.copy(alpha = 0.7f),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -1111,7 +1111,7 @@ fun CampaignDurationCard(duration: String) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("CAMPAIGN DURATION", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("Campaign duration", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Text("$duration days", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
         }
     }
@@ -1141,7 +1141,7 @@ fun PlatformMetricCard(analytics: CollaborationAnalytics, expandedDefault: Boole
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = analytics.platform?.uppercase() ?: "UNKNOWN", fontWeight = FontWeight.Black, fontSize = 14.sp, color = Color.Black)
+                    Text(text = analytics.platform?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Unknown", fontWeight = FontWeight.Black, fontSize = 14.sp, color = Color.Black)
                     Text(text = "${String.format("%,d", analytics.impressions ?: 0)} impressions", fontSize = 11.sp, color = textGray)
                 }
                 Surface(color = Color(0xFFFFF4F4), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFDEDE))) {
@@ -1222,7 +1222,7 @@ fun getPlatformIcon(platform: String?): ImageVector {
 @Composable
 fun BrandTargetsSection(collaboration: Collaboration, onSetTargets: () -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        SectionTitle("CAMPAIGN TARGETS")
+        SectionTitle("Campaign targets")
         Spacer(modifier = Modifier.height(6.dp))
 
         val targets = collaboration.performanceTargets
@@ -1310,7 +1310,7 @@ fun PerformanceScoreCard(tracking: PerformanceTracking) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "PERFORMANCE SCORE",
+                    "Performance score",
                     color = Color.White.copy(alpha = 0.8f),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
@@ -1572,7 +1572,7 @@ fun ContentTypeBadge(label: String, color: Color) {
         border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f))
     ) {
         Text(
-            text = label.uppercase(),
+            text = label,
             color = color,
             fontSize = 9.sp,
             fontWeight = FontWeight.ExtraBold,
