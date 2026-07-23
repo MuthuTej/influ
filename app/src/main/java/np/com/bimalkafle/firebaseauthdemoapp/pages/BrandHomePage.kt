@@ -44,8 +44,12 @@ import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.computeBrandHeroStats
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.computeBrandSpendBuckets
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.computePerformanceStats
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SpendBucket
+import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.SpendBucketPeriod
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
+import np.com.bimalkafle.firebaseauthdemoapp.utils.formatCompactCount
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -183,6 +187,10 @@ fun BrandHomePage(
                         )
                     }
                     item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        SpendBreakdownSection(collaborations = collaborations)
+                    }
+                    item {
                         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
                             ActiveCampaignSection(
                                 collaborations = collaborations,
@@ -255,6 +263,159 @@ fun BrandHeaderAndReachSection(
             Spacer(modifier = Modifier.width(8.dp))
         }
     )
+}
+
+// ── Spend Breakdown ──────────────────────────────────────────────────────────
+// Weekly/Monthly/Yearly re-slice of the same paid-collaboration data the hero
+// card's single "Total Spend" number already reads (computeBrandSpendBuckets,
+// viewmodel/HeroStats.kt) — no extra network call. Direct port of
+// connect_flutter's SpendBreakdownSection widget; no charting library
+// dependency exists in this app (checked app/build.gradle.kts), so the bar
+// chart below is hand-rolled from Boxes, same as the Flutter version's
+// FractionallySizedBox approach.
+
+private val spendPeriodOptions = listOf(
+    SpendBucketPeriod.WEEKLY to "Weekly",
+    SpendBucketPeriod.MONTHLY to "Monthly",
+    SpendBucketPeriod.YEARLY to "Yearly"
+)
+
+@Composable
+fun SpendBreakdownSection(collaborations: List<Collaboration>) {
+    var period by remember { mutableStateOf(SpendBucketPeriod.MONTHLY) }
+    val themeColor = brandThemeColor
+    val buckets = remember(collaborations, period) { computeBrandSpendBuckets(collaborations, period) }
+    val maxAmount = buckets.maxOfOrNull { it.amount } ?: 0.0
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 2.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Spend Breakdown", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
+                SpendPeriodToggle(selected = period, onSelected = { period = it }, themeColor = themeColor)
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+            if (maxAmount <= 0.0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No paid spend in this window yet", color = Color.Gray, fontSize = 13.sp)
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    buckets.forEach { bucket ->
+                        SpendBar(
+                            bucket = bucket,
+                            maxAmount = maxAmount,
+                            color = themeColor,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpendPeriodToggle(
+    selected: SpendBucketPeriod,
+    onSelected: (SpendBucketPeriod) -> Unit,
+    themeColor: Color
+) {
+    Surface(
+        color = themeColor.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Row(modifier = Modifier.padding(3.dp)) {
+            spendPeriodOptions.forEach { (optionPeriod, label) ->
+                val isSelected = optionPeriod == selected
+                Surface(
+                    color = if (isSelected) themeColor else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.clickable { onSelected(optionPeriod) }
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isSelected) Color.White else Color(0xFF616161),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpendBar(
+    bucket: SpendBucket,
+    maxAmount: Double,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val rawFraction = if (maxAmount > 0) (bucket.amount / maxAmount).toFloat().coerceIn(0f, 1f) else 0f
+    // A non-zero bucket always shows at least a sliver of a bar so it doesn't
+    // visually disappear next to a much larger neighbor.
+    val heightFraction = if (rawFraction < 0.04f && bucket.amount > 0) 0.04f else rawFraction
+
+    Column(
+        modifier = modifier.padding(horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = if (bucket.amount > 0) formatCompactCount(bucket.amount.toLong()) else "",
+            fontSize = 9.sp,
+            color = Color.Gray,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(heightFraction)
+                    .background(
+                        color = if (bucket.amount > 0) color else color.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                    )
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = bucket.label,
+            fontSize = 9.sp,
+            color = Color(0xFF616161),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

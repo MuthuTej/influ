@@ -1,6 +1,7 @@
 package np.com.bimalkafle.firebaseauthdemoapp.ui.chat
 
 import android.app.Activity
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -51,6 +52,15 @@ private val STATUS_ORDER = listOf(
     "BRIEF_SENT", "BRIEF_FINALIZED",
     "SCRIPT_SENT",
     "WAITING_FOR_PAYMENT", "IN_PROGRESS", "COMPLETED"
+)
+
+// Once a collaboration passes ACCEPTED, neither party can reject/withdraw it
+// directly anymore — the only way to end it is to ask an admin to step in via
+// the "Request Cancellation" action, available only in these statuses (mirrors
+// the backend's requestCollaborationCancellation status guard exactly).
+private val CANCELLATION_ELIGIBLE_STATUSES = listOf(
+    "ACCEPTED", "BRIEF_SENT", "BRIEF_FINALIZED",
+    "SCRIPT_SENT", "WAITING_FOR_PAYMENT", "IN_PROGRESS"
 )
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -247,6 +257,39 @@ fun ChatScreen(
         }
     }
 
+    // ── Request Cancellation (escalates to admin review; never changes status directly) ──
+    var showCancellationDialog by remember { mutableStateOf(false) }
+    var isCancellationLoading by remember { mutableStateOf(false) }
+    val canRequestCancellation = currentCollaboration != null &&
+        currentCollaboration.status in CANCELLATION_ELIGIBLE_STATUSES &&
+        currentCollaboration.cancellationRequest?.status != "PENDING"
+
+    val onRequestCancellation: (String) -> Unit = { reason ->
+        if (!isCancellationLoading) {
+            isCancellationLoading = true
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)
+                ?.addOnSuccessListener { result ->
+                    val token = result.token
+                    if (token == null) {
+                        isCancellationLoading = false
+                        return@addOnSuccessListener
+                    }
+                    val onCancellationComplete: (String?) -> Unit = { errorMessage ->
+                        isCancellationLoading = false
+                        val toastMessage = errorMessage
+                            ?: "Cancellation request sent — our team will review it shortly."
+                        android.widget.Toast.makeText(localContext, toastMessage, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                    if (isBrand) {
+                        brandViewModel.requestCollaborationCancellation(token, collaborationId ?: "", reason, onCancellationComplete)
+                    } else {
+                        influencerViewModel.requestCollaborationCancellation(token, collaborationId ?: "", reason, onCancellationComplete)
+                    }
+                }
+                ?.addOnFailureListener { isCancellationLoading = false }
+        }
+    }
+
     Scaffold(
         bottomBar = {
             Surface(color = Color.White, modifier = Modifier.fillMaxWidth(), shadowElevation = 8.dp) {
@@ -290,15 +333,34 @@ fun ChatScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Surface(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape),
-                        color = Color(0xFFF2F2F7),
-                        shape = CircleShape
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Person, contentDescription = "Profile", modifier = Modifier.size(24.dp), tint = Color.Gray)
+                    if (canRequestCancellation) {
+                        // A directly-tappable, always-visible button (not tucked
+                        // behind a "more options" menu) — this is the only way to
+                        // end a collaboration once it's past ACCEPTED, so it needs
+                        // to be obvious, not discovered. Takes the decorative
+                        // avatar's place since there's only room for one.
+                        OutlinedButton(
+                            onClick = { showCancellationDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TlRed),
+                            border = BorderStroke(1.dp, TlRed),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Icon(Icons.Default.Flag, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("End Collaboration", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Surface(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape),
+                            color = Color(0xFFF2F2F7),
+                            shape = CircleShape
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Person, contentDescription = "Profile", modifier = Modifier.size(24.dp), tint = Color.Gray)
+                            }
                         }
                     }
                 }
@@ -371,6 +433,19 @@ fun ChatScreen(
             }
         }
     }
+
+    if (showCancellationDialog) {
+        TextInputDialog(
+            title = "Request Cancellation",
+            label = "Tell our team why this collaboration should end",
+            multiline = true,
+            onDismiss = { showCancellationDialog = false },
+            onSend = { reason ->
+                showCancellationDialog = false
+                onRequestCancellation(reason)
+            }
+        )
+    }
 }
 
 // ── Campaign Status Banner ───────────────────────────────────────────────────
@@ -390,32 +465,62 @@ private fun CampaignStatusBanner(collaboration: Collaboration) {
         "COMPLETED" -> "Completed"
         "REJECTED" -> "Rejected"
         "REVOKED" -> "Withdrawn"
+        "CANCELLED" -> "Cancelled"
         else -> status.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
     }
 
-    Surface(color = Color(0xFFFFF0F0), modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "CAMPAIGN STATUS",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TlRed,
-                    letterSpacing = 1.sp
-                )
-                Spacer(Modifier.height(3.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(8.dp).background(TlRed, CircleShape))
-                    Spacer(Modifier.width(6.dp))
-                    Text(statusText, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Surface(color = Color(0xFFFFF0F0), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "CAMPAIGN STATUS",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TlRed,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(8.dp).background(TlRed, CircleShape))
+                        Spacer(Modifier.width(6.dp))
+                        Text(statusText, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
+                    }
                 }
-            }
 
+            }
+        }
+
+        val cancellationRequest = collaboration.cancellationRequest
+        if (cancellationRequest?.status == "PENDING") {
+            Surface(color = Color(0xFFFFF8E1), modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Cancellation requested — pending admin review.\n\"${cancellationRequest.reason}\"",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF8A6D00),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
+        } else if (cancellationRequest?.status == "DENIED") {
+            val noteSuffix = cancellationRequest.adminNote?.takeIf { it.isNotBlank() }
+                ?.let { ": \"$it\"" } ?: "."
+            Surface(color = Color(0xFFF0F0F0), modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "A previous cancellation request was denied by our team$noteSuffix",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF555555),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
         }
     }
 }
@@ -485,7 +590,11 @@ fun CollaborationTimeline(
     val status = collaboration.status
     val statusIndex = STATUS_ORDER.indexOf(status).coerceAtLeast(0)
 
-    val briefMessage = remember(messages) { messages.firstOrNull { it.type == "BRIEF" } }
+    // lastOrNull, not firstOrNull: after a "Request Correction" + resend there
+    // can be more than one BRIEF message, and the timeline should always show
+    // the most recently sent brief, not the original one that got corrected.
+    val briefMessage = remember(messages) { messages.lastOrNull { it.type == "BRIEF" } }
+    val briefRejectionMessage = remember(messages) { messages.lastOrNull { it.type == "BRIEF_REJECTED" } }
     // lastOrNull, not firstOrNull: after a rejection + resubmission there can be
     // more than one SCRIPT message, and the timeline should always show the
     // most recently submitted script, not the original rejected one.
@@ -500,6 +609,7 @@ fun CollaborationTimeline(
     val negotiationMessages = remember(messages) { messages.filter { it.type == "NEGOTIATION" }.sortedBy { it.timestamp } }
 
     var showBriefDialog by remember { mutableStateOf(false) }
+    var showRejectBriefDialog by remember { mutableStateOf(false) }
     var showScriptDialog by remember { mutableStateOf(false) }
     var showRejectScriptDialog by remember { mutableStateOf(false) }
     var showNegotiationDialog by remember { mutableStateOf(false) }
@@ -510,6 +620,12 @@ fun CollaborationTimeline(
     val briefStepShown  = statusIndex >= STATUS_ORDER.indexOf("ACCEPTED")
     val briefContentAvail = briefMessage != null || statusIndex >= STATUS_ORDER.indexOf("BRIEF_SENT")
     val briefDone        = statusIndex >= STATUS_ORDER.indexOf("BRIEF_FINALIZED")
+    // True while the brand's most recent brief was sent back for correction
+    // and hasn't been resent yet — never changes collaboration status, same as
+    // a content rejection (status stays BRIEF_SENT the whole time).
+    val briefRejectedPendingResend = status == "BRIEF_SENT" &&
+        briefRejectionMessage != null &&
+        (briefMessage == null || briefRejectionMessage.timestamp > briefMessage.timestamp)
     val scriptStepShown  = statusIndex >= STATUS_ORDER.indexOf("BRIEF_FINALIZED")
     val scriptContentAvail = scriptMessage != null || statusIndex >= STATUS_ORDER.indexOf("SCRIPT_SENT")
     val scriptDone       = statusIndex >= STATUS_ORDER.indexOf("WAITING_FOR_PAYMENT")
@@ -752,14 +868,51 @@ fun CollaborationTimeline(
         // ── Step 2: Campaign Brief ───────────────────────────────────────
         TimelineStepCard(
             title = "Campaign Brief",
-            time = briefMessage?.timeFormatted ?: "",
+            time = (if (briefRejectedPendingResend) briefRejectionMessage else briefMessage)?.timeFormatted ?: "",
             isActive = briefStepShown && !briefDone,
             isDone = briefDone,
             isLocked = !briefStepShown,
             isLast = false,
-            badge = if (briefDone) "ACCEPTED" else null
+            badge = if (briefDone) "ACCEPTED" else if (briefRejectedPendingResend) "REJECTED" else null
         ) {
-            if (briefContentAvail) {
+            if (briefRejectedPendingResend) {
+                Text(
+                    text = "BRIEF NEEDS CORRECTION",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF5252),
+                    letterSpacing = 1.sp
+                )
+                Spacer(Modifier.height(6.dp))
+                val reason = briefRejectionMessage?.metadata?.get("reason")?.toString() ?: briefRejectionMessage?.text ?: ""
+                if (reason.isNotBlank()) {
+                    Text(
+                        text = reason,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF333333)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                if (isBrand) {
+                    Button(
+                        onClick = { showBriefDialog = true },
+                        enabled = !isActionLoading,
+                        colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isActionLoading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Resend Brief", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    Text("Waiting for brand to resend the brief.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                }
+            } else if (briefContentAvail) {
                 val briefContent = briefMessage?.metadata?.get("link")?.toString()
                     ?: briefMessage?.text
                     ?: ""
@@ -780,22 +933,38 @@ fun CollaborationTimeline(
                         )
                     }
                 }
-                // Influencer can approve the brief
+                // Influencer can approve the brief, or send it back for correction
                 if (status == "BRIEF_SENT" && !isBrand && briefMessage != null) {
                     Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = { onStatusUpdate("BRIEF_FINALIZED") },
-                        enabled = !isActionLoading,
-                        colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (isActionLoading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Button(
+                            onClick = { onStatusUpdate("BRIEF_FINALIZED") },
+                            enabled = !isActionLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (isActionLoading) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Approve Brief", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Button(
+                            onClick = { showRejectBriefDialog = true },
+                            enabled = !isActionLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Approve Brief", fontWeight = FontWeight.Bold)
+                            Text("Request Correction", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -924,7 +1093,7 @@ fun CollaborationTimeline(
                         ) {
                             Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Reject", fontWeight = FontWeight.Bold)
+                            Text("Request Correction", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -1099,7 +1268,7 @@ fun CollaborationTimeline(
                             ) {
                                 Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Reject", fontWeight = FontWeight.Bold)
+                                Text("Request Correction", fontWeight = FontWeight.Bold)
                             }
                         }
                     } else {
@@ -1197,10 +1366,22 @@ fun CollaborationTimeline(
             }
         )
     }
+    if (showRejectBriefDialog) {
+        TextInputDialog(
+            title = "Request Correction",
+            label = "What needs to change in this brief?",
+            multiline = true,
+            onDismiss = { showRejectBriefDialog = false },
+            onSend = { reason ->
+                onSend("Brief Needs Correction", "BRIEF_REJECTED", mapOf("reason" to reason))
+                showRejectBriefDialog = false
+            }
+        )
+    }
     if (showRejectScriptDialog) {
         TextInputDialog(
-            title = "Reject Script",
-            label = "Reason for rejection",
+            title = "Request Correction",
+            label = "What needs to change in this script?",
             multiline = true,
             onDismiss = { showRejectScriptDialog = false },
             onSend = { reason ->
@@ -1248,8 +1429,8 @@ fun CollaborationTimeline(
     }
     if (showRejectContentDialog) {
         TextInputDialog(
-            title = "Reject Content",
-            label = "Reason for rejection",
+            title = "Request Correction",
+            label = "What needs to change in this content?",
             multiline = true,
             onDismiss = { showRejectContentDialog = false },
             onSend = { reason ->

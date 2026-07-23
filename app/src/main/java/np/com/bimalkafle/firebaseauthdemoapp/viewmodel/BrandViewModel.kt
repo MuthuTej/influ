@@ -6,13 +6,23 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+import np.com.bimalkafle.firebaseauthdemoapp.BuildConfig
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.util.concurrent.TimeUnit
 
 class BrandViewModel : ViewModel() {
 
@@ -515,6 +525,18 @@ class BrandViewModel : ViewModel() {
                           name
                         }
                       }
+                      isVerified
+                      gstNumber
+                      verificationRequest {
+                        method
+                        gstNumber
+                        documentUrl
+                        status
+                        submittedAt
+                        reviewedAt
+                        reviewedBy
+                        adminNote
+                      }
                     }
                   }
                 }
@@ -679,7 +701,24 @@ class BrandViewModel : ViewModel() {
             preferredPlatforms = preferredPlatforms,
             targetAudience = targetAudience,
             averageRating = if (obj.isNull("averageRating")) null else obj.optDouble("averageRating"),
-            reviews = reviews
+            reviews = reviews,
+            isVerified = if (obj.isNull("isVerified")) null else obj.optBoolean("isVerified"),
+            gstNumber = if (obj.isNull("gstNumber")) null else obj.optString("gstNumber"),
+            verificationRequest = parseBrandVerificationRequest(obj.optJSONObject("verificationRequest"))
+        )
+    }
+
+    private fun parseBrandVerificationRequest(obj: JSONObject?): BrandVerificationRequest? {
+        if (obj == null) return null
+        return BrandVerificationRequest(
+            method = obj.optString("method"),
+            gstNumber = if (obj.isNull("gstNumber")) null else obj.optString("gstNumber"),
+            documentUrl = if (obj.isNull("documentUrl")) null else obj.optString("documentUrl"),
+            status = obj.optString("status"),
+            submittedAt = obj.optString("submittedAt"),
+            reviewedAt = if (obj.isNull("reviewedAt")) null else obj.optString("reviewedAt"),
+            reviewedBy = if (obj.isNull("reviewedBy")) null else obj.optString("reviewedBy"),
+            adminNote = if (obj.isNull("adminNote")) null else obj.optString("adminNote")
         )
     }
 
@@ -798,6 +837,16 @@ class BrandViewModel : ViewModel() {
                     viewsGrowthSincePosting
                     selectedInstagramProfileId
                     hasReviewed
+                    cancellationRequest {
+                      requestedBy
+                      requestedByRole
+                      reason
+                      status
+                      requestedAt
+                      resolvedAt
+                      resolvedBy
+                      adminNote
+                    }
                   }
                 }
             """.trimIndent()
@@ -1018,6 +1067,7 @@ class BrandViewModel : ViewModel() {
 
             val performanceTargets = parsePerformanceTargets(obj.optJSONObject("performanceTargets"))
             val performanceTracking = parsePerformanceTracking(obj.optJSONObject("performanceTracking"))
+            val cancellationRequest = parseCancellationRequest(obj.optJSONObject("cancellationRequest"))
 
             list.add(
                 Collaboration(
@@ -1049,11 +1099,26 @@ class BrandViewModel : ViewModel() {
                     selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() },
                     performanceTargets = performanceTargets,
                     performanceTracking = performanceTracking,
-                    hasReviewed = if (obj.isNull("hasReviewed")) null else obj.optBoolean("hasReviewed")
+                    hasReviewed = if (obj.isNull("hasReviewed")) null else obj.optBoolean("hasReviewed"),
+                    cancellationRequest = cancellationRequest
                 )
             )
         }
         return list
+    }
+
+    private fun parseCancellationRequest(obj: JSONObject?): CancellationRequest? {
+        if (obj == null) return null
+        return CancellationRequest(
+            requestedBy = obj.optString("requestedBy"),
+            requestedByRole = obj.optString("requestedByRole"),
+            reason = obj.optString("reason"),
+            status = obj.optString("status"),
+            requestedAt = obj.optString("requestedAt"),
+            resolvedAt = if (obj.isNull("resolvedAt")) null else obj.optString("resolvedAt"),
+            resolvedBy = if (obj.isNull("resolvedBy")) null else obj.optString("resolvedBy"),
+            adminNote = if (obj.isNull("adminNote")) null else obj.optString("adminNote")
+        )
     }
 
     private fun parsePerformanceTargets(obj: JSONObject?): PerformanceTargets? {
@@ -1475,6 +1540,47 @@ class BrandViewModel : ViewModel() {
     }
 
     /**
+     * Asks an admin to end a collaboration that has already passed ACCEPTED
+     * (requestCollaborationCancellation mutation, src/graphql/modules/collaboration/index.js).
+     * This does not change the collaboration's status itself — only an admin's
+     * separate review can do that — so we just refresh collaborations on success
+     * so the new PENDING cancellationRequest shows up in the status banner.
+     * onComplete receives null on success, or a human-readable error message
+     * (e.g. "A cancellation request is already pending admin review for this
+     * collaboration") on failure.
+     */
+    fun requestCollaborationCancellation(
+        token: String,
+        collaborationId: String,
+        reason: String,
+        onComplete: (String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val mutation = """
+                mutation RequestCollaborationCancellation(${'$'}collaborationId: ID!, ${'$'}reason: String!) {
+                  requestCollaborationCancellation(collaborationId: ${'$'}collaborationId, reason: ${'$'}reason) {
+                    id
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "collaborationId" to collaborationId,
+                "reason" to reason
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess {
+                fetchCollaborations(token, force = true)
+                onComplete(null)
+            }.onFailure {
+                Log.e("BrandViewModel", "Error requesting collaboration cancellation", it)
+                onComplete(it.message ?: "Failed to send cancellation request. Please try again.")
+            }
+        }
+    }
+
+    /**
      * Submits the brand's post-collaboration rating of the influencer
      * (addReview mutation, src/graphql/modules/review/index.js). The backend
      * rejects this unless the collaboration's status is COMPLETED and blocks
@@ -1580,6 +1686,128 @@ class BrandViewModel : ViewModel() {
                 onComplete(false)
             }
             _loading.postValue(false)
+        }
+    }
+
+    /**
+     * Uploads a GST certificate / business registration document ahead of
+     * [submitBrandVerification]. This is a plain REST route (not GraphQL —
+     * no file-upload middleware wired into Apollo here), same reasoning as
+     * AiChatRepository's /api/chat route: POST {origin}/api/uploads/verification-document,
+     * multipart field name "document". Uses OkHttp (already a dependency, see
+     * ChatWebSocketClient/CollaborationWebSocketClient) rather than hand-rolling
+     * multipart with HttpURLConnection. onComplete receives (url, null) on
+     * success or (null, errorMessage) on failure.
+     */
+    fun uploadVerificationDocument(token: String, file: File, onComplete: (String?, String?) -> Unit) {
+        viewModelScope.launch {
+            val (url, error) = withContext(Dispatchers.IO) {
+                try {
+                    val mediaType = when (file.extension.lowercase()) {
+                        "pdf" -> "application/pdf"
+                        "png" -> "image/png"
+                        "webp" -> "image/webp"
+                        else -> "image/jpeg"
+                    }.toMediaTypeOrNull()
+
+                    val requestBody = MultipartBody.Builder()
+                        .setType(MultipartBody.FORM)
+                        .addFormDataPart("document", file.name, file.asRequestBody(mediaType))
+                        .build()
+
+                    val uploadUrl = BuildConfig.BACKEND_BASE_URL.removeSuffix("/graphql") + "/api/uploads/verification-document"
+                    val request = Request.Builder()
+                        .url(uploadUrl)
+                        .header("Authorization", "Bearer $token")
+                        .post(requestBody)
+                        .build()
+
+                    val client = OkHttpClient.Builder()
+                        .connectTimeout(30, TimeUnit.SECONDS)
+                        .readTimeout(60, TimeUnit.SECONDS)
+                        .build()
+
+                    client.newCall(request).execute().use { response ->
+                        val bodyString = response.body?.string()
+                        val json = bodyString?.takeIf { it.isNotBlank() }?.let { JSONObject(it) }
+                        if (response.isSuccessful && json?.has("url") == true) {
+                            Pair<String?, String?>(json.optString("url"), null)
+                        } else {
+                            val message = json?.optString("error")?.takeIf { it.isNotBlank() }
+                                ?: "Failed to upload document. Please try again."
+                            Pair<String?, String?>(null, message)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("BrandViewModel", "Error uploading verification document", e)
+                    Pair<String?, String?>(null, e.message ?: "Failed to upload document. Please try again.")
+                }
+            }
+            onComplete(url, error)
+        }
+    }
+
+    /**
+     * Submits (or resubmits) the brand's verification request
+     * (submitBrandVerification mutation, src/graphql/modules/brand/index.js).
+     * BRAND-only, self. Only GST_DOCUMENT and BUSINESS_REGISTRATION_DOCUMENT
+     * are offered here — AADHAAR_EKYC is a real enum value but the backend
+     * rejects it today (only UIDAI-licensed AUA/KUA entities may collect
+     * Aadhaar data), so it's deliberately never sent from this UI. Re-fetches
+     * brand details on success so isVerified/verificationRequest reflect the
+     * new PENDING submission immediately.
+     */
+    fun submitBrandVerification(
+        token: String,
+        gstNumber: String?,
+        method: String,
+        documentUrl: String,
+        onComplete: (Brand?, String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val mutation = """
+                mutation SubmitBrandVerification(${'$'}gstNumber: String, ${'$'}method: VerificationMethod!, ${'$'}documentUrl: String!) {
+                  submitBrandVerification(gstNumber: ${'$'}gstNumber, method: ${'$'}method, documentUrl: ${'$'}documentUrl) {
+                    id
+                    isVerified
+                    gstNumber
+                    verificationRequest {
+                      method
+                      gstNumber
+                      documentUrl
+                      status
+                      submittedAt
+                      reviewedAt
+                      reviewedBy
+                      adminNote
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mutableMapOf<String, Any>(
+                "method" to method,
+                "documentUrl" to documentUrl
+            )
+            if (!gstNumber.isNullOrBlank()) {
+                variables["gstNumber"] = gstNumber
+            }
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess { jsonObject ->
+                val obj = jsonObject.optJSONObject("data")?.optJSONObject("submitBrandVerification")
+                if (obj != null) {
+                    fetchBrandDetails(token, force = true)
+                    onComplete(parseBrand(obj), null)
+                } else {
+                    val message = jsonObject.optJSONArray("errors")?.optJSONObject(0)?.optString("message")
+                        ?: "Failed to submit verification. Please try again."
+                    onComplete(null, message)
+                }
+            }.onFailure {
+                Log.e("BrandViewModel", "Error submitting brand verification", it)
+                onComplete(null, it.message ?: "Failed to submit verification. Please try again.")
+            }
         }
     }
 
