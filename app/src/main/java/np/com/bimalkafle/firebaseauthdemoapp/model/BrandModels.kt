@@ -210,7 +210,8 @@ data class Campaign(
     val createdAt: String?,
     val updatedAt: String?,
     val platforms: List<Platform>? = null,
-    val collaborations: List<CampaignCollaborationSummary>? = null
+    val collaborations: List<CampaignCollaborationSummary>? = null,
+    val hosting: HostingPricingResponse? = null
 )
 
 data class Pricing(

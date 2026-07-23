@@ -47,10 +47,22 @@ private val TlRed = Color(0xFFE63946)
 private val TlGreen = Color(0xFF4CAF50)
 private val TlGray = Color(0xFFBDBDBD)
 
-private val STATUS_ORDER = listOf(
+// Content collaborations (Instagram/YouTube/Facebook deliverables) walk
+// Brief -> Script -> Payment -> Content Upload. Hosting collaborations (a
+// "HOSTING" pricing entry) branch off after BRIEF_FINALIZED into their own
+// Venue/Time/Event sequence and rejoin at WAITING_FOR_PAYMENT — see
+// isHosting in CollaborationTimeline below.
+private val CONTENT_STATUS_ORDER = listOf(
     "PENDING", "NEGOTIATION", "ACCEPTED",
     "BRIEF_SENT", "BRIEF_FINALIZED",
     "SCRIPT_SENT",
+    "WAITING_FOR_PAYMENT", "IN_PROGRESS", "COMPLETED"
+)
+
+private val HOSTING_STATUS_ORDER = listOf(
+    "PENDING", "NEGOTIATION", "ACCEPTED",
+    "BRIEF_SENT", "BRIEF_FINALIZED",
+    "VENUE_SENT", "TIME_SENT", "EVENT_SENT",
     "WAITING_FOR_PAYMENT", "IN_PROGRESS", "COMPLETED"
 )
 
@@ -58,6 +70,11 @@ private val STATUS_ORDER = listOf(
 // directly anymore — the only way to end it is to ask an admin to step in via
 // the "Request Cancellation" action, available only in these statuses (mirrors
 // the backend's requestCollaborationCancellation status guard exactly).
+// Deliberately content-flow statuses only: the backend's CollaborationStatus
+// enum (connect-backend/graphql/modules/collaboration/index.js) doesn't have
+// VENUE_SENT/TIME_SENT/EVENT_SENT yet, so a hosting collaboration can't
+// actually reach those as a real server-side status today — extend this once
+// the backend adds them.
 private val CANCELLATION_ELIGIBLE_STATUSES = listOf(
     "ACCEPTED", "BRIEF_SENT", "BRIEF_FINALIZED",
     "SCRIPT_SENT", "WAITING_FOR_PAYMENT", "IN_PROGRESS"
@@ -140,12 +157,12 @@ fun ChatScreen(
     }
 
     // When the other party sends a brief or script the collaboration-status WebSocket fires first.
-    // Re-fetch messages so the BRIEF/SCRIPT message is guaranteed to be in the list even if
-    // the chat-message WebSocket missed it.  A short delay lets any concurrent Firestore write
-    // propagate before we query.
+    // Re-fetch messages so the BRIEF/SCRIPT/VENUE/TIME/EVENT message is guaranteed to be in
+    // the list even if the chat-message WebSocket missed it. A short delay lets any concurrent
+    // Firestore write propagate before we query.
     LaunchedEffect(currentCollaboration?.status) {
         val s = currentCollaboration?.status
-        if (s == "BRIEF_SENT" || s == "SCRIPT_SENT") {
+        if (s == "BRIEF_SENT" || s == "SCRIPT_SENT" || s == "VENUE_SENT" || s == "TIME_SENT" || s == "EVENT_SENT") {
             kotlinx.coroutines.delay(500)
             viewModel.refreshMessages()
         }
@@ -460,6 +477,9 @@ private fun CampaignStatusBanner(collaboration: Collaboration) {
         "BRIEF_SENT" -> "Brief Sent"
         "BRIEF_FINALIZED" -> "Brief Approved"
         "SCRIPT_SENT" -> "Script Under Review"
+        "VENUE_SENT" -> "Venue Shared"
+        "TIME_SENT" -> "Timing Shared"
+        "EVENT_SENT" -> "Event Details Under Review"
         "WAITING_FOR_PAYMENT" -> "Awaiting Payment"
         "IN_PROGRESS" -> "In Progress"
         "COMPLETED" -> "Completed"
@@ -588,7 +608,12 @@ fun CollaborationTimeline(
     modifier: Modifier = Modifier
 ) {
     val status = collaboration.status
-    val statusIndex = STATUS_ORDER.indexOf(status).coerceAtLeast(0)
+    // A collaboration is "hosting" if any accepted pricing line is the
+    // formats-less "Hosting" deliverable (see InfluencerApplyCampaignScreen /
+    // InfluencerCreateProposal) — it walks Venue/Time/Event instead of Script.
+    val isHosting = collaboration.pricing?.any { it.platform.equals("HOSTING", ignoreCase = true) } == true
+    val statusOrder = if (isHosting) HOSTING_STATUS_ORDER else CONTENT_STATUS_ORDER
+    val statusIndex = statusOrder.indexOf(status).coerceAtLeast(0)
 
     // lastOrNull, not firstOrNull: after a "Request Correction" + resend there
     // can be more than one BRIEF message, and the timeline should always show
@@ -608,6 +633,12 @@ fun CollaborationTimeline(
     }
     val negotiationMessages = remember(messages) { messages.filter { it.type == "NEGOTIATION" }.sortedBy { it.timestamp } }
 
+    // Hosting-only messages, same lastOrNull convention as scriptMessage above.
+    val venueMessage = remember(messages) { messages.lastOrNull { it.type == "VENUE" } }
+    val timeMessage = remember(messages) { messages.lastOrNull { it.type == "TIME" } }
+    val eventMessage = remember(messages) { messages.lastOrNull { it.type == "EVENT" } }
+    val eventRejectionMessage = remember(messages) { messages.lastOrNull { it.type == "EVENT_REJECTED" } }
+
     var showBriefDialog by remember { mutableStateOf(false) }
     var showRejectBriefDialog by remember { mutableStateOf(false) }
     var showScriptDialog by remember { mutableStateOf(false) }
@@ -615,36 +646,67 @@ fun CollaborationTimeline(
     var showNegotiationDialog by remember { mutableStateOf(false) }
     var showUploadDialog by remember { mutableStateOf(false) }
     var showRejectContentDialog by remember { mutableStateOf(false) }
+    var showVenueDialog by remember { mutableStateOf(false) }
+    var showTimeDialog by remember { mutableStateOf(false) }
+    var showEventDialog by remember { mutableStateOf(false) }
+    var showRejectEventDialog by remember { mutableStateOf(false) }
 
     // Step state flags
-    val briefStepShown  = statusIndex >= STATUS_ORDER.indexOf("ACCEPTED")
-    val briefContentAvail = briefMessage != null || statusIndex >= STATUS_ORDER.indexOf("BRIEF_SENT")
-    val briefDone        = statusIndex >= STATUS_ORDER.indexOf("BRIEF_FINALIZED")
+    val briefStepShown  = statusIndex >= statusOrder.indexOf("ACCEPTED")
+    val briefContentAvail = briefMessage != null || statusIndex >= statusOrder.indexOf("BRIEF_SENT")
+    val briefDone        = statusIndex >= statusOrder.indexOf("BRIEF_FINALIZED")
     // True while the brand's most recent brief was sent back for correction
     // and hasn't been resent yet — never changes collaboration status, same as
-    // a content rejection (status stays BRIEF_SENT the whole time).
+    // a content rejection (status stays BRIEF_SENT the whole time). Common to
+    // both the content and hosting flows, since BRIEF_SENT/BRIEF_FINALIZED
+    // precede where they branch.
     val briefRejectedPendingResend = status == "BRIEF_SENT" &&
         briefRejectionMessage != null &&
         (briefMessage == null || briefRejectionMessage.timestamp > briefMessage.timestamp)
-    val scriptStepShown  = statusIndex >= STATUS_ORDER.indexOf("BRIEF_FINALIZED")
-    val scriptContentAvail = scriptMessage != null || statusIndex >= STATUS_ORDER.indexOf("SCRIPT_SENT")
-    val scriptDone       = statusIndex >= STATUS_ORDER.indexOf("WAITING_FOR_PAYMENT")
+
+    // ── Content flow (Script Revision) ──────────────────────────────────
+    val scriptStepShown  = !isHosting && statusIndex >= statusOrder.indexOf("BRIEF_FINALIZED")
+    val scriptContentAvail = scriptMessage != null || statusIndex >= statusOrder.indexOf("SCRIPT_SENT")
+    val scriptDone       = statusIndex >= statusOrder.indexOf("WAITING_FOR_PAYMENT")
     // True while the brand's most recent action on this script was a rejection
     // that the influencer hasn't resubmitted for yet (status is back to
     // BRIEF_FINALIZED and no newer SCRIPT message exists than the rejection).
-    val rejectionPendingResubmit = status == "BRIEF_FINALIZED" &&
+    val rejectionPendingResubmit = !isHosting && status == "BRIEF_FINALIZED" &&
         rejectionMessage != null &&
         (scriptMessage == null || rejectionMessage.timestamp > scriptMessage.timestamp)
+
+    // ── Hosting flow (Venue / Time / Event) — influencer fills these in
+    // sequence with no brand gate in between; only the final Event step
+    // needs the brand's Accept/Reject, mirroring Script Revision's shape. ──
+    val venueStepShown   = isHosting && statusIndex >= statusOrder.indexOf("BRIEF_FINALIZED")
+    val venueContentAvail = venueMessage != null || statusIndex >= statusOrder.indexOf("VENUE_SENT")
+    val venueDone         = statusIndex >= statusOrder.indexOf("TIME_SENT")
+    val timeStepShown    = isHosting && statusIndex >= statusOrder.indexOf("VENUE_SENT")
+    val timeContentAvail  = timeMessage != null || statusIndex >= statusOrder.indexOf("TIME_SENT")
+    val timeDone          = statusIndex >= statusOrder.indexOf("EVENT_SENT")
+    val eventStepShown   = isHosting && statusIndex >= statusOrder.indexOf("TIME_SENT")
+    val eventContentAvail = eventMessage != null || statusIndex >= statusOrder.indexOf("EVENT_SENT")
+    val eventDone         = statusIndex >= statusOrder.indexOf("WAITING_FOR_PAYMENT")
+    // Same shape as rejectionPendingResubmit above, but for the hosting flow's
+    // Event step being kicked back to BRIEF_FINALIZED.
+    val eventRejectionPendingResubmit = isHosting && status == "BRIEF_FINALIZED" &&
+        eventRejectionMessage != null &&
+        (eventMessage == null || eventRejectionMessage.timestamp > eventMessage.timestamp)
+
     val paymentActive    = status == "WAITING_FOR_PAYMENT"
-    val paymentDone      = statusIndex >= STATUS_ORDER.indexOf("IN_PROGRESS")
-    val contentDeliveryActive = status == "IN_PROGRESS"
-    val contentDeliveryDone   = status == "COMPLETED"
+    val paymentDone      = statusIndex >= statusOrder.indexOf("IN_PROGRESS")
+    val contentDeliveryActive = !isHosting && status == "IN_PROGRESS"
+    val contentDeliveryDone   = !isHosting && status == "COMPLETED"
     // Content stays IN_PROGRESS through the whole review cycle (so the
     // analytics-sync cron, which only polls IN_PROGRESS collaborations, never
     // stalls while the brand is reviewing) — these two flags branch the UI
     // on top of that single status rather than needing extra status values.
     val contentAwaitingReview = status == "IN_PROGRESS" && latestContentEvent?.type == "CONTENT_SUBMITTED"
     val contentRejectedPendingResubmit = status == "IN_PROGRESS" && latestContentEvent?.type == "CONTENT_REJECTED"
+    // Hosting has no artifact to submit/review — "delivery" is the event
+    // itself happening, so the brand's Accept is the only action.
+    val hostingDayActive = isHosting && status == "IN_PROGRESS"
+    val hostingDayDone   = isHosting && status == "COMPLETED"
 
     Column(
         modifier = modifier
@@ -990,7 +1052,8 @@ fun CollaborationTimeline(
             }
         }
 
-        // ── Step 3: Script Revision ──────────────────────────────────────
+        // ── Step 3: Script Revision (content) / Venue+Time+Event (hosting) ──
+        if (!isHosting) {
         val canSubmitScript = status == "BRIEF_FINALIZED" && !isBrand
         TimelineStepCard(
             title = "Script Revision",
@@ -1119,6 +1182,222 @@ fun CollaborationTimeline(
                 Text("Available after brief approval", style = MaterialTheme.typography.bodySmall, color = TlGray)
             }
         }
+        } else {
+            // ── Venue Details ──────────────────────────────────────────
+            TimelineStepCard(
+                title = "Venue Details",
+                time = venueMessage?.timeFormatted ?: "",
+                isActive = venueStepShown && !venueDone,
+                isDone = venueDone,
+                isLocked = !venueStepShown,
+                isLast = false,
+                badge = null
+            ) {
+                if (venueContentAvail) {
+                    val venueContent = venueMessage?.metadata?.get("venue")?.toString() ?: venueMessage?.text ?: ""
+                    if (venueMessage == null) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = TlRed)
+                    } else if (venueContent.isNotBlank()) {
+                        Text(
+                            text = venueContent,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF333333)
+                        )
+                    }
+                } else if (venueStepShown && !isBrand) {
+                    Button(
+                        onClick = { showVenueDialog = true },
+                        enabled = !isActionLoading,
+                        colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isActionLoading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Share Venue", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else if (venueStepShown) {
+                    Text("Waiting for influencer to share the venue.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                } else {
+                    Text("Available after brief approval", style = MaterialTheme.typography.bodySmall, color = TlGray)
+                }
+            }
+
+            // ── Time Details ───────────────────────────────────────────
+            TimelineStepCard(
+                title = "Time Details",
+                time = timeMessage?.timeFormatted ?: "",
+                isActive = timeStepShown && !timeDone,
+                isDone = timeDone,
+                isLocked = !timeStepShown,
+                isLast = false,
+                badge = null
+            ) {
+                if (timeContentAvail) {
+                    val timeContent = timeMessage?.metadata?.get("time")?.toString() ?: timeMessage?.text ?: ""
+                    if (timeMessage == null) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = TlRed)
+                    } else if (timeContent.isNotBlank()) {
+                        Text(
+                            text = timeContent,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF333333)
+                        )
+                    }
+                } else if (timeStepShown && !isBrand) {
+                    Button(
+                        onClick = { showTimeDialog = true },
+                        enabled = !isActionLoading,
+                        colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isActionLoading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Share Timing", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else if (timeStepShown) {
+                    Text("Waiting for influencer to share the event timing.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                } else {
+                    Text("Available after venue details", style = MaterialTheme.typography.bodySmall, color = TlGray)
+                }
+            }
+
+            // ── Event Details ──────────────────────────────────────────
+            val canSubmitEvent = status == "TIME_SENT" && !isBrand
+            TimelineStepCard(
+                title = "Event Details",
+                time = (if (eventRejectionPendingResubmit) eventRejectionMessage else eventMessage)?.timeFormatted ?: "",
+                isActive = eventStepShown && !eventDone,
+                isDone = eventDone,
+                isLocked = !eventStepShown && !canSubmitEvent,
+                isLast = false,
+                badge = if (eventRejectionPendingResubmit) "REJECTED" else null
+            ) {
+                if (eventRejectionPendingResubmit) {
+                    Text(
+                        text = "Event details rejected",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF5252),
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    val reason = eventRejectionMessage?.metadata?.get("reason")?.toString() ?: eventRejectionMessage?.text ?: ""
+                    if (reason.isNotBlank()) {
+                        Text(
+                            text = reason,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF333333)
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    if (!isBrand) {
+                        Button(
+                            onClick = { showEventDialog = true },
+                            enabled = !isActionLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isActionLoading) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.EditNote, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Resubmit Event Details", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Text("Waiting for influencer to resubmit event details.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                } else if (eventContentAvail) {
+                    val eventContent = eventMessage?.metadata?.get("details")?.toString() ?: eventMessage?.text ?: ""
+                    if (eventMessage == null) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = TlRed)
+                    } else {
+                        Text(
+                            text = "Event details",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Gray,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        if (eventContent.isNotBlank()) {
+                            Text(
+                                text = eventContent,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF333333)
+                            )
+                        }
+                    }
+                    // Brand can accept or reject the event details
+                    if (status == "EVENT_SENT" && isBrand && eventMessage != null) {
+                        Spacer(Modifier.height(14.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = { onStatusUpdate("WAITING_FOR_PAYMENT") },
+                                enabled = !isActionLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                if (isActionLoading) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Accept", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Button(
+                                onClick = { showRejectEventDialog = true },
+                                enabled = !isActionLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Reject", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                } else if (canSubmitEvent) {
+                    Button(
+                        onClick = { showEventDialog = true },
+                        enabled = !isActionLoading,
+                        colors = ButtonDefaults.buttonColors(containerColor = TlRed),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isActionLoading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.EditNote, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Submit Event Details", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else if (eventStepShown) {
+                    Text("Waiting for influencer to submit event details.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                } else {
+                    Text("Available after time details", style = MaterialTheme.typography.bodySmall, color = TlGray)
+                }
+            }
+        }
 
         // ── Step 4: Final Payment ────────────────────────────────────────
         TimelineStepCard(
@@ -1203,7 +1482,8 @@ fun CollaborationTimeline(
             }
         }
 
-        // ── Step 5: Content Delivery ─────────────────────────────────────────
+        // ── Step 5: Content Delivery (content) / Hosting Day (hosting) ───────
+        if (!isHosting) {
         TimelineStepCard(
             title = "Content Delivery",
             time = "",
@@ -1337,6 +1617,56 @@ fun CollaborationTimeline(
                 else -> Text("Available after payment", style = MaterialTheme.typography.bodySmall, color = TlGray)
             }
         }
+        } else {
+            // ── Hosting Day ──────────────────────────────────────────────
+            // No artifact to submit/review — "delivery" is the event itself
+            // happening, so the brand's Accept is the only action needed.
+            TimelineStepCard(
+                title = "Hosting Day",
+                time = "",
+                isActive = hostingDayActive,
+                isDone = hostingDayDone,
+                isLocked = !hostingDayActive && !hostingDayDone,
+                isLast = true,
+                badge = if (hostingDayDone) "DONE" else null
+            ) {
+                when {
+                    hostingDayDone -> Text(
+                        "Hosting completed.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF555555)
+                    )
+                    hostingDayActive -> {
+                        if (isBrand) {
+                            Text(
+                                "Once the event has taken place, mark this collaboration as completed.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF333333)
+                            )
+                            Spacer(Modifier.height(14.dp))
+                            Button(
+                                onClick = { onStatusUpdate("COMPLETED") },
+                                enabled = !isActionLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (isActionLoading) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Mark Completed", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        } else {
+                            Text("Waiting for brand to confirm the event took place.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        }
+                    }
+                    else -> Text("Available after payment", style = MaterialTheme.typography.bodySmall, color = TlGray)
+                }
+            }
+        }
 
     }
 
@@ -1436,6 +1766,56 @@ fun CollaborationTimeline(
             onSend = { reason ->
                 onSend("Content Rejected", "CONTENT_REJECTED", mapOf("reason" to reason))
                 showRejectContentDialog = false
+            }
+        )
+    }
+    if (showVenueDialog) {
+        TextInputDialog(
+            title = "Share Venue Details",
+            label = "Venue / Address",
+            onDismiss = { showVenueDialog = false },
+            onSend = { venue ->
+                onSend("Venue Details Shared", "VENUE", mapOf("venue" to venue))
+                onStatusUpdate("VENUE_SENT")
+                showVenueDialog = false
+            }
+        )
+    }
+    if (showTimeDialog) {
+        TextInputDialog(
+            title = "Share Event Timing",
+            label = "Event Date & Time",
+            onDismiss = { showTimeDialog = false },
+            onSend = { time ->
+                onSend("Event Timing Shared", "TIME", mapOf("time" to time))
+                onStatusUpdate("TIME_SENT")
+                showTimeDialog = false
+            }
+        )
+    }
+    if (showEventDialog) {
+        TextInputDialog(
+            title = "Submit Event Details",
+            label = "Event Description",
+            multiline = true,
+            onDismiss = { showEventDialog = false },
+            onSend = { details ->
+                onSend("Event Details Submitted", "EVENT", mapOf("details" to details))
+                onStatusUpdate("EVENT_SENT")
+                showEventDialog = false
+            }
+        )
+    }
+    if (showRejectEventDialog) {
+        TextInputDialog(
+            title = "Reject Event Details",
+            label = "Reason for rejection",
+            multiline = true,
+            onDismiss = { showRejectEventDialog = false },
+            onSend = { reason ->
+                onSend("Event Details Rejected", "EVENT_REJECTED", mapOf("reason" to reason))
+                onStatusUpdate("BRIEF_FINALIZED")
+                showRejectEventDialog = false
             }
         )
     }

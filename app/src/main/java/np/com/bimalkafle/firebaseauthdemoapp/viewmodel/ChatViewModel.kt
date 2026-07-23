@@ -271,39 +271,48 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             val token = getToken() ?: run { onDone?.invoke(); return@launch }
 
-            if (platform.equals("Instagram", ignoreCase = true)) {
-                val scrapeResult = BackendRepository.scrapeInstagramPost(
-                    postUrl = link, collaborationId = collaborationId, token = token
-                )
-                scrapeResult.onSuccess { success ->
-                    if (success) {
+            when {
+                platform.equals("Instagram", ignoreCase = true) -> {
+                    val scrapeResult = BackendRepository.scrapeInstagramPost(
+                        postUrl = link, collaborationId = collaborationId, token = token
+                    )
+                    scrapeResult.onSuccess { success ->
+                        if (success) {
+                            sendMessage("Instagram Post Uploaded", "UPLOAD",
+                                mapOf("link" to link, "platform" to "Instagram", "status" to "SCRAPED"))
+                        } else {
+                            sendMessage("Instagram Post Uploaded (Pending verification)", "UPLOAD",
+                                mapOf("link" to link, "platform" to "Instagram"))
+                        }
+                    }.onFailure {
                         sendMessage("Instagram Post Uploaded", "UPLOAD",
-                            mapOf("link" to link, "platform" to "Instagram", "status" to "SCRAPED"))
-                    } else {
-                        sendMessage("Instagram Post Uploaded (Pending verification)", "UPLOAD",
                             mapOf("link" to link, "platform" to "Instagram"))
                     }
-                }.onFailure {
-                    sendMessage("Instagram Post Uploaded", "UPLOAD",
-                        mapOf("link" to link, "platform" to "Instagram"))
                 }
-            } else {
-                val videoResult = BackendRepository.getVideoByUrl(
-                    videoUrl = link, userId = currentUserId, collaborationId = collaborationId, token = token
-                )
-                videoResult.onSuccess { data ->
-                    sendMessage(
-                        text = "Content Uploaded: ${data.optString("title", "Video")}",
-                        type = "UPLOAD",
-                        metadata = mapOf(
-                            "link" to link,
-                            "title" to data.optString("title", "Video"),
-                            "viewCount" to data.optInt("viewCount", 0),
-                            "platform" to "YouTube"
-                        )
+                platform.equals("YouTube", ignoreCase = true) -> {
+                    val videoResult = BackendRepository.getVideoByUrl(
+                        videoUrl = link, userId = currentUserId, collaborationId = collaborationId, token = token
                     )
-                }.onFailure {
-                    sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link, "platform" to "YouTube"))
+                    videoResult.onSuccess { data ->
+                        sendMessage(
+                            text = "Content Uploaded: ${data.optString("title", "Video")}",
+                            type = "UPLOAD",
+                            metadata = mapOf(
+                                "link" to link,
+                                "title" to data.optString("title", "Video"),
+                                "viewCount" to data.optInt("viewCount", 0),
+                                "platform" to "YouTube"
+                            )
+                        )
+                    }.onFailure {
+                        sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link, "platform" to "YouTube"))
+                    }
+                }
+                else -> {
+                    // Facebook (and any other future platform) has no scraping/analytics
+                    // integration yet — just record the submitted link, same as the
+                    // Instagram/YouTube failure fallbacks above.
+                    sendMessage("Content Uploaded", "UPLOAD", mapOf("link" to link, "platform" to platform))
                 }
             }
             onDone?.invoke()

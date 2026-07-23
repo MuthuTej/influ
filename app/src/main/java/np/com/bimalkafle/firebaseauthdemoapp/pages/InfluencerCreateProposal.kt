@@ -29,6 +29,7 @@ import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.HostingPriceItem
 import np.com.bimalkafle.firebaseauthdemoapp.components.UnifiedDeliverableItem
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 
@@ -192,7 +193,7 @@ fun InfluencerCreateProposal(
             )
 
             // Unified Deliverables & Pricing section
-            if (selectedCampaign != null && !selectedCampaign.platforms.isNullOrEmpty()) {
+            if (selectedCampaign != null && (!selectedCampaign.platforms.isNullOrEmpty() || selectedCampaign.hosting?.price != null)) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("Deliverables & Pricing", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
                 
@@ -269,6 +270,41 @@ fun InfluencerCreateProposal(
                         }
                     }
                 }
+
+                // Hosting has no formats — it's a single flat-fee line item, not
+                // tied to a platform, so it's rendered outside the platforms loop.
+                val hostingPrice = selectedCampaign.hosting?.price
+                if (hostingPrice != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "Hosting",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            "Brand's asking price: ₹$hostingPrice",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val hostingPriceInput = pricing["Hosting"]?.get("Event Hosting") ?: ""
+                    HostingPriceItem(
+                        price = hostingPriceInput,
+                        onPriceChange = { newPrice ->
+                            val newPricing = pricing.toMutableMap()
+                            val platformPricing = newPricing["Hosting"]?.toMutableMap() ?: mutableMapOf()
+                            platformPricing["Event Hosting"] = newPrice
+                            newPricing["Hosting"] = platformPricing
+                            pricing = newPricing
+                        }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -278,8 +314,13 @@ fun InfluencerCreateProposal(
                     val finalPricing = mutableListOf<Map<String, Any>>()
                     pricing.forEach { (platform, deliverables) ->
                         deliverables.forEach { (deliverable, price) ->
-                            val quantityStr = platformDeliverableQuantities[platform]?.get(deliverable) ?: "0"
-                            val quantity = quantityStr.toIntOrNull() ?: 0
+                            // Hosting is a single flat-fee booking, not tied to a
+                            // quantity input — count is implicitly 1.
+                            val quantity = if (platform.equals("Hosting", ignoreCase = true)) {
+                                1
+                            } else {
+                                (platformDeliverableQuantities[platform]?.get(deliverable) ?: "0").toIntOrNull() ?: 0
+                            }
                             if (price.isNotEmpty() && quantity > 0) {
                                 finalPricing.add(
                                     mapOf(

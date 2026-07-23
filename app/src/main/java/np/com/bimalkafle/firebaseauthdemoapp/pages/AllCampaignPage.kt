@@ -60,7 +60,9 @@ private fun formatBudget(amount: Int?): String {
  * anything past the applicant/negotiation stage. Mirrors the admin
  * dashboard's "Active" collaboration group. */
 private val ONGOING_COLLABORATION_STATUSES = setOf(
-    "ACCEPTED", "BRIEF_SENT", "BRIEF_FINALIZED", "SCRIPT_SENT", "IN_PROGRESS", "WAITING_FOR_PAYMENT", "COMPLETED"
+    "ACCEPTED", "BRIEF_SENT", "BRIEF_FINALIZED", "SCRIPT_SENT",
+    "VENUE_SENT", "TIME_SENT", "EVENT_SENT",
+    "IN_PROGRESS", "WAITING_FOR_PAYMENT", "COMPLETED"
 )
 
 private enum class CampaignFilter(val label: String) {
