@@ -448,7 +448,7 @@ fun OtherInfluencersCard() {
         InfluencerItem("Rebekkah Lafantano")
         Spacer(modifier = Modifier.height(8.dp))
         TextButton(onClick = { /* TODO */ }) {
-            Text("VIEW MORE INFLUENCERS", color = themeColor_campaign, fontWeight = FontWeight.Bold)
+            Text("View more influencers", color = themeColor_campaign, fontWeight = FontWeight.Bold)
         }
     }
 }

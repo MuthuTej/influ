@@ -198,7 +198,7 @@ fun CampaignDetailsPage(
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("SEARCH INFLUENCER", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Search influencer", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -729,7 +729,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                else Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
+                else Text("Next", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }

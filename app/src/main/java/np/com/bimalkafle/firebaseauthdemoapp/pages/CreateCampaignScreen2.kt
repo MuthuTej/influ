@@ -345,7 +345,7 @@ fun CreateCampaignScreen2(
                 if (loading) {
                     androidx.compose.material3.CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("SUBMIT", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Submit", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }

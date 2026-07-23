@@ -705,7 +705,7 @@ fun CampaignCardInfluencer(
             // ── Row 2: Status badge · Budget · Dates ─────────────────────────
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(shape = RoundedCornerShape(4.dp), color = statusBg) {
-                    Text(campaign.status.uppercase(), fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                    Text(campaign.status.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 9.sp, fontWeight = FontWeight.Bold,
                         color = statusFg, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                 }
                 if (budgetText != null) {

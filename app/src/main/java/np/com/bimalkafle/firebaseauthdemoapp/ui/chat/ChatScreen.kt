@@ -402,7 +402,7 @@ private fun CampaignStatusBanner(collaboration: Collaboration) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "CAMPAIGN STATUS",
+                    text = "Campaign status",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = TlRed,
@@ -834,7 +834,7 @@ fun CollaborationTimeline(
         ) {
             if (rejectionPendingResubmit) {
                 Text(
-                    text = "SCRIPT REJECTED",
+                    text = "Script rejected",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFFF5252),
@@ -878,7 +878,7 @@ fun CollaborationTimeline(
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = TlRed)
                 } else {
                     Text(
-                        text = "SCRIPT CONTENT",
+                        text = "Script content",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Gray,
@@ -1044,7 +1044,7 @@ fun CollaborationTimeline(
             isLast = true,
             badge = when {
                 contentDeliveryDone -> "DONE"
-                contentAwaitingReview -> "IN REVIEW"
+                contentAwaitingReview -> "In review"
                 contentRejectedPendingResubmit -> "REJECTED"
                 else -> null
             }
@@ -1057,7 +1057,7 @@ fun CollaborationTimeline(
                 )
                 contentAwaitingReview -> {
                     Text(
-                        text = "CONTENT SUBMITTED",
+                        text = "Content submitted",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Gray,
@@ -1108,7 +1108,7 @@ fun CollaborationTimeline(
                 }
                 contentRejectedPendingResubmit -> {
                     Text(
-                        text = "CONTENT REJECTED",
+                        text = "Content rejected",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFFF5252),

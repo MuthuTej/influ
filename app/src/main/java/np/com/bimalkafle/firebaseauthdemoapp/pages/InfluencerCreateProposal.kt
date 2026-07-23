@@ -148,7 +148,7 @@ fun InfluencerCreateProposal(
         ) {
 
             Text(
-                "CREATE PROPOSAL",
+                "Create proposal",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -219,7 +219,7 @@ fun InfluencerCreateProposal(
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
                                 Text(
-                                    platformName.uppercase(),
+                                    platformName.lowercase().replaceFirstChar { it.uppercase() },
                                     fontWeight = FontWeight.ExtraBold,
                                     color = when(platformType) {
                                         "youtube", "instagram" -> Color.Black
@@ -334,7 +334,7 @@ fun InfluencerCreateProposal(
                     if (isLoading) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("CREATE PROPOSAL", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Create proposal", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }

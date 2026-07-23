@@ -224,7 +224,7 @@ fun InfluencerDetailScreenContent(
                             .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("APPROACH BRANDS", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Approach brands", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }

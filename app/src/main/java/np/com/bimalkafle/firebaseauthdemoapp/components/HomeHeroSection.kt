@@ -144,7 +144,7 @@ fun HomeHeroCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            amountLabel.uppercase(),
+                            amountLabel.replaceFirstChar { it.uppercase() },
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp,
