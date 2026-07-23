@@ -1281,6 +1281,9 @@ class BrandViewModel : ViewModel() {
                       paymentStatus
                       totalAmount
                     }
+                    hosting {
+                      price
+                    }
                   }
                 }
             """.trimIndent()
@@ -1336,7 +1339,10 @@ class BrandViewModel : ViewModel() {
                                     createdAt = if (obj.isNull("createdAt")) null else obj.optString("createdAt"),
                                     updatedAt = if (obj.isNull("updatedAt")) null else obj.optString("updatedAt"),
                                     platforms = platforms,
-                                    collaborations = parseCampaignCollaborationSummaries(obj.optJSONArray("collaborations"))
+                                    collaborations = parseCampaignCollaborationSummaries(obj.optJSONArray("collaborations")),
+                                    hosting = obj.optJSONObject("hosting")?.let { h ->
+                                        HostingPricingResponse(price = if (h.isNull("price")) null else h.optInt("price"))
+                                    }
                                 )
                             )
                         }

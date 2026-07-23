@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.components.HostingPriceItem
 import np.com.bimalkafle.firebaseauthdemoapp.components.UnifiedDeliverableItem
 import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramProfile
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.CampaignViewModel
@@ -240,10 +241,10 @@ fun InfluencerApplyCampaignScreen(
             )
 
             // Unified Deliverables & Pricing section
-            if (campaignDetail != null && !campaignDetail?.platforms.isNullOrEmpty()) {
+            if (campaignDetail != null && (!campaignDetail?.platforms.isNullOrEmpty() || campaignDetail?.hosting?.price != null)) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Deliverables & Pricing", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
-                
+
                 campaignDetail?.platforms?.forEach { campaignPlatform ->
                     val platformName = campaignPlatform.platform
                     val formats = campaignPlatform.formats ?: emptyList()
@@ -317,6 +318,41 @@ fun InfluencerApplyCampaignScreen(
                         }
                     }
                 }
+
+                // Hosting has no formats — it's a single flat-fee line item, not
+                // tied to a platform, so it's rendered outside the platforms loop.
+                val hostingPrice = campaignDetail?.hosting?.price
+                if (hostingPrice != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "Hosting",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            "Brand's asking price: ₹$hostingPrice",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val hostingPriceInput = pricingMap["Hosting"]?.get("Event Hosting") ?: ""
+                    HostingPriceItem(
+                        price = hostingPriceInput,
+                        onPriceChange = { newPrice ->
+                            val newPricing = pricingMap.toMutableMap()
+                            val platformPricing = newPricing["Hosting"]?.toMutableMap() ?: mutableMapOf()
+                            platformPricing["Event Hosting"] = newPrice
+                            newPricing["Hosting"] = platformPricing
+                            pricingMap = newPricing
+                        }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -326,8 +362,13 @@ fun InfluencerApplyCampaignScreen(
                     val finalPricing = mutableListOf<Map<String, Any>>()
                     pricingMap.forEach { (platform, deliverables) ->
                         deliverables.forEach { (deliverable, price) ->
-                            val quantityStr = platformDeliverableQuantities[platform]?.get(deliverable) ?: "0"
-                            val quantity = quantityStr.toIntOrNull() ?: 0
+                            // Hosting is a single flat-fee booking, not tied to a
+                            // quantity input — count is implicitly 1.
+                            val quantity = if (platform.equals("Hosting", ignoreCase = true)) {
+                                1
+                            } else {
+                                (platformDeliverableQuantities[platform]?.get(deliverable) ?: "0").toIntOrNull() ?: 0
+                            }
                             if (price.isNotEmpty() && quantity > 0) {
                                 finalPricing.add(
                                     mapOf(

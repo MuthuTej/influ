@@ -155,7 +155,7 @@ fun ContentUploadDialog(
     val links = remember { mutableStateListOf("") }
     var selectedPlatform by remember { mutableStateOf("YouTube") }
     var showPlatformDropdown by remember { mutableStateOf(false) }
-    val platforms = listOf("YouTube", "Instagram")
+    val platforms = listOf("YouTube", "Instagram", "Facebook")
 
     AlertDialog(
         onDismissRequest = onDismiss,

@@ -78,13 +78,18 @@ fun CreateCampaignScreen(
     val formPaddingTop = headerHeight - 40.dp
 
     // Validation
+    // A campaign needs either at least one platform (with formats picked for
+    // each) or the Hosting deliverable (with a price set) — it doesn't need
+    // both, so a hosting-only campaign (no Instagram/YouTube/etc.) is valid.
+    val hasValidPlatforms = campaignViewModel.selectedPlatforms.isNotEmpty() &&
+            campaignViewModel.selectedPlatforms.all { platform ->
+                campaignViewModel.platformFormats[platform]?.isNotEmpty() == true
+            }
     val isFormValid = campaignViewModel.title.isNotBlank() &&
             campaignViewModel.description.isNotBlank() &&
             campaignViewModel.selectedCategories.isNotEmpty() &&
-            campaignViewModel.selectedPlatforms.isNotEmpty() &&
-            campaignViewModel.selectedPlatforms.all { platform -> 
-                campaignViewModel.platformFormats[platform]?.isNotEmpty() == true 
-            } &&
+            (hasValidPlatforms || campaignViewModel.hostingSelected) &&
+            (!campaignViewModel.hostingSelected || campaignViewModel.hostingPrice > 0) &&
             campaignViewModel.startDate != null
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -312,6 +317,21 @@ fun CreateCampaignScreen(
                         checked = campaignViewModel.hostingSelected,
                         onCheckedChange = null,
                         colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                    )
+                }
+                if (campaignViewModel.hostingSelected) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = if (campaignViewModel.hostingPrice == 0) "" else campaignViewModel.hostingPrice.toString(),
+                        onValueChange = {
+                            campaignViewModel.hostingPrice = it.filter { char -> char.isDigit() }.toIntOrNull() ?: 0
+                        },
+                        label = { Text("Hosting Price (₹) *") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)
                     )
                 }
             }

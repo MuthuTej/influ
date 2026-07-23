@@ -69,6 +69,48 @@ fun UnifiedDeliverableItem(
     }
 }
 
+/** Hosting has no per-item quantity — it's a single flat-fee booking, not
+ * "how many hostings" — so unlike UnifiedDeliverableItem this only collects
+ * a price, and callers should treat it as a fixed count of 1. */
+@Composable
+fun HostingPriceItem(
+    price: String,
+    onPriceChange: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(1.dp, Color(0xFFF5F5F5))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Event Hosting",
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = Color(0xFF333333),
+                modifier = Modifier.weight(1f)
+            )
+
+            CompactInput(
+                label = "Price",
+                value = price,
+                onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) onPriceChange(it) },
+                prefix = "₹",
+                modifier = Modifier.width(85.dp)
+            )
+        }
+    }
+}
+
 @Composable
 fun CompactInput(
     label: String,
