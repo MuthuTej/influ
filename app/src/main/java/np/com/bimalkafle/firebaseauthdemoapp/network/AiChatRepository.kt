@@ -11,7 +11,11 @@ import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
 
-data class ChatEntity(val type: String, val id: String, val label: String)
+// `aliases` holds every form (display name, @handle) the model might use to
+// mention this entity in prose — the chat UI matches against all of them to
+// decide what text to make tappable, since the model isn't consistent about
+// which form it picks for a given reply.
+data class ChatEntity(val type: String, val id: String, val label: String, val aliases: List<String> = emptyList())
 
 data class AiChatResponse(val reply: String, val entities: List<ChatEntity>)
 
@@ -75,7 +79,14 @@ object AiChatRepository {
                     if (entitiesJson != null) {
                         for (i in 0 until entitiesJson.length()) {
                             val e = entitiesJson.getJSONObject(i)
-                            entities.add(ChatEntity(e.getString("type"), e.getString("id"), e.optString("label", e.getString("id"))))
+                            val label = e.optString("label", e.getString("id"))
+                            val aliasesJson = e.optJSONArray("aliases")
+                            val aliases = if (aliasesJson != null) {
+                                (0 until aliasesJson.length()).map { aliasesJson.getString(it) }
+                            } else {
+                                listOf(label)
+                            }
+                            entities.add(ChatEntity(e.getString("type"), e.getString("id"), label, aliases))
                         }
                     }
                     Result.success(AiChatResponse(reply = json.optString("reply", ""), entities = entities))

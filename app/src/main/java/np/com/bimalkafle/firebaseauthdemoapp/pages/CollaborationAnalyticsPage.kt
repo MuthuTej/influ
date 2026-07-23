@@ -83,10 +83,21 @@ fun CollaborationAnalyticsPage(
     val influencerCollaborations by (influencerViewModel?.collaborations?.observeAsState(emptyList()) ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) })
     val isLoading by brandViewModel.loading.observeAsState(initial = false)
 
+    // Campaign targets are brand-only: the backend never returns
+    // performanceTargets/performanceTracking for an influencer-authenticated
+    // request, but the UI must also avoid even attempting to render that
+    // section when this screen is opened from the influencer side.
+    // influencerViewModel is a shared singleton passed to every route regardless
+    // of the logged-in role (see MyAppNavigation.kt), so it's always non-null —
+    // it can't be used as the role signal. authState.role (the same source
+    // HomePage.kt uses to pick Brand/Influencer home screens) is the real one.
     val authState by (authViewModel?.authState?.observeAsState() ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) })
     val isBrandView = (authState as? AuthState.Authenticated)?.role == "BRAND"
     var showTargetsDialog by remember { mutableStateOf(false) }
 
+    // Prefer the collaboration from whichever ViewModel already has analytics data.
+    // The influencer VM may already have it loaded (from ProposalPage) with yt/ig
+    // fields populated. Brand VM is the authoritative fallback fetched on open.
     val collaboration = run {
         val fromBrand = brandCollaborations.find { it.id == collaborationId }
         val fromInfluencer = influencerCollaborations.find { it.id == collaborationId }
@@ -104,6 +115,7 @@ fun CollaborationAnalyticsPage(
          !collaboration.ig.isNullOrEmpty() ||
          !collaboration.platformAnalytics.isNullOrEmpty())
 
+    // Tracks how many auto-retries have fired; capped at 3 before giving up.
     var syncRetries by remember(collaborationId) { androidx.compose.runtime.mutableStateOf(0) }
     var syncTimedOut by remember(collaborationId) { androidx.compose.runtime.mutableStateOf(false) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -114,6 +126,7 @@ fun CollaborationAnalyticsPage(
         }
     }
 
+    // Calls the backend to read UPLOAD chat messages and retroactively populate yt
     fun refreshAnalytics() {
         FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
             val token = result.token ?: return@addOnSuccessListener
@@ -128,6 +141,10 @@ fun CollaborationAnalyticsPage(
 
     LaunchedEffect(Unit) { fetchLatest() }
 
+    // If COMPLETED but no analytics data yet, retry twice (every 3 s), then on the
+    // third attempt call refreshCollaborationAnalytics which retroactively reads the
+    // UPLOAD chat messages and populates yt — handles existing collaborations where
+    // the influencer didn't have YouTube OAuth when they originally uploaded.
     LaunchedEffect(collaboration?.status, hasAnalyticsData, syncRetries) {
         if (collaboration?.status == "COMPLETED" && !hasAnalyticsData && !syncTimedOut) {
             when {
@@ -164,7 +181,7 @@ fun CollaborationAnalyticsPage(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item {
                     AnalyticsHeader(navController, collaboration)
@@ -188,14 +205,14 @@ fun CollaborationAnalyticsPage(
                 if (collaboration.status != "COMPLETED") {
                     val statusMessage = when (collaboration.status) {
                         "PENDING" -> "Collaboration proposal is pending"
-                        "ACCEPTED" -> "Accepted, waiting for steps"
-                        "NEGOTIATION" -> "Under negotiation"
-                        "BRIEF_FINALIZED" -> "Brief finalized"
-                        "WAITING_FOR_PAYMENT" -> "Waiting for payment"
-                        "IN_PROGRESS" -> "In progress"
-                        "REVOKED" -> "Revoked"
-                        "REJECTED" -> "Rejected"
-                        else -> "In ${collaboration.status.replace("_", " ").lowercase()}"
+                        "ACCEPTED" -> "Collaboration is accepted, waiting for next steps"
+                        "NEGOTIATION" -> "Collaboration is currently under negotiation"
+                        "BRIEF_FINALIZED" -> "Campaign brief is finalized, moving to production"
+                        "WAITING_FOR_PAYMENT" -> "Waiting for payment to be processed"
+                        "IN_PROGRESS" -> "Collaboration is currently in progress"
+                        "REVOKED" -> "Collaboration has been revoked"
+                        "REJECTED" -> "Collaboration proposal was rejected"
+                        else -> "Collaboration is in ${collaboration.status.replace("_", " ").lowercase()} status"
                     }
                     val statusIcon = when (collaboration.status) {
                         "PENDING" -> Icons.Default.HourglassEmpty
@@ -210,55 +227,69 @@ fun CollaborationAnalyticsPage(
                     }
                     item { StatusPlaceholder(statusMessage, statusIcon) }
                 } else if (!hasAnalyticsData) {
+                    // COMPLETED but analytics data not ready yet (or unavailable)
                     item {
                         Column(
-                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             if (!syncTimedOut) {
-                                CircularProgressIndicator(color = themeColor_campaign, modifier = Modifier.size(36.dp))
-                                Spacer(modifier = Modifier.height(12.dp))
+                                CircularProgressIndicator(color = themeColor_campaign)
+                                Spacer(modifier = Modifier.height(16.dp))
                                 Text(
                                     "Syncing analytics…",
                                     fontWeight = FontWeight.Medium,
                                     color = Color.Gray,
                                     textAlign = TextAlign.Center,
-                                    fontSize = 14.sp
+                                    fontSize = 16.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "Video data is being saved. This usually takes a few seconds.",
+                                    color = Color.Gray,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
                                 )
                             } else {
                                 Icon(
                                     Icons.Default.BarChart,
                                     contentDescription = null,
-                                    modifier = Modifier.size(48.dp),
+                                    modifier = Modifier.size(64.dp),
                                     tint = Color.LightGray
                                 )
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
                                 Text(
                                     "No analytics data available",
                                     fontWeight = FontWeight.Medium,
                                     color = Color.Gray,
                                     textAlign = TextAlign.Center,
-                                    fontSize = 14.sp
+                                    fontSize = 16.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "Analytics are collected after the content is verified. Try refreshing after a few minutes.",
+                                    color = Color.Gray,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
                                 )
                             }
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                             Button(
                                 onClick = {
                                     syncRetries = 0
                                     syncTimedOut = false
                                     refreshAnalytics()
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColor_campaign),
-                                modifier = Modifier.height(36.dp),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColor_campaign)
                             ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Refresh", fontSize = 13.sp)
+                                Text("Refresh")
                             }
                         }
                     }
                 } else {
+                    // Overall Performance Header
                     if (collaboration.overallAnalytics != null) {
                         item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -269,16 +300,10 @@ fun CollaborationAnalyticsPage(
                         item {
                             val duration = collaboration.platformAnalytics?.firstOrNull()?.duration ?: 0
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                TotalImpressionsCard(
-                                    impressions = String.format("%,d", collaboration.overallAnalytics.impressions ?: 0),
+                                OverallPerformanceCard(
+                                    stats = collaboration.overallAnalytics,
                                     subtext = "Reached across $duration days"
                                 )
-                            }
-                        }
-
-                        item {
-                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                OverallStatsGrid(collaboration)
                             }
                         }
 
@@ -297,42 +322,46 @@ fun CollaborationAnalyticsPage(
                         }
                     }
 
+                    // YouTube Video Analytics Section
                     if (collaboration.yt != null && collaboration.yt.isNotEmpty()) {
                         item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                SectionTitle("YOUTUBE PERFORMANCE")
-                                Spacer(modifier = Modifier.height(4.dp))
+                                SectionTitle("YOUTUBE VIDEO PERFORMANCE")
+                                Spacer(modifier = Modifier.height(8.dp))
                                 collaboration.yt.forEach { video ->
                                     YouTubeVideoCard(video)
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(12.dp))
                                 }
                             }
                         }
                     }
 
+                    // Performance Timeline (milestones)
                     if (!collaboration.performanceMilestones.isNullOrEmpty()) {
                         item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 SectionTitle("PERFORMANCE TIMELINE")
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 PerformanceTimelineCard(collaboration.performanceMilestones)
                             }
                         }
                     }
 
+                    // Instagram Post Analytics Section
                     if (collaboration.ig != null && collaboration.ig.isNotEmpty()) {
                         item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 SectionTitle("INSTAGRAM PERFORMANCE")
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 collaboration.ig.forEach { post ->
                                     InstagramPostCard(post)
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(12.dp))
                                 }
                             }
                         }
                     }
 
+                    // Platform Breakdown Section
                     if (collaboration.platformAnalytics != null && collaboration.platformAnalytics.isNotEmpty()) {
                         item {
                             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -382,18 +411,19 @@ fun InstagramPostCard(post: InstagramPostData) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
+            // Header row: thumbnail + metadata
             Row(verticalAlignment = Alignment.Top) {
                 Box {
                     AsyncImage(
                         model = post.mediaUrl,
                         contentDescription = "Instagram Post",
                         modifier = Modifier
-                            .size(70.dp)
+                            .size(72.dp)
                             .clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop,
                         error = painterResource(id = R.drawable.instagram_logo)
@@ -415,6 +445,7 @@ fun InstagramPostCard(post: InstagramPostData) {
                 Spacer(modifier = Modifier.width(10.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
+                    // Content type badge
                     ContentTypeBadge(
                         label = "Instagram Post",
                         color = igColor
@@ -437,13 +468,14 @@ fun InstagramPostCard(post: InstagramPostData) {
                 }
             }
 
+            // Hashtags row
             if (hashtags.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     hashtags.take(6).forEach { tag ->
                         HashtagChip(tag, igColor)
@@ -455,6 +487,7 @@ fun InstagramPostCard(post: InstagramPostData) {
             HorizontalDivider(color = softGray)
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Metrics
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -464,8 +497,9 @@ fun InstagramPostCard(post: InstagramPostData) {
                 VideoStatItem("Views", String.format("%,d", post.viewCount ?: 0))
             }
 
+            // Open on Instagram button
             if (!post.postId.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = {
                         context.startActivity(
@@ -473,13 +507,13 @@ fun InstagramPostCard(post: InstagramPostData) {
                         )
                     },
                     modifier = Modifier.fillMaxWidth().height(36.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = igColor),
-                    contentPadding = PaddingValues(0.dp)
+                    contentPadding = PaddingValues(vertical = 0.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = igColor)
                 ) {
                     Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Instagram", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text("Open on Instagram", fontSize = 12.sp)
                 }
             }
         }
@@ -544,20 +578,22 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
+            // ── Video area: thumbnail → WebView player on tap ──
             if (video.videoId.isNotBlank()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f)
-                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 ) {
                     when {
                         playerError -> {
+                            // Video embedding is disabled by owner — offer YouTube app fallback
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -566,18 +602,18 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     Icon(
                                         Icons.Default.Warning,
                                         contentDescription = null,
                                         tint = Color.White.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(32.dp)
                                     )
                                     Text(
-                                        "Embedding disabled",
+                                        "Embedding disabled for this video",
                                         color = Color.White.copy(alpha = 0.8f),
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         textAlign = TextAlign.Center
                                     )
                                     Button(
@@ -586,16 +622,17 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                                             context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = ytRed),
-                                        shape = RoundedCornerShape(6.dp),
-                                        modifier = Modifier.height(30.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                        shape = RoundedCornerShape(6.dp)
                                     ) {
-                                        Text("Open", color = Color.White, fontSize = 11.sp)
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Open in YouTube", color = Color.White, fontSize = 13.sp)
                                     }
                                 }
                             }
                         }
                         playerVisible -> {
+                            // Player + optional loading overlay
                             AndroidView(
                                 factory = { ctx ->
                                     YouTubePlayerView(ctx).also { view ->
@@ -619,11 +656,12 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                                     modifier = Modifier.fillMaxSize().background(Color.Black),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    CircularProgressIndicator(color = ytRed, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+                                    CircularProgressIndicator(color = ytRed, strokeWidth = 3.dp)
                                 }
                             }
                         }
                         else -> {
+                            // Thumbnail with play button overlay
                             AsyncImage(
                                 model = video.thumbnail
                                     ?: "https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg",
@@ -641,13 +679,15 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                                 Surface(
                                     shape = CircleShape,
                                     color = ytRed,
-                                    modifier = Modifier.size(44.dp)
+                                    modifier = Modifier.size(56.dp)
                                 ) {
                                     Icon(
                                         Icons.Default.PlayArrow,
                                         contentDescription = "Play",
                                         tint = Color.White,
-                                        modifier = Modifier.padding(10.dp)
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(12.dp)
                                     )
                                 }
                             }
@@ -657,6 +697,7 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
             }
 
             Column(modifier = Modifier.padding(12.dp)) {
+                // Badges: content type + duration
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -669,7 +710,7 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                                 color = Color.White,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                             )
                         }
                     }
@@ -677,6 +718,7 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
 
                 Spacer(modifier = Modifier.height(6.dp))
 
+                // Title
                 Text(
                     text = video.title,
                     fontWeight = FontWeight.Bold,
@@ -686,8 +728,9 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                     overflow = TextOverflow.Ellipsis
                 )
 
+                // Channel + publish date
                 if (!video.authorName.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.Person,
@@ -695,7 +738,7 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                             tint = textGray,
                             modifier = Modifier.size(12.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(video.authorName, fontSize = 11.sp, color = textGray)
                         if (!video.publishedAt.isNullOrBlank()) {
                             Text(
@@ -707,10 +750,33 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                     }
                 }
 
+                // Collapsible description
+                if (!video.description.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = video.description,
+                        fontSize = 11.sp,
+                        color = textGray,
+                        fontStyle = FontStyle.Italic,
+                        maxLines = if (descExpanded) Int.MAX_VALUE else 2,
+                        overflow = if (descExpanded) TextOverflow.Clip else TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .animateContentSize()
+                            .clickable { descExpanded = !descExpanded }
+                    )
+                    Text(
+                        text = if (descExpanded) "Show less" else "Show more",
+                        fontSize = 10.sp,
+                        color = ytRed,
+                        modifier = Modifier.clickable { descExpanded = !descExpanded }
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(10.dp))
                 HorizontalDivider(color = softGray)
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Public metrics
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -720,6 +786,7 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                     VideoStatItem("Comments", formatCount(video.commentCount ?: video.analytics?.comments?.toString()))
                 }
 
+                // Private channel analytics (YouTube Analytics API)
                 val analytics = video.analytics
                 if (analytics != null && (analytics.watchTimeMinutes != null || analytics.engagementRate != null)) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -739,19 +806,20 @@ fun YouTubeVideoCard(video: YouTubeVideoData) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                // Watch on YouTube button
+                Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl)))
                     },
                     modifier = Modifier.fillMaxWidth().height(36.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ytRed),
-                    contentPadding = PaddingValues(0.dp)
+                    contentPadding = PaddingValues(vertical = 0.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ytRed)
                 ) {
                     Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("YouTube", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text("Watch on YouTube", fontSize = 12.sp)
                 }
             }
         }
@@ -776,21 +844,18 @@ fun AnalyticsHeader(navController: NavController, collaboration: Collaboration?)
                     colors = listOf(themeColor_campaign, themeColor_campaign.copy(alpha = 0.9f))
                 )
             )
-            .padding(bottom = 16.dp)
+            .padding(bottom = 14.dp)
     ) {
         Image(
             painter = painterResource(id = R.drawable.vector),
             contentDescription = null,
             modifier = Modifier
                 .matchParentSize()
-                .alpha(0.2f),
+                .alpha(0.25f),
             contentScale = ContentScale.Crop
         )
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 8.dp)
-            ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = { navController.popBackStack() },
                     modifier = Modifier
@@ -802,28 +867,30 @@ fun AnalyticsHeader(navController: NavController, collaboration: Collaboration?)
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     "ANALYTICS",
-                    color = Color.White,
+                    color = Color.White.copy(alpha = 0.85f),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontSize = 11.sp,
                     letterSpacing = 1.sp
                 )
             }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
+
+            Spacer(modifier = Modifier.height(10.dp))
+
             if (collaboration != null) {
                 Text(
                     collaboration.campaign.title,
                     color = Color.White,
-                    fontSize = 26.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Black,
-                    lineHeight = 30.sp
+                    lineHeight = 26.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
-                
+
                 Text(
                     "with ${collaboration.influencer.name}",
                     color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
@@ -835,16 +902,16 @@ fun AnalyticsHeader(navController: NavController, collaboration: Collaboration?)
 fun InfluencerProfileCard(collaboration: Collaboration) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(1.dp)
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(38.dp),
                 shape = CircleShape,
                 color = Color.LightGray.copy(alpha = 0.1f)
             ) {
@@ -863,15 +930,16 @@ fun InfluencerProfileCard(collaboration: Collaboration) {
             }
             if (collaboration.status == "COMPLETED") {
                 Surface(
-                    color = Color(0xFF2E7D32).copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(10.dp)
+                    color = Color(0xFF2E7D32).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF4CAF50).copy(alpha = 0.5f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(12.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text("DONE", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 9.sp)
                     }
                 }
@@ -883,20 +951,20 @@ fun InfluencerProfileCard(collaboration: Collaboration) {
 @Composable
 fun StatusPlaceholder(message: String, icon: ImageVector) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(24.dp),
+        modifier = Modifier.fillMaxWidth().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(60.dp),
-            tint = themeColor_campaign.copy(alpha = 0.4f)
+            modifier = Modifier.size(80.dp),
+            tint = themeColor_campaign.copy(alpha = 0.5f)
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = message,
-            fontSize = 16.sp,
+            fontSize = 18.sp,
             fontWeight = FontWeight.Medium,
             color = Color.Gray,
             textAlign = TextAlign.Center
@@ -909,7 +977,7 @@ fun SectionTitle(title: String) {
     Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.CenterStart) {
         Text(
             title,
-            color = themeColor_campaign.copy(alpha = 0.7f),
+            color = themeColor_campaign.copy(alpha = 0.8f),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.5.sp
@@ -917,72 +985,71 @@ fun SectionTitle(title: String) {
     }
 }
 
+// Merges what used to be a separate hero "Total Impressions" card plus a
+// 2x2 stat-card grid (~350dp combined) into one compact card (~150dp):
+// impressions lead stat up top, a divider, then a tight 4-column stat row.
 @Composable
-fun TotalImpressionsCard(impressions: String, subtext: String) {
+fun OverallPerformanceCard(stats: np.com.bimalkafle.firebaseauthdemoapp.model.OverallAnalytics?, subtext: String) {
+    stats ?: return
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(themeColor_campaign)
+                .padding(14.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    "TOTAL IMPRESSIONS",
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        impressions,
-                        color = Color.White,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.weight(1f)
+                        "TOTAL IMPRESSIONS",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
                     )
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Visibility,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.padding(10.dp)
-                        )
-                    }
+                    Text(
+                        String.format("%,d", stats.impressions ?: 0),
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(subtext, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
                 }
-                Text(
-                    subtext,
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 12.sp
-                )
+                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Visibility,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.padding(9.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                MiniOverallStat(Icons.Default.PlayArrow, String.format("%,d", stats.views ?: 0), "Views")
+                MiniOverallStat(Icons.Default.AdsClick, String.format("%,d", stats.clicks ?: 0), "Clicks")
+                MiniOverallStat(Icons.Default.Favorite, String.format("%,d", stats.likes ?: 0), "Likes")
+                MiniOverallStat(Icons.Default.ChatBubble, String.format("%,d", stats.comments ?: 0), "Comments")
             }
         }
     }
 }
 
 @Composable
-fun OverallStatsGrid(collaboration: Collaboration) {
-    val stats = collaboration.overallAnalytics ?: return
-    
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatCard(Icons.Default.PlayArrow, Color(0xFF4285F4), String.format("%,d", stats.views ?: 0), "Views", Color(0xFF4285F4), Modifier.weight(1f))
-            StatCard(Icons.Default.AdsClick, Color(0xFF9E9E9E), String.format("%,d", stats.clicks ?: 0), "Clicks", Color(0xFF9E9E9E), Modifier.weight(1f))
+fun MiniOverallStat(icon: ImageVector, value: String, label: String) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(12.dp))
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
-        
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatCard(Icons.Default.Favorite, Color(0xFFFF5252), String.format("%,d", stats.likes ?: 0), "Likes", Color(0xFFFF5252), Modifier.weight(1f))
-            StatCard(Icons.Default.ChatBubble, Color(0xFFFFD740), String.format("%,d", stats.comments ?: 0), "Comments", Color(0xFFFFD740), Modifier.weight(1f))
-        }
+        Text(label, color = Color.White.copy(alpha = 0.65f), fontSize = 9.sp)
     }
 }
 
@@ -992,11 +1059,11 @@ fun EngagementBreakdownCard(likes: Int, comments: Int, shares: Int, saves: Int, 
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(1.dp)
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(12.dp))
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(title, color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
             val total = (likes + comments + shares + saves).toFloat()
             EngagementBarItem("Likes", likes, total, Color(0xFFFF5252), Icons.Default.Favorite)
             EngagementBarItem("Comments", comments, total, Color(0xFFFFD740), Icons.Default.ChatBubble)
@@ -1017,8 +1084,8 @@ fun EngagementBarItem(label: String, value: Int, total: Float, color: Color, ico
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(label, color = textGray, fontSize = 12.sp)
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(5.dp))
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
             }
             Text(String.format("%,d", value), fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
@@ -1033,35 +1100,19 @@ fun EngagementBarItem(label: String, value: Int, total: Float, color: Color, ico
 }
 
 @Composable
-fun StatCard(icon: ImageVector, iconColor: Color, value: String, label: String, topAccentColor: Color, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier.height(65.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(1.dp)
-    ) {
-        Column(modifier = Modifier.padding(8.dp).fillMaxSize(), verticalArrangement = Arrangement.Center) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(value, fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color.Black)
-            }
-            Text(label.uppercase(), fontSize = 9.sp, color = textGray, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
 fun CampaignDurationCard(duration: String) {
     Card(
-        modifier = Modifier.fillMaxWidth().height(80.dp),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = themeColor_campaign)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.Center) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
             Text("CAMPAIGN DURATION", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text("$duration days", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+            Text("$duration days", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
         }
     }
 }
@@ -1074,46 +1125,46 @@ fun PlatformMetricCard(analytics: CollaborationAnalytics, expandedDefault: Boole
         modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(1.dp)
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Surface(modifier = Modifier.size(32.dp), shape = RoundedCornerShape(8.dp), color = Color.Transparent) {
+                Surface(modifier = Modifier.size(32.dp), shape = RoundedCornerShape(10.dp), color = Color.Transparent) {
                     val platformType = analytics.platform?.lowercase()
                     if (platformType == "instagram") {
-                        Image(painter = painterResource(id = R.drawable.instagram_logo), contentDescription = null, modifier = Modifier.padding(4.dp))
+                        Image(painter = painterResource(id = R.drawable.instagram_logo), contentDescription = null, modifier = Modifier.padding(6.dp))
                     } else if (platformType == "youtube") {
-                        Image(painter = painterResource(id = R.drawable.youtube_logo), contentDescription = null, modifier = Modifier.padding(4.dp))
+                        Image(painter = painterResource(id = R.drawable.youtube_logo), contentDescription = null, modifier = Modifier.padding(6.dp))
                     } else {
-                        Icon(imageVector = getPlatformIcon(analytics.platform), contentDescription = null, tint = themeColor_campaign, modifier = Modifier.padding(4.dp))
+                        Icon(imageVector = getPlatformIcon(analytics.platform), contentDescription = null, tint = themeColor_campaign, modifier = Modifier.padding(6.dp))
                     }
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = analytics.platform?.uppercase() ?: "UNKNOWN", fontWeight = FontWeight.Black, fontSize = 15.sp, color = Color.Black)
+                    Text(text = analytics.platform?.uppercase() ?: "UNKNOWN", fontWeight = FontWeight.Black, fontSize = 14.sp, color = Color.Black)
                     Text(text = "${String.format("%,d", analytics.impressions ?: 0)} impressions", fontSize = 11.sp, color = textGray)
                 }
                 Surface(color = Color(0xFFFFF4F4), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFDEDE))) {
-                    Text(text = "₹${analytics.cost ?: 0f}", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB35A5A))
+                    Text(text = "₹${analytics.cost ?: 0f}", modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB35A5A))
                 }
-                Icon(imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null, tint = textGray, modifier = Modifier.size(20.dp))
+                Icon(imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null, tint = textGray, modifier = Modifier.padding(start = 6.dp).size(18.dp))
             }
 
             AnimatedVisibility(visible = expanded) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.2f))
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
+                Column(modifier = Modifier.padding(top = 10.dp)) {
+                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     PlatformStatsDetails(analytics)
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     EngagementBreakdownCard(
                         likes = analytics.likes ?: 0,
                         comments = analytics.comments ?: 0,
                         shares = analytics.shares ?: 0,
                         saves = analytics.saves ?: 0,
-                        title = "Engagement"
+                        title = "Platform Engagement"
                     )
                 }
             }
@@ -1123,28 +1174,33 @@ fun PlatformMetricCard(analytics: CollaborationAnalytics, expandedDefault: Boole
 
 @Composable
 fun PlatformStatsDetails(analytics: CollaborationAnalytics) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            MiniStatCard("Views", String.format("%,d", analytics.views ?: 0), Icons.Default.PlayArrow, Color(0xFF4285F4), Modifier.weight(1f))
-            MiniStatCard("Clicks", String.format("%,d", analytics.clicks ?: 0), Icons.Default.AdsClick, Color(0xFF9E9E9E), Modifier.weight(1f))
-        }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        MiniStatCard("Views", String.format("%,d", analytics.views ?: 0), Icons.Default.PlayArrow, Color(0xFF4285F4), Modifier.weight(1f))
+        MiniStatCard("Clicks", String.format("%,d", analytics.clicks ?: 0), Icons.Default.AdsClick, Color(0xFF9E9E9E), Modifier.weight(1f))
     }
 }
 
 @Composable
 fun MiniStatCard(label: String, value: String, icon: ImageVector, iconColor: Color, modifier: Modifier = Modifier) {
-    Column(
+    Row(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(Color(0xFFF8F9FE))
-            .padding(8.dp)
+            .padding(9.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(12.dp))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(value, color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Black)
+        Surface(
+            shape = RoundedCornerShape(7.dp),
+            color = iconColor.copy(alpha = 0.1f),
+            modifier = Modifier.size(24.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.padding(5.dp))
         }
-        Text(label, color = textGray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
+            Text(label, color = textGray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Text(value, color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Black)
+        }
     }
 }
 
@@ -1157,11 +1213,17 @@ fun getPlatformIcon(platform: String?): ImageVector {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Campaign Target Tracking — brand-only. Shown independent of the COMPLETED-
+// gated analytics sections above, since brands should be able to set and
+// monitor targets throughout the live collaboration, not just afterwards.
+// ---------------------------------------------------------------------------
+
 @Composable
 fun BrandTargetsSection(collaboration: Collaboration, onSetTargets: () -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         SectionTitle("CAMPAIGN TARGETS")
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         val targets = collaboration.performanceTargets
         val tracking = collaboration.performanceTracking
@@ -1169,23 +1231,23 @@ fun BrandTargetsSection(collaboration: Collaboration, onSetTargets: () -> Unit) 
         if (targets == null) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(1.dp)
+                elevation = CardDefaults.cardElevation(2.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    modifier = Modifier.padding(18.dp).fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Icon(
                         Icons.Default.GpsFixed,
                         contentDescription = null,
-                        tint = themeColor_campaign.copy(alpha = 0.4f),
-                        modifier = Modifier.size(32.dp)
+                        tint = themeColor_campaign.copy(alpha = 0.5f),
+                        modifier = Modifier.size(30.dp)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        "No targets set",
+                        "No targets set for this collaboration yet",
                         color = textGray,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center
@@ -1193,31 +1255,29 @@ fun BrandTargetsSection(collaboration: Collaboration, onSetTargets: () -> Unit) 
                     Spacer(modifier = Modifier.height(10.dp))
                     Button(
                         onClick = onSetTargets,
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColor_campaign),
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColor_campaign)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Set", fontSize = 12.sp)
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text("Set Targets", fontSize = 13.sp)
                     }
                 }
             }
         } else {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onSetTargets, modifier = Modifier.height(28.dp), contentPadding = PaddingValues(0.dp)) {
-                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp), tint = themeColor_campaign)
+                TextButton(onClick = onSetTargets) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(13.dp), tint = themeColor_campaign)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Edit", color = themeColor_campaign, fontSize = 12.sp)
+                    Text("Edit Targets", color = themeColor_campaign, fontSize = 12.sp)
                 }
             }
 
             if (tracking != null) {
                 PerformanceScoreCard(tracking)
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 TargetAchievementCard(tracking)
                 if (tracking.history.size >= 2) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     PerformanceTrendCard(tracking.history)
                 }
             }
@@ -1238,14 +1298,14 @@ fun PerformanceScoreCard(tracking: PerformanceTracking) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(outcomeColor)
-                .padding(16.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -1257,23 +1317,26 @@ fun PerformanceScoreCard(tracking: PerformanceTracking) {
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    score?.let { "${it.toInt()}/100" } ?: "—",
-                    color = Color.White,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Black
-                )
-                if (tracking.campaignOutcome != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        tracking.campaignOutcome.replace("_", " "),
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
+                        score?.let { "${it.toInt()}/100" } ?: "—",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black
                     )
+                    if (tracking.campaignOutcome != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            tracking.campaignOutcome.replace("_", " "),
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
             tracking.overallAchievedPercent?.let { pct ->
-                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(48.dp)) {
+                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(42.dp)) {
                     Box(contentAlignment = Alignment.Center) {
                         Text("${pct.toInt()}%", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
@@ -1287,17 +1350,17 @@ fun PerformanceScoreCard(tracking: PerformanceTracking) {
 fun TargetAchievementCard(tracking: PerformanceTracking) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(1.dp)
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Target vs Actual", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(12.dp))
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text("Target vs Actual", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(10.dp))
             tracking.achievements.forEachIndexed { index, achievement ->
                 AchievementRow(achievement)
                 if (index != tracking.achievements.lastIndex) {
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
@@ -1322,7 +1385,7 @@ fun AchievementRow(achievement: PerformanceAchievement) {
         ) {
             Text(label, color = textGray, fontSize = 12.sp)
             if (!achievement.tracked) {
-                Text("N/A", color = Color.LightGray, fontSize = 11.sp)
+                Text("Not tracked yet", color = Color.LightGray, fontSize = 11.sp, fontStyle = FontStyle.Italic)
             } else {
                 Text(
                     "${formatMetricValue(achievement.actual)} / ${formatMetricValue(achievement.target)}",
@@ -1339,6 +1402,13 @@ fun AchievementRow(achievement: PerformanceAchievement) {
                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
                 color = statusColor,
                 trackColor = statusColor.copy(alpha = 0.15f)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                "${achievement.achievedPercent.toInt()}% achieved",
+                color = statusColor,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
@@ -1358,20 +1428,20 @@ private fun formatTargetForInput(value: Double?): String {
 fun PerformanceTrendCard(history: List<PerformanceSnapshot>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(1.dp)
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Trend", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(12.dp))
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text("Performance Score Trend", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(10.dp))
 
             val points = history.mapIndexedNotNull { index, snapshot ->
                 snapshot.performanceScore?.let { Point(index.toFloat(), it.toFloat()) }
             }
 
             if (points.size >= 2) {
-                Box(modifier = Modifier.height(100.dp).fillMaxWidth()) {
+                Box(modifier = Modifier.height(90.dp).fillMaxWidth()) {
                     LineChart(
                         modifier = Modifier.fillMaxSize(),
                         data = points,
@@ -1380,7 +1450,7 @@ fun PerformanceTrendCard(history: List<PerformanceSnapshot>) {
                     )
                 }
             } else {
-                Text("Not enough history", color = textGray, fontSize = 12.sp)
+                Text("Not enough history yet to show a trend", color = textGray, fontSize = 12.sp)
             }
         }
     }
@@ -1406,12 +1476,18 @@ fun SetTargetsDialog(
 
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
-        title = { Text("Set Targets", fontWeight = FontWeight.Bold) },
+        title = { Text("Set Performance Targets", fontWeight = FontWeight.Bold) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "Visible only to you — never shown to the influencer.",
+                    color = textGray,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
                 TargetField("Target Views", views) { views = it }
                 TargetField("Target Reach", reach) { reach = it }
-                TargetField("Engagement Rate (%)", engagementRate) { engagementRate = it }
+                TargetField("Target Engagement Rate (%)", engagementRate) { engagementRate = it }
                 TargetField("Target Likes", likes) { likes = it }
                 TargetField("Target Comments", comments) { comments = it }
                 TargetField("Target Shares", shares) { shares = it }
@@ -1428,7 +1504,7 @@ fun SetTargetsDialog(
                 onClick = {
                     val fields = listOf(views, reach, engagementRate, likes, comments, shares, saves)
                     if (fields.all { it.isBlank() }) {
-                        error = "Set one target"
+                        error = "Set at least one target"
                         return@Button
                     }
                     error = null
@@ -1437,7 +1513,7 @@ fun SetTargetsDialog(
                         val token = tokenResult.token
                         if (token == null) {
                             saving = false
-                            error = "Auth failed"
+                            error = "Could not authenticate. Please try again."
                             return@addOnSuccessListener
                         }
                         scope.launch {
@@ -1453,14 +1529,21 @@ fun SetTargetsDialog(
                                 token = token
                             )
                             saving = false
-                            if (result.isSuccess) onDismiss() else error = "Save failed"
+                            if (result.isSuccess) {
+                                onDismiss()
+                            } else {
+                                error = "Failed to save targets. Please try again."
+                            }
                         }
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = themeColor_campaign)
             ) {
-                if (saving) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
-                else Text("Save")
+                if (saving) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("Save")
+                }
             }
         },
         dismissButton = {
@@ -1474,11 +1557,10 @@ fun TargetField(label: String, value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = { new -> if (new.isEmpty() || new.matches(Regex("^\\d*\\.?\\d*$"))) onValueChange(new) },
-        label = { Text(label, fontSize = 12.sp) },
+        label = { Text(label, fontSize = 13.sp) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-        singleLine = true,
-        shape = RoundedCornerShape(8.dp)
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        singleLine = true
     )
 }
 
@@ -1492,9 +1574,10 @@ fun ContentTypeBadge(label: String, color: Color) {
         Text(
             text = label.uppercase(),
             color = color,
-            fontSize = 8.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+            letterSpacing = 0.5.sp,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
         )
     }
 }
@@ -1503,14 +1586,14 @@ fun ContentTypeBadge(label: String, color: Color) {
 fun HashtagChip(tag: String, color: Color) {
     Surface(
         color = color.copy(alpha = 0.08f),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Text(
             text = tag,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             color = color,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
         )
     }
 }
@@ -1519,22 +1602,23 @@ fun HashtagChip(tag: String, color: Color) {
 fun PerformanceTimelineCard(milestones: List<PerformanceMilestone>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(1.dp)
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text("Growth", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
-            Spacer(modifier = Modifier.height(12.dp))
+            Text("Growth over time", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.Black)
+            Spacer(modifier = Modifier.height(10.dp))
 
             milestones.forEachIndexed { idx, m ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Top
                 ) {
+                    // Timeline spine
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.width(24.dp)
+                        modifier = Modifier.width(26.dp)
                     ) {
                         Surface(
                             shape = CircleShape,
@@ -1544,8 +1628,8 @@ fun PerformanceTimelineCard(milestones: List<PerformanceMilestone>) {
                         if (idx < milestones.lastIndex) {
                             Box(
                                 modifier = Modifier
-                                    .width(1.dp)
-                                    .height(40.dp)
+                                    .width(2.dp)
+                                    .height(32.dp)
                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                             )
                         }
@@ -1555,14 +1639,34 @@ fun PerformanceTimelineCard(milestones: List<PerformanceMilestone>) {
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            m.label.ifBlank { "${m.hoursAfterPost}h post" },
+                            m.label.ifBlank { "${m.hoursAfterPost}h after post" },
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 12.sp,
                             color = Color.Black
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            if (m.views != null) Text("${formatCount(m.views.toString())} views", fontSize = 10.sp, color = Color(0xFF4285F4))
-                            if (m.likes != null) Text("${formatCount(m.likes.toString())} likes", fontSize = 10.sp, color = Color(0xFFFF5252))
+                            if (m.views != null) {
+                                Text(
+                                    "${String.format("%,d", m.views)} views",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF4285F4)
+                                )
+                            }
+                            if (m.likes != null) {
+                                Text(
+                                    "${String.format("%,d", m.likes)} likes",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFFFF5252)
+                                )
+                            }
+                            if (m.comments != null) {
+                                Text(
+                                    "${String.format("%,d", m.comments)} comments",
+                                    fontSize = 10.sp,
+                                    color = textGray
+                                )
+                            }
                         }
                         if (!m.capturedAt.isNullOrBlank()) {
                             Text(
@@ -1571,7 +1675,7 @@ fun PerformanceTimelineCard(milestones: List<PerformanceMilestone>) {
                                 color = textGray
                             )
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
             }

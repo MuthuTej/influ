@@ -1,7 +1,10 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,6 +37,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
@@ -52,23 +58,49 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
     val context = LocalContext.current
     val prefsManager = PrefsManager(context)
 
+    // Google Sign In configuration
+    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        .requestIdToken(context.getString(R.string.default_web_client_id))
+        .requestEmail()
+        .build()
+    val googleSignInClient = GoogleSignIn.getClient(context, gso)
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            account.idToken?.let { authViewModel.signInWithGoogle(it) }
+        } catch (e: ApiException) {
+            Toast.makeText(context, "Google sign in failed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     LaunchedEffect(authState.value) {
         when (val state = authState.value) {
             is AuthState.Authenticated -> {
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
                 if (uid != null) {
-                    if (prefsManager.isProfileCompleted(uid)) {
-                        val route = if (state.role.equals("BRAND", ignoreCase = true)) "brand_home" else "influencer_home"
+                    val isBrand = state.role.equals("BRAND", ignoreCase = true)
+                    if (state.isProfileCompleted) {
+                        prefsManager.saveProfileCompleted(uid, true)
+                        val route = if (isBrand) "brand_home" else "influencer_home"
                         navController.navigate(route) {
+                            popUpTo("login") { inclusive = true }
                             popUpTo("signup") { inclusive = true }
                         }
                     } else {
-                        val route = if (state.role.equals("BRAND", ignoreCase = true)) "brand_registration" else "influencer_registration"
+                        // User exists but profile is incomplete - Go to registration
+                        val route = if (isBrand) "brand_registration" else "influencer_registration"
                         navController.navigate(route) {
+                            popUpTo("login") { inclusive = true }
                             popUpTo("signup") { inclusive = true }
                         }
                     }
                 }
+            }
+            is AuthState.GoogleNewUser -> {
+                email = state.email
+                // Do NOT auto-fill name from Google, user must fill it manually
             }
             is AuthState.Error -> {
                 Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
@@ -111,8 +143,38 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
             role = role,
             onRoleChange = { role = it },
             authState = authState.value,
-            onSignupClick = { authViewModel.signup(email, password, confirmPassword, name, role) },
-            onLoginClick = { navController.navigate("login") },
+            onSignupClick = { 
+                if (name.isBlank()) {
+                    Toast.makeText(context, "${if (role == "BRAND") "Brand Name" else "Name"} is mandatory", Toast.LENGTH_SHORT).show()
+                    return@SignupPageContent
+                }
+                if (authState.value is AuthState.GoogleNewUser) {
+                    authViewModel.completeBackendSignup(name, role)
+                } else {
+                    if (email.isBlank() || password.isBlank()) {
+                        Toast.makeText(context, "Email and password are required", Toast.LENGTH_SHORT).show()
+                        return@SignupPageContent
+                    }
+                    authViewModel.signup(email, password, confirmPassword, name, role)
+                }
+            },
+            onGoogleSignupClick = {
+                if (name.isBlank()) {
+                    Toast.makeText(context, "Please enter ${if (role == "BRAND") "Brand Name" else "Name"} first", Toast.LENGTH_SHORT).show()
+                } else {
+                    // Force account picker
+                    googleSignInClient.signOut().addOnCompleteListener {
+                        launcher.launch(googleSignInClient.signInIntent)
+                    }
+                }
+            },
+            onLoginClick = { 
+                if (!navController.popBackStack("login", inclusive = false)) {
+                    navController.navigate("login") {
+                        popUpTo("signup") { inclusive = true }
+                    }
+                }
+            },
             headerTopPadding = topPadding
         )
     }
@@ -134,14 +196,17 @@ fun SignupPageContent(
     onRoleChange: (String) -> Unit,
     authState: AuthState?,
     onSignupClick: () -> Unit,
+    onGoogleSignupClick: () -> Unit,
     onLoginClick: () -> Unit,
     headerTopPadding: Dp
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     val roles = listOf("BRAND", "INFLUENCER")
+    val isGoogleUser = authState is AuthState.GoogleNewUser
 
     val themeColor = MaterialTheme.colorScheme.primary
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -202,61 +267,67 @@ fun SignupPageContent(
                 value = name,
                 onValueChange = onNameChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Name") },
+                label = { Text(if (role == "BRAND") "Brand Name *" else "Name *") },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColor)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            if (!isGoogleUser) {
+                Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = email,
-                onValueChange = onEmailChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Email") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
-            )
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = onEmailChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Email") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColor)
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = password,
-                onValueChange = onPasswordChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Password") },
-                singleLine = true,
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                            contentDescription = if (passwordVisible) "Hide password" else "Show password"
-                        )
-                    }
-                },
-                shape = RoundedCornerShape(12.dp)
-            )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = onPasswordChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Password") },
+                    singleLine = true,
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColor)
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = onConfirmPasswordChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Confirm Password") },
-                singleLine = true,
-                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                        Icon(
-                            imageVector = if (confirmPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                            contentDescription = if (confirmPasswordVisible) "Hide password" else "Show password"
-                        )
-                    }
-                },
-                shape = RoundedCornerShape(12.dp)
-            )
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = onConfirmPasswordChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Confirm Password") },
+                    singleLine = true,
+                    visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                            Icon(
+                                imageVector = if (confirmPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                contentDescription = if (confirmPasswordVisible) "Hide password" else "Show password"
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColor)
+                )
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -273,11 +344,40 @@ fun SignupPageContent(
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
                     Text(
-                        text = "Create Account",
+                        text = if (isGoogleUser) "Complete Account" else "Create Account",
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
+            }
+
+            if (!isGoogleUser) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Google Signup Button
+                OutlinedButton(
+                    onClick = onGoogleSignupClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color.LightGray)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.google_logo),
+                            contentDescription = "Google Logo",
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Continue with Google",
+                            color = Color.Black,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 
@@ -298,6 +398,8 @@ fun SignupPageContent(
                 fontSize = 14.sp,
                 modifier = Modifier.clickable { onLoginClick() }
             )
+            
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
@@ -318,6 +420,7 @@ fun SignupPagePreview() {
         onRoleChange = {},
         authState = null,
         onSignupClick = {},
+        onGoogleSignupClick = {},
         onLoginClick = {},
         headerTopPadding = 100.dp
     )

@@ -96,7 +96,10 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                                 result.onSuccess {
                                     Log.d("FCM", "FCM Token updated successfully")
                                 }.onFailure {
-                                    Log.e("FCM", "Failed to update FCM Token", it)
+                                    // Silence NOT_FOUND error as it means user is not yet in the DB
+                                    if (it.message?.contains("NOT_FOUND", ignoreCase = true) == false) {
+                                        Log.e("FCM", "Failed to update FCM Token", it)
+                                    }
                                 }
                             }
                         }

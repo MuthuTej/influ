@@ -456,23 +456,6 @@ fun CampaignCardSearch(
                             fontSize = 12.sp,
                             color = Color.Gray
                         )
-                        val rating = campaign.brand?.averageRating
-                        if (rating != null && rating > 0.0) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = Color(0xFFFFC107),
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(
-                                text = String.format("%.1f", rating),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.DarkGray
-                            )
-                        }
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))

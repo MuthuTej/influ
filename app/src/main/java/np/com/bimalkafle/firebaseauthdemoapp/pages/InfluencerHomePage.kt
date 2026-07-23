@@ -692,14 +692,6 @@ fun CampaignCardInfluencer(
                     }
                 }
 
-                // Rating + Wishlist grouped together
-                val rating = campaign.brand?.averageRating
-                if (rating != null && rating > 0) {
-                    Icon(Icons.Default.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(13.dp))
-                    Spacer(Modifier.width(2.dp))
-                    Text("${"%.1f".format(rating)}", fontSize = 12.sp, color = Color(0xFFF59E0B), fontWeight = FontWeight.SemiBold)
-                }
-
                 IconButton(onClick = onWishlistToggle, modifier = Modifier.size(36.dp)) {
                     Icon(
                         if (isWishlisted) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,

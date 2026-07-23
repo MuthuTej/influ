@@ -1,9 +1,18 @@
 package np.com.bimalkafle.firebaseauthdemoapp.ui.chat
 
+import android.Manifest
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
+import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -22,14 +31,18 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import np.com.bimalkafle.firebaseauthdemoapp.network.ChatEntity
@@ -42,37 +55,106 @@ import java.util.*
 
 private val BOLD_MARKDOWN_REGEX = Regex("\\*\\*(.+?)\\*\\*")
 private val BULLET_LINE_REGEX = Regex("^\\s*[*-]\\s+(.*)$")
+private const val ENTITY_ANNOTATION_TAG = "entity"
+
+private data class TextRange(val start: Int, val end: Int)
 
 // The AI's replies are Gemini-generated markdown (**bold**, "* " bullet
 // lists) but the chat bubble was rendering that raw — so users saw literal
 // asterisks instead of formatting. This is a small, dependency-free
 // markdown-lite renderer covering just the two constructs Gemini actually
-// produces here, not a general markdown parser.
-private fun formatChatMarkdown(raw: String): AnnotatedString = buildAnnotatedString {
-    val lines = raw.split("\n")
-    lines.forEachIndexed { index, line ->
-        val bulletMatch = BULLET_LINE_REGEX.find(line)
-        val content = if (bulletMatch != null) {
-            append("•  ")
-            bulletMatch.groupValues[1]
-        } else {
-            line
+// produces here, not a general markdown parser. It also turns any mention of
+// a suggested entity's name (influencer, campaign, collaboration) into a tap
+// target, so results link out from their own name in the reply instead of a
+// separate redirect chip below the message.
+private fun formatChatMarkdown(raw: String, entities: List<ChatEntity>, linkColor: Color): AnnotatedString =
+    buildAnnotatedString {
+        val lines = raw.split("\n")
+        lines.forEachIndexed { index, line ->
+            val bulletMatch = BULLET_LINE_REGEX.find(line)
+            val content = if (bulletMatch != null) {
+                append("•  ")
+                bulletMatch.groupValues[1]
+            } else {
+                line
+            }
+            appendWithBoldAndEntitySpans(content, entities, linkColor)
+            if (index != lines.lastIndex) append("\n")
         }
-        appendWithBoldSpans(content)
-        if (index != lines.lastIndex) append("\n")
     }
-}
 
-private fun AnnotatedString.Builder.appendWithBoldSpans(text: String) {
+private fun AnnotatedString.Builder.appendWithBoldAndEntitySpans(
+    text: String,
+    entities: List<ChatEntity>,
+    linkColor: Color
+) {
+    // Strip **bold** markers first, remembering the bold ranges in the
+    // resulting plain text so entity-name matching runs against clean text.
+    val clean = StringBuilder()
+    val boldRanges = mutableListOf<TextRange>()
     var lastIndex = 0
     for (match in BOLD_MARKDOWN_REGEX.findAll(text)) {
-        append(text.substring(lastIndex, match.range.first))
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-            append(match.groupValues[1])
-        }
+        clean.append(text, lastIndex, match.range.first)
+        val start = clean.length
+        clean.append(match.groupValues[1])
+        boldRanges.add(TextRange(start, clean.length))
         lastIndex = match.range.last + 1
     }
-    append(text.substring(lastIndex))
+    clean.append(text, lastIndex, text.length)
+    val plain = clean.toString()
+
+    // Locate where each suggested entity is mentioned in this line so it can
+    // become a tap target. The model isn't consistent about whether it names
+    // an influencer by display name or @handle, so every known alias is
+    // tried IN PRIORITY ORDER — the backend puts the display name before the
+    // @handle, so the name wins whenever both happen to appear; a raw
+    // Firestore ID is never a candidate at all (aliases only ever holds
+    // human-readable name/handle/title values), so a link can never anchor
+    // on an ID. The first candidate actually found in the text wins (first
+    // non-overlapping mention only).
+    data class EntityMention(val range: TextRange, val entityIndex: Int)
+    val mentions = mutableListOf<EntityMention>()
+    entities.forEachIndexed { entityIndex, entity ->
+        val candidates = entity.aliases.filter { it.isNotBlank() }.distinct()
+        val match = candidates.firstNotNullOfOrNull { candidate ->
+            Regex(Regex.escape(candidate), RegexOption.IGNORE_CASE).find(plain)
+        } ?: return@forEachIndexed
+        val range = TextRange(match.range.first, match.range.last + 1)
+        if (mentions.none { it.range.start < range.end && range.start < it.range.end }) {
+            mentions.add(EntityMention(range, entityIndex))
+        }
+    }
+    mentions.sortBy { it.range.start }
+
+    fun appendPlainRange(from: Int, to: Int) {
+        var pos = from
+        boldRanges.filter { it.end > from && it.start < to }.sortedBy { it.start }.forEach { bold ->
+            val segStart = maxOf(bold.start, pos)
+            val segEnd = minOf(bold.end, to)
+            if (segStart > pos) append(plain.substring(pos, segStart))
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(plain.substring(segStart, segEnd)) }
+            pos = segEnd
+        }
+        if (pos < to) append(plain.substring(pos, to))
+    }
+
+    var cursor = 0
+    mentions.forEach { mention ->
+        appendPlainRange(cursor, mention.range.start)
+        pushStringAnnotation(tag = ENTITY_ANNOTATION_TAG, annotation = mention.entityIndex.toString())
+        withStyle(
+            SpanStyle(
+                fontWeight = FontWeight.Bold,
+                color = linkColor,
+                textDecoration = TextDecoration.Underline
+            )
+        ) {
+            append(plain.substring(mention.range.start, mention.range.end))
+        }
+        pop()
+        cursor = mention.range.end
+    }
+    appendPlainRange(cursor, plain.length)
 }
 
 private fun routeForEntity(entity: ChatEntity): String? = when (entity.type) {
@@ -371,7 +453,6 @@ private fun AiAvatar(brandColor: Color, size: Int = 32) {
 
 // ── Message bubble ──────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AiMessageBubble(
     message: AiChatMessage,
@@ -381,6 +462,9 @@ private fun AiMessageBubble(
     val isUser = message.isUser
     val time   = remember(message) {
         try { SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date()) } catch (e: Exception) { "" }
+    }
+    val annotatedText = remember(message, brandColor) {
+        if (isUser) AnnotatedString(message.text) else formatChatMarkdown(message.text, message.entities, brandColor)
     }
 
     Column(
@@ -413,12 +497,23 @@ private fun AiMessageBubble(
                 color = if (isUser) brandColor else Color.White,
                 shadowElevation = if (isUser) 0.dp else 2.dp
             ) {
-                Text(
-                    text  = if (isUser) AnnotatedString(message.text) else formatChatMarkdown(message.text),
-                    color = if (isUser) Color.White else Color(0xFF1C1C1E),
-                    fontSize   = 15.sp,
-                    lineHeight = 22.sp,
-                    modifier   = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                ClickableText(
+                    text  = annotatedText,
+                    style = TextStyle(
+                        color      = if (isUser) Color.White else Color(0xFF1C1C1E),
+                        fontSize   = 15.sp,
+                        lineHeight = 22.sp
+                    ),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    onClick  = { offset ->
+                        if (!isUser) {
+                            annotatedText.getStringAnnotations(ENTITY_ANNOTATION_TAG, offset, offset)
+                                .firstOrNull()
+                                ?.item?.toIntOrNull()
+                                ?.let { message.entities.getOrNull(it) }
+                                ?.let(onEntityClick)
+                        }
+                    }
                 )
             }
         }
@@ -433,31 +528,6 @@ private fun AiMessageBubble(
                 start = if (!isUser) (32 + 8).dp else 0.dp
             )
         )
-
-        // Entity chips (links to campaigns/influencers/collaborations)
-        if (message.entities.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp, if (isUser) Alignment.End else Alignment.Start),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                message.entities.forEach { entity ->
-                    AssistChip(
-                        onClick = { onEntityClick(entity) },
-                        label   = { Text(entity.label, fontSize = 12.sp, maxLines = 1) },
-                        trailingIcon = {
-                            Icon(Icons.Default.ChevronRight, null, modifier = Modifier.size(14.dp))
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor       = brandColor.copy(alpha = 0.1f),
-                            labelColor           = brandColor,
-                            trailingIconContentColor = brandColor
-                        ),
-                        border = null
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -524,6 +594,47 @@ private fun AiInputBar(
     onSend: (String) -> Unit
 ) {
     var text by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spoken = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+            if (!spoken.isNullOrBlank()) text = spoken
+        }
+    }
+
+    fun launchVoiceSearch() {
+        val intent = android.content.Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Ask anything…")
+        }
+        try {
+            speechLauncher.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, "Speech recognition isn't available on this device", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchVoiceSearch()
+        } else {
+            Toast.makeText(context, "Microphone permission is needed for voice search", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun onMicClick() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) launchVoiceSearch() else micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    }
 
     Surface(
         shadowElevation = 12.dp,
@@ -570,16 +681,31 @@ private fun AiInputBar(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(if (canSend) brandColor else Color(0xFFE0E0E0), CircleShape)
-                    .then(if (canSend) Modifier.clickable { onSend(text); text = "" } else Modifier),
+                    .background(if (canSend) brandColor else Color(0xFFF2F2F7), CircleShape)
+                    .then(
+                        when {
+                            canSend -> Modifier.clickable { onSend(text); text = "" }
+                            enabled -> Modifier.clickable { onMicClick() }
+                            else    -> Modifier
+                        }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    "Send",
-                    tint     = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
+                if (canSend) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        "Send",
+                        tint     = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Mic,
+                        "Voice search",
+                        tint     = brandColor.copy(alpha = if (enabled) 1f else 0.4f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
