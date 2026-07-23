@@ -577,10 +577,84 @@ fun TextInputDialog(
         },
         confirmButton = {
             Button(
-                onClick = { 
-                    if (text.isNotBlank()) onSend(text) 
+                onClick = {
+                    if (text.isNotBlank()) onSend(text)
                 },
                 enabled = text.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text("Send")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+/** Hosting collaborations only — the brand shares venue, timing, and a full
+ * event description together as one submission (see CollaborationTimeline's
+ * "Event Details" step), instead of the influencer submitting three separate
+ * steps. */
+@Composable
+fun EventDetailsDialog(
+    onDismiss: () -> Unit,
+    onSend: (venue: String, time: String, details: String) -> Unit
+) {
+    var venue by remember { mutableStateOf("") }
+    var time by remember { mutableStateOf("") }
+    var details by remember { mutableStateOf("") }
+    val isValid = venue.isNotBlank() && time.isNotBlank() && details.isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Share Event Details") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                TextField(
+                    value = venue,
+                    onValueChange = { venue = it },
+                    label = { Text("Venue / Address") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+                Spacer(Modifier.height(12.dp))
+                TextField(
+                    value = time,
+                    onValueChange = { time = it },
+                    label = { Text("Event Date & Time") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+                Spacer(Modifier.height(12.dp))
+                TextField(
+                    value = details,
+                    onValueChange = { details = it },
+                    label = { Text("Event Description") },
+                    minLines = 3,
+                    maxLines = 5,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (isValid) onSend(venue, time, details) },
+                enabled = isValid,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Text("Send")

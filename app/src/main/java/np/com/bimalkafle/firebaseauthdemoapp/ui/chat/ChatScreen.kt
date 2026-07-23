@@ -49,9 +49,10 @@ private val TlGray = Color(0xFFBDBDBD)
 
 // Content collaborations (Instagram/YouTube/Facebook deliverables) walk
 // Brief -> Script -> Payment -> Content Upload. Hosting collaborations (a
-// "HOSTING" pricing entry) branch off after BRIEF_FINALIZED into their own
-// Venue/Time/Event sequence and rejoin at WAITING_FOR_PAYMENT — see
-// isHosting in CollaborationTimeline below.
+// "HOSTING" pricing entry) branch off after BRIEF_FINALIZED: the brand shares
+// venue/time/event details in one go (EVENT_SENT) and the influencer
+// approves, then both rejoin at WAITING_FOR_PAYMENT — see isHosting in
+// CollaborationTimeline below.
 private val CONTENT_STATUS_ORDER = listOf(
     "PENDING", "NEGOTIATION", "ACCEPTED",
     "BRIEF_SENT", "BRIEF_FINALIZED",
@@ -62,7 +63,7 @@ private val CONTENT_STATUS_ORDER = listOf(
 private val HOSTING_STATUS_ORDER = listOf(
     "PENDING", "NEGOTIATION", "ACCEPTED",
     "BRIEF_SENT", "BRIEF_FINALIZED",
-    "VENUE_SENT", "TIME_SENT", "EVENT_SENT",
+    "EVENT_SENT",
     "WAITING_FOR_PAYMENT", "IN_PROGRESS", "COMPLETED"
 )
 
@@ -157,12 +158,12 @@ fun ChatScreen(
     }
 
     // When the other party sends a brief or script the collaboration-status WebSocket fires first.
-    // Re-fetch messages so the BRIEF/SCRIPT/VENUE/TIME/EVENT message is guaranteed to be in
-    // the list even if the chat-message WebSocket missed it. A short delay lets any concurrent
+    // Re-fetch messages so the BRIEF/SCRIPT/EVENT message is guaranteed to be in the list
+    // even if the chat-message WebSocket missed it. A short delay lets any concurrent
     // Firestore write propagate before we query.
     LaunchedEffect(currentCollaboration?.status) {
         val s = currentCollaboration?.status
-        if (s == "BRIEF_SENT" || s == "SCRIPT_SENT" || s == "VENUE_SENT" || s == "TIME_SENT" || s == "EVENT_SENT") {
+        if (s == "BRIEF_SENT" || s == "SCRIPT_SENT" || s == "EVENT_SENT") {
             kotlinx.coroutines.delay(500)
             viewModel.refreshMessages()
         }
@@ -477,9 +478,7 @@ private fun CampaignStatusBanner(collaboration: Collaboration) {
         "BRIEF_SENT" -> "Brief Sent"
         "BRIEF_FINALIZED" -> "Brief Approved"
         "SCRIPT_SENT" -> "Script Under Review"
-        "VENUE_SENT" -> "Venue Shared"
-        "TIME_SENT" -> "Timing Shared"
-        "EVENT_SENT" -> "Event Details Under Review"
+        "EVENT_SENT" -> "Event Details Shared"
         "WAITING_FOR_PAYMENT" -> "Awaiting Payment"
         "IN_PROGRESS" -> "In Progress"
         "COMPLETED" -> "Completed"
@@ -633,9 +632,8 @@ fun CollaborationTimeline(
     }
     val negotiationMessages = remember(messages) { messages.filter { it.type == "NEGOTIATION" }.sortedBy { it.timestamp } }
 
-    // Hosting-only messages, same lastOrNull convention as scriptMessage above.
-    val venueMessage = remember(messages) { messages.lastOrNull { it.type == "VENUE" } }
-    val timeMessage = remember(messages) { messages.lastOrNull { it.type == "TIME" } }
+    // Hosting-only message: venue/time/event are all sent together as one
+    // message (the brand fills one form), so there's a single EVENT type.
     val eventMessage = remember(messages) { messages.lastOrNull { it.type == "EVENT" } }
     val eventRejectionMessage = remember(messages) { messages.lastOrNull { it.type == "EVENT_REJECTED" } }
 
@@ -646,8 +644,6 @@ fun CollaborationTimeline(
     var showNegotiationDialog by remember { mutableStateOf(false) }
     var showUploadDialog by remember { mutableStateOf(false) }
     var showRejectContentDialog by remember { mutableStateOf(false) }
-    var showVenueDialog by remember { mutableStateOf(false) }
-    var showTimeDialog by remember { mutableStateOf(false) }
     var showEventDialog by remember { mutableStateOf(false) }
     var showRejectEventDialog by remember { mutableStateOf(false) }
 
@@ -675,16 +671,10 @@ fun CollaborationTimeline(
         rejectionMessage != null &&
         (scriptMessage == null || rejectionMessage.timestamp > scriptMessage.timestamp)
 
-    // ── Hosting flow (Venue / Time / Event) — influencer fills these in
-    // sequence with no brand gate in between; only the final Event step
-    // needs the brand's Accept/Reject, mirroring Script Revision's shape. ──
-    val venueStepShown   = isHosting && statusIndex >= statusOrder.indexOf("BRIEF_FINALIZED")
-    val venueContentAvail = venueMessage != null || statusIndex >= statusOrder.indexOf("VENUE_SENT")
-    val venueDone         = statusIndex >= statusOrder.indexOf("TIME_SENT")
-    val timeStepShown    = isHosting && statusIndex >= statusOrder.indexOf("VENUE_SENT")
-    val timeContentAvail  = timeMessage != null || statusIndex >= statusOrder.indexOf("TIME_SENT")
-    val timeDone          = statusIndex >= statusOrder.indexOf("EVENT_SENT")
-    val eventStepShown   = isHosting && statusIndex >= statusOrder.indexOf("TIME_SENT")
+    // ── Hosting flow (Event Details) — mirrors Script Revision but with
+    // roles swapped: the brand shares venue/time/event details in one
+    // submission, and the influencer approves or rejects it. ──
+    val eventStepShown   = isHosting && statusIndex >= statusOrder.indexOf("BRIEF_FINALIZED")
     val eventContentAvail = eventMessage != null || statusIndex >= statusOrder.indexOf("EVENT_SENT")
     val eventDone         = statusIndex >= statusOrder.indexOf("WAITING_FOR_PAYMENT")
     // Same shape as rejectionPendingResubmit above, but for the hosting flow's
@@ -1183,96 +1173,9 @@ fun CollaborationTimeline(
             }
         }
         } else {
-            // ── Venue Details ──────────────────────────────────────────
-            TimelineStepCard(
-                title = "Venue Details",
-                time = venueMessage?.timeFormatted ?: "",
-                isActive = venueStepShown && !venueDone,
-                isDone = venueDone,
-                isLocked = !venueStepShown,
-                isLast = false,
-                badge = null
-            ) {
-                if (venueContentAvail) {
-                    val venueContent = venueMessage?.metadata?.get("venue")?.toString() ?: venueMessage?.text ?: ""
-                    if (venueMessage == null) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = TlRed)
-                    } else if (venueContent.isNotBlank()) {
-                        Text(
-                            text = venueContent,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF333333)
-                        )
-                    }
-                } else if (venueStepShown && !isBrand) {
-                    Button(
-                        onClick = { showVenueDialog = true },
-                        enabled = !isActionLoading,
-                        colors = ButtonDefaults.buttonColors(containerColor = TlRed),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (isActionLoading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Share Venue", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                } else if (venueStepShown) {
-                    Text("Waiting for influencer to share the venue.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                } else {
-                    Text("Available after brief approval", style = MaterialTheme.typography.bodySmall, color = TlGray)
-                }
-            }
-
-            // ── Time Details ───────────────────────────────────────────
-            TimelineStepCard(
-                title = "Time Details",
-                time = timeMessage?.timeFormatted ?: "",
-                isActive = timeStepShown && !timeDone,
-                isDone = timeDone,
-                isLocked = !timeStepShown,
-                isLast = false,
-                badge = null
-            ) {
-                if (timeContentAvail) {
-                    val timeContent = timeMessage?.metadata?.get("time")?.toString() ?: timeMessage?.text ?: ""
-                    if (timeMessage == null) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = TlRed)
-                    } else if (timeContent.isNotBlank()) {
-                        Text(
-                            text = timeContent,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF333333)
-                        )
-                    }
-                } else if (timeStepShown && !isBrand) {
-                    Button(
-                        onClick = { showTimeDialog = true },
-                        enabled = !isActionLoading,
-                        colors = ButtonDefaults.buttonColors(containerColor = TlRed),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (isActionLoading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Share Timing", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                } else if (timeStepShown) {
-                    Text("Waiting for influencer to share the event timing.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                } else {
-                    Text("Available after venue details", style = MaterialTheme.typography.bodySmall, color = TlGray)
-                }
-            }
-
-            // ── Event Details ──────────────────────────────────────────
-            val canSubmitEvent = status == "TIME_SENT" && !isBrand
+            // ── Event Details — brand shares venue/time/event details in one
+            // submission, influencer approves or rejects it. ─────────────
+            val canSubmitEvent = status == "BRIEF_FINALIZED" && isBrand
             TimelineStepCard(
                 title = "Event Details",
                 time = (if (eventRejectionPendingResubmit) eventRejectionMessage else eventMessage)?.timeFormatted ?: "",
@@ -1300,7 +1203,7 @@ fun CollaborationTimeline(
                         )
                     }
                     Spacer(Modifier.height(14.dp))
-                    if (!isBrand) {
+                    if (isBrand) {
                         Button(
                             onClick = { showEventDialog = true },
                             enabled = !isActionLoading,
@@ -1317,31 +1220,36 @@ fun CollaborationTimeline(
                             }
                         }
                     } else {
-                        Text("Waiting for influencer to resubmit event details.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        Text("Waiting for brand to resubmit event details.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                     }
                 } else if (eventContentAvail) {
-                    val eventContent = eventMessage?.metadata?.get("details")?.toString() ?: eventMessage?.text ?: ""
                     if (eventMessage == null) {
+                        // Status is already EVENT_SENT but message hasn't arrived yet — refreshing
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = TlRed)
                     } else {
-                        Text(
-                            text = "Event details",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Gray,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        if (eventContent.isNotBlank()) {
-                            Text(
-                                text = eventContent,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF333333)
-                            )
+                        val venueContent = eventMessage.metadata.get("venue")?.toString() ?: ""
+                        val timeContent = eventMessage.metadata.get("time")?.toString() ?: ""
+                        val detailsContent = eventMessage.metadata.get("details")?.toString()?.ifBlank { null } ?: eventMessage.text
+                        if (venueContent.isNotBlank()) {
+                            Text("VENUE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
+                            Spacer(Modifier.height(4.dp))
+                            Text(venueContent, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF333333))
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        if (timeContent.isNotBlank()) {
+                            Text("DATE & TIME", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
+                            Spacer(Modifier.height(4.dp))
+                            Text(timeContent, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF333333))
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        if (detailsContent.isNotBlank()) {
+                            Text("EVENT DETAILS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
+                            Spacer(Modifier.height(4.dp))
+                            Text(detailsContent, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF333333))
                         }
                     }
-                    // Brand can accept or reject the event details
-                    if (status == "EVENT_SENT" && isBrand && eventMessage != null) {
+                    // Influencer can accept or reject the event details
+                    if (status == "EVENT_SENT" && !isBrand && eventMessage != null) {
                         Spacer(Modifier.height(14.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1388,13 +1296,13 @@ fun CollaborationTimeline(
                         } else {
                             Icon(Icons.Default.EditNote, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Submit Event Details", fontWeight = FontWeight.Bold)
+                            Text("Share Event Details", fontWeight = FontWeight.Bold)
                         }
                     }
                 } else if (eventStepShown) {
-                    Text("Waiting for influencer to submit event details.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text("Waiting for brand to share event details.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 } else {
-                    Text("Available after time details", style = MaterialTheme.typography.bodySmall, color = TlGray)
+                    Text("Available after brief approval", style = MaterialTheme.typography.bodySmall, color = TlGray)
                 }
             }
         }
@@ -1769,38 +1677,15 @@ fun CollaborationTimeline(
             }
         )
     }
-    if (showVenueDialog) {
-        TextInputDialog(
-            title = "Share Venue Details",
-            label = "Venue / Address",
-            onDismiss = { showVenueDialog = false },
-            onSend = { venue ->
-                onSend("Venue Details Shared", "VENUE", mapOf("venue" to venue))
-                onStatusUpdate("VENUE_SENT")
-                showVenueDialog = false
-            }
-        )
-    }
-    if (showTimeDialog) {
-        TextInputDialog(
-            title = "Share Event Timing",
-            label = "Event Date & Time",
-            onDismiss = { showTimeDialog = false },
-            onSend = { time ->
-                onSend("Event Timing Shared", "TIME", mapOf("time" to time))
-                onStatusUpdate("TIME_SENT")
-                showTimeDialog = false
-            }
-        )
-    }
     if (showEventDialog) {
-        TextInputDialog(
-            title = "Submit Event Details",
-            label = "Event Description",
-            multiline = true,
+        EventDetailsDialog(
             onDismiss = { showEventDialog = false },
-            onSend = { details ->
-                onSend("Event Details Submitted", "EVENT", mapOf("details" to details))
+            onSend = { venue, time, details ->
+                onSend(
+                    "Event Details Shared",
+                    "EVENT",
+                    mapOf("venue" to venue, "time" to time, "details" to details)
+                )
                 onStatusUpdate("EVENT_SENT")
                 showEventDialog = false
             }
