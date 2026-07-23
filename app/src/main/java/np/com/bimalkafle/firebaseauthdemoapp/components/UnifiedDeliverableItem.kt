@@ -50,7 +50,7 @@ fun UnifiedDeliverableItem(
             )
 
             CompactInput(
-                label = "QTY",
+                label = "Qty",
                 value = count,
                 onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) onCountChange(it) },
                 modifier = Modifier.width(60.dp)
@@ -59,7 +59,7 @@ fun UnifiedDeliverableItem(
             Spacer(modifier = Modifier.width(12.dp))
 
             CompactInput(
-                label = "PRICE",
+                label = "Price",
                 value = price,
                 onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) onPriceChange(it) },
                 prefix = "₹",

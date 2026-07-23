@@ -242,9 +242,15 @@ fun BrandHeaderAndReachSection(
         amount = heroStats.totalSpent,
         trendPercent = heroStats.spendTrendPercent,
         statColumns = listOf(
-            HeroStatColumnData("Pending", heroStats.pendingApplicationsCount.toString()),
-            HeroStatColumnData("Active", heroStats.activeCollaborationsCount.toString()),
-            HeroStatColumnData("Completed", heroStats.completedCount.toString())
+            HeroStatColumnData("Pending", heroStats.pendingApplicationsCount.toString()) {
+                navController.navigate("all_campaigns?filter=PENDING")
+            },
+            HeroStatColumnData("Active", heroStats.activeCollaborationsCount.toString()) {
+                navController.navigate("all_campaigns?filter=ONGOING")
+            },
+            HeroStatColumnData("Completed", heroStats.completedCount.toString()) {
+                navController.navigate("all_campaigns?filter=COMPLETED")
+            }
         ),
         ctaLabel = "Find Influencer",
         onCtaClick = { navController.navigate("brand_search") },

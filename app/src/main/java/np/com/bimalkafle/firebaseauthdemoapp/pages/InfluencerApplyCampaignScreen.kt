@@ -169,7 +169,7 @@ fun InfluencerApplyCampaignScreen(
                 .padding(24.dp)
         ) {
             Text(
-                "APPLY FOR CAMPAIGN",
+                "Apply for campaign",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
                 textAlign = TextAlign.Center,
@@ -267,7 +267,7 @@ fun InfluencerApplyCampaignScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
                                 Text(
-                                    platformName.uppercase(),
+                                    platformName.lowercase().replaceFirstChar { it.uppercase() },
                                     fontWeight = FontWeight.ExtraBold,
                                     color = when(platformType) {
                                         "youtube", "instagram" -> Color.Black
@@ -381,7 +381,7 @@ fun InfluencerApplyCampaignScreen(
                 if (isLoading) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("SUBMIT PROPOSAL", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Submit proposal", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
 

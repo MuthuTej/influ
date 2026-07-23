@@ -349,7 +349,7 @@ fun CreateCampaignScreen(
                     containerColor = if (isFormValid) MaterialTheme.colorScheme.primary else Color.LightGray
                 )
             ) {
-                Text("NEXT", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Next", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
 

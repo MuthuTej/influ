@@ -495,7 +495,7 @@ fun BrandRegistrationScreen(
                     if (isLoading) {
                         CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("COMPLETE SETUP", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Complete setup", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }

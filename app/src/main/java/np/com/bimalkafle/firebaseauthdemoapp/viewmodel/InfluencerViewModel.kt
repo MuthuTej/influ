@@ -289,6 +289,21 @@ class InfluencerViewModel : ViewModel() {
             updatedAt
             engagementRate
           }
+          aiInsights {
+            primaryNiche
+            secondaryNiche
+            contentStyle
+            tone
+            audienceInterests
+            topics
+            brandSuitability
+            strengths
+            weaknesses
+            professionalSummary
+            aiSummary
+            weightingLabel
+            summarySource
+          }
         }
         recentPosts {
           id
@@ -312,6 +327,8 @@ class InfluencerViewModel : ViewModel() {
           weaknesses
           professionalSummary
           aiSummary
+          weightingLabel
+          summarySource
         }
     """.trimIndent()
 
@@ -402,6 +419,36 @@ class InfluencerViewModel : ViewModel() {
                           totalPostsAnalyzed
                           updatedAt
                         }
+                        aiInsights {
+                          primaryNiche
+                          secondaryNiche
+                          contentStyle
+                          tone
+                          audienceInterests
+                          topics
+                          brandSuitability
+                          strengths
+                          weaknesses
+                          professionalSummary
+                          aiSummary
+                          weightingLabel
+                          summarySource
+                        }
+                      }
+                      aiInsights {
+                        primaryNiche
+                        secondaryNiche
+                        contentStyle
+                        tone
+                        audienceInterests
+                        topics
+                        brandSuitability
+                        strengths
+                        weaknesses
+                        professionalSummary
+                        aiSummary
+                        weightingLabel
+                        summarySource
                       }
                     }
                   }
@@ -518,6 +565,21 @@ class InfluencerViewModel : ViewModel() {
                         updatedAt
                         engagementRate
                       }
+                      aiInsights {
+                        primaryNiche
+                        secondaryNiche
+                        contentStyle
+                        tone
+                        audienceInterests
+                        topics
+                        brandSuitability
+                        strengths
+                        weaknesses
+                        professionalSummary
+                        aiSummary
+                        weightingLabel
+                        summarySource
+                      }
                     }
                     audienceInsights {
                       topLocations { city country percentage }
@@ -530,6 +592,7 @@ class InfluencerViewModel : ViewModel() {
                     aiInsights {
                       primaryNiche secondaryNiche contentStyle tone audienceInterests
                       topics brandSuitability strengths weaknesses professionalSummary aiSummary
+                      weightingLabel summarySource
                     }
                     followers
                     totalFollowers
@@ -770,7 +833,28 @@ class InfluencerViewModel : ViewModel() {
                     followers = if (p.has("followers") && !p.isNull("followers")) p.optInt("followers") else null,
                     isDefault = p.optBoolean("isDefault", false),
                     connectedAt = p.optString("connectedAt"),
-                    metrics = metrics
+                    metrics = metrics,
+                    aiInsights = p.optJSONObject("aiInsights")?.let { ai ->
+                        AiInsights(
+                            primaryNiche = ai.optString("primaryNiche").takeIf { it.isNotBlank() },
+                            secondaryNiche = ai.optString("secondaryNiche").takeIf { it.isNotBlank() },
+                            contentStyle = ai.optString("contentStyle").takeIf { it.isNotBlank() },
+                            tone = ai.optString("tone").takeIf { it.isNotBlank() },
+                            audienceInterests = ai.optJSONArray("audienceInterests")?.let { arr ->
+                                (0 until arr.length()).map { arr.getString(it) }
+                            },
+                            topics = ai.optJSONArray("topics")?.let { arr ->
+                                (0 until arr.length()).map { arr.getString(it) }
+                            },
+                            brandSuitability = ai.optString("brandSuitability").takeIf { it.isNotBlank() },
+                            strengths = ai.optJSONArray("strengths")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } },
+                            weaknesses = ai.optJSONArray("weaknesses")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } },
+                            professionalSummary = ai.optString("professionalSummary").takeIf { it.isNotBlank() },
+                            aiSummary = ai.optString("aiSummary").takeIf { it.isNotBlank() },
+                            weightingLabel = ai.optString("weightingLabel").takeIf { it.isNotBlank() },
+                            summarySource = ai.optString("summarySource").takeIf { it.isNotBlank() }
+                        )
+                    }
                 ))
             }
         }
@@ -854,7 +938,9 @@ class InfluencerViewModel : ViewModel() {
                     strengths = ai.optJSONArray("strengths")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } },
                     weaknesses = ai.optJSONArray("weaknesses")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } },
                     professionalSummary = ai.optString("professionalSummary").takeIf { it.isNotBlank() },
-                    aiSummary = ai.optString("aiSummary").takeIf { it.isNotBlank() }
+                    aiSummary = ai.optString("aiSummary").takeIf { it.isNotBlank() },
+                    weightingLabel = ai.optString("weightingLabel").takeIf { it.isNotBlank() },
+                    summarySource = ai.optString("summarySource").takeIf { it.isNotBlank() }
                 )
             },
             followers = if (obj.has("followers") && !obj.isNull("followers")) obj.optInt("followers") else null,

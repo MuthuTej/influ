@@ -244,7 +244,7 @@ private fun DetailContent(campaign: CampaignDetail, navController: NavController
                     else     -> Color(0xFFF1F5F9) to Color(0xFF64748B)
                 }
                 Surface(shape = RoundedCornerShape(6.dp), color = statusBg) {
-                    Text(campaign.status.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    Text(campaign.status.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 10.sp, fontWeight = FontWeight.Bold,
                         color = statusFg, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                 }
                 Spacer(Modifier.height(10.dp))
@@ -261,7 +261,7 @@ private fun DetailContent(campaign: CampaignDetail, navController: NavController
             Spacer(Modifier.height(14.dp))
 
             // ── Campaign details ───────────────────────────────────────────────
-            DetailSectionLabel("CAMPAIGN DETAILS")
+            DetailSectionLabel("Campaign details")
             Spacer(Modifier.height(6.dp))
             DetailCard {
                 val budgetText = when {
@@ -312,7 +312,7 @@ private fun DetailContent(campaign: CampaignDetail, navController: NavController
             // ── Platforms & formats ────────────────────────────────────────────
             val platforms = campaign.platforms
             if (!platforms.isNullOrEmpty()) {
-                DetailSectionLabel("PLATFORMS & FORMATS")
+                DetailSectionLabel("Platforms & formats")
                 Spacer(Modifier.height(6.dp))
                 DetailCard {
                     platforms.forEachIndexed { idx, plat ->
@@ -346,7 +346,7 @@ private fun DetailContent(campaign: CampaignDetail, navController: NavController
             }
 
             // ── Brand section ─────────────────────────────────────────────────
-            DetailSectionLabel("BRAND")
+            DetailSectionLabel("Brand")
             Spacer(Modifier.height(6.dp))
             DetailCard {
                 val brand = campaign.brand
