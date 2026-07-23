@@ -164,8 +164,13 @@ fun ProposalPage(
              FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                  val firebaseToken = result.token
                  if (firebaseToken != null) {
-                     if (isBrand) brandViewModel.fetchCollaborations(firebaseToken)
-                     else influencerViewModel.fetchCollaborations(firebaseToken)
+                     // force = true: this screen exists specifically to show
+                     // current status, so skipping the network call in favor of
+                     // the FetchThrottle's cached copy (the force=false default)
+                     // can show a status that changed elsewhere — e.g. an admin
+                     // resolving a cancellation request — as stale indefinitely.
+                     if (isBrand) brandViewModel.fetchCollaborations(firebaseToken, force = true)
+                     else influencerViewModel.fetchCollaborations(firebaseToken, force = true)
                  }
              }
         }

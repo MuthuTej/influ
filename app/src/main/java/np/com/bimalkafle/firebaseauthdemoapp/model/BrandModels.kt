@@ -175,7 +175,26 @@ data class Collaboration(
     val performanceTracking: PerformanceTracking? = null,
     // Whether the current user has already reviewed this collaboration —
     // used to decide whether to prompt the post-collaboration rating dialog.
-    val hasReviewed: Boolean? = null
+    val hasReviewed: Boolean? = null,
+    // Set while a BRAND or INFLUENCER participant has asked an admin to end
+    // this collaboration (requestCollaborationCancellation mutation). Null
+    // when no request has ever been made.
+    val cancellationRequest: CancellationRequest? = null
+)
+
+// Mirrors the backend's CancellationRequest type (collaboration module) —
+// an admin-reviewed request to terminate a collaboration that has already
+// passed ACCEPTED. Never set/cleared directly by either party; only the
+// admin's reviewCollaborationCancellation mutation (admin webapp) resolves it.
+data class CancellationRequest(
+    val requestedBy: String,
+    val requestedByRole: String,
+    val reason: String,
+    val status: String,
+    val requestedAt: String,
+    val resolvedAt: String? = null,
+    val resolvedBy: String? = null,
+    val adminNote: String? = null
 )
 
 data class Campaign(
@@ -282,5 +301,21 @@ data class Brand(
     val averageRating: Double? = null,
     val fcmToken: String? = null,
     val preferredPlatforms: List<PreferredPlatform>? = null,
-    val targetAudience: TargetAudience? = null
+    val targetAudience: TargetAudience? = null,
+    val gstNumber: String? = null,
+    val verificationRequest: BrandVerificationRequest? = null
+)
+
+// Mirrors the backend's BrandVerificationRequest type (brand module) — the
+// brand's most recent submission to get its "verified" badge, reviewed by an
+// admin via the (admin-webapp-only) reviewBrandVerification mutation.
+data class BrandVerificationRequest(
+    val method: String,
+    val gstNumber: String? = null,
+    val documentUrl: String? = null,
+    val status: String,
+    val submittedAt: String,
+    val reviewedAt: String? = null,
+    val reviewedBy: String? = null,
+    val adminNote: String? = null
 )

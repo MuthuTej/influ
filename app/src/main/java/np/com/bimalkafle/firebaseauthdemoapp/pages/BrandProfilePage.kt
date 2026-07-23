@@ -1,5 +1,10 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -21,10 +26,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -41,6 +48,8 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.components.StarRatingDisplay
+import java.io.File
+import java.io.FileOutputStream
 
 @Composable
 fun BrandProfilePage(
@@ -72,6 +81,28 @@ fun BrandProfilePage(
             }
         },
         onNavigateToCreateCampaign = { navController.navigate("create_campaign") },
+        onSubmitVerification = { gstNumber, method, file, onResult ->
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)
+                ?.addOnSuccessListener { result ->
+                    val firebaseToken = result.token
+                    if (firebaseToken == null) {
+                        onResult("Not authenticated. Please sign in again.")
+                        return@addOnSuccessListener
+                    }
+                    brandViewModel.uploadVerificationDocument(firebaseToken, file) { url, uploadError ->
+                        if (url != null) {
+                            brandViewModel.submitBrandVerification(firebaseToken, gstNumber, method, url) { _, submitError ->
+                                onResult(submitError)
+                            }
+                        } else {
+                            onResult(uploadError ?: "Failed to upload document. Please try again.")
+                        }
+                    }
+                }
+                ?.addOnFailureListener {
+                    onResult("Not authenticated. Please sign in again.")
+                }
+        },
         onUpdateProfile = { updatedBrand: Brand ->
             FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                 val firebaseToken = result.token
@@ -120,6 +151,8 @@ fun BrandProfileContent(
     onSignOut: () -> Unit,
     onNavigateToCreateCampaign: () -> Unit,
     onUpdateProfile: (Brand) -> Unit,
+    // (gstNumber, method, document file, onResult: error message or null on success)
+    onSubmitVerification: (String?, String, File, (String?) -> Unit) -> Unit = { _, _, _, onResult -> onResult("Not available.") },
     bottomBar: @Composable () -> Unit = {},
     floatingActionButton: @Composable () -> Unit = {}
 ) {
@@ -242,12 +275,23 @@ fun BrandProfileContent(
                                 textStyle = TextStyle(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             )
                         } else {
-                            Text(
-                                text = name.ifEmpty { "Brand Name" },
-                                color = Color.White,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = name.ifEmpty { "Brand Name" },
+                                    color = Color.White,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (brandProfile?.isVerified == true) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Verified,
+                                        contentDescription = "Verified brand",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(6.dp))
@@ -409,6 +453,10 @@ fun BrandProfileContent(
 
                     if (!isEditMode) {
                         RatingsSection(brandProfile = brandProfile)
+                        BusinessVerificationSection(
+                            brandProfile = brandProfile,
+                            onSubmitVerification = onSubmitVerification
+                        )
                     }
 
                     if (saveError != null) {
@@ -528,6 +576,269 @@ fun RatingsSection(brandProfile: Brand?) {
                 color = Color.Gray
             )
         }
+    }
+}
+
+/**
+ * GST/business-document verification section (submitBrandVerification mutation,
+ * src/graphql/modules/brand/index.js). Deliberately offers only GST_DOCUMENT and
+ * BUSINESS_REGISTRATION_DOCUMENT — AADHAAR_EKYC exists as a backend enum value
+ * but is rejected server-side (only UIDAI-licensed AUA/KUA entities may collect
+ * Aadhaar data), so it's never surfaced here.
+ */
+@Composable
+fun BusinessVerificationSection(
+    brandProfile: Brand?,
+    onSubmitVerification: (String?, String, File, (String?) -> Unit) -> Unit
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    val verificationRequest = brandProfile?.verificationRequest
+
+    DetailInfoSection(icon = Icons.Default.VerifiedUser, title = "Business Verification") {
+        when {
+            brandProfile?.isVerified == true -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = Color(0xFF2E7D32),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Verified — influencers can see your verified badge.",
+                        color = Color(0xFF2E7D32),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            verificationRequest?.status == "PENDING" -> {
+                Text(
+                    text = "Submitted — pending admin review. This usually takes a couple of days.",
+                    color = Color(0xFF8A6D00),
+                    fontSize = 14.sp
+                )
+            }
+            verificationRequest?.status == "REJECTED" -> {
+                Column {
+                    val note = verificationRequest.adminNote?.takeIf { it.isNotBlank() }
+                    Text(
+                        text = note ?: "Your last submission was rejected. Please review and resubmit.",
+                        color = Color(0xFFC62828),
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(onClick = { showDialog = true }) {
+                        Text("Resubmit")
+                    }
+                }
+            }
+            else -> {
+                Column {
+                    Text(
+                        text = "Get a verified badge so influencers know your brand is legitimate.",
+                        color = Color.Gray,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = { showDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Get Verified", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDialog) {
+        VerificationSubmitDialog(
+            onDismiss = { showDialog = false },
+            onSubmit = { gstNumber, method, file, onResult ->
+                onSubmitVerification(gstNumber, method, file, onResult)
+            }
+        )
+    }
+}
+
+private val VERIFICATION_METHOD_OPTIONS = listOf(
+    "GST_DOCUMENT" to "GST Certificate",
+    "BUSINESS_REGISTRATION_DOCUMENT" to "Business Registration Document"
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VerificationSubmitDialog(
+    onDismiss: () -> Unit,
+    onSubmit: (gstNumber: String?, method: String, file: File, onResult: (String?) -> Unit) -> Unit
+) {
+    val context = LocalContext.current
+    var method by remember { mutableStateOf(VERIFICATION_METHOD_OPTIONS.first().first) }
+    var methodMenuExpanded by remember { mutableStateOf(false) }
+    var gstNumber by remember { mutableStateOf("") }
+    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedFileName by remember { mutableStateOf<String?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            selectedUri = uri
+            selectedFileName = queryDisplayName(context, uri) ?: uri.lastPathSegment ?: "Selected document"
+        }
+    }
+
+    val methodLabel = VERIFICATION_METHOD_OPTIONS.first { it.first == method }.second
+    val canSubmit = selectedUri != null && (method != "GST_DOCUMENT" || gstNumber.isNotBlank()) && !isSubmitting
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = { Text("Get Verified") },
+        text = {
+            Column {
+                ExposedDropdownMenuBox(
+                    expanded = methodMenuExpanded,
+                    onExpandedChange = { if (!isSubmitting) methodMenuExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = methodLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Document Type") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = methodMenuExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = methodMenuExpanded,
+                        onDismissRequest = { methodMenuExpanded = false }
+                    ) {
+                        VERIFICATION_METHOD_OPTIONS.forEach { (value, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    method = value
+                                    methodMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (method == "GST_DOCUMENT") {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = gstNumber,
+                        onValueChange = { gstNumber = it.uppercase() },
+                        label = { Text("GST Number") },
+                        singleLine = true,
+                        enabled = !isSubmitting,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        documentPickerLauncher.launch(
+                            arrayOf("application/pdf", "image/jpeg", "image/png", "image/webp")
+                        )
+                    },
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = selectedFileName ?: "Attach Document",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                errorMessage?.let {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(text = it, color = Color(0xFFC62828), fontSize = 13.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = canSubmit,
+                onClick = {
+                    val uri = selectedUri ?: return@Button
+                    isSubmitting = true
+                    errorMessage = null
+                    val file = copyUriToCacheFile(context, uri)
+                    if (file == null) {
+                        isSubmitting = false
+                        errorMessage = "Couldn't read the selected file. Please try again."
+                        return@Button
+                    }
+                    val gstNumberArg = gstNumber.takeIf { method == "GST_DOCUMENT" && it.isNotBlank() }
+                    onSubmit(gstNumberArg, method, file) { error ->
+                        isSubmitting = false
+                        if (error != null) {
+                            errorMessage = error
+                        } else {
+                            onDismiss()
+                        }
+                    }
+                }
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Submit")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSubmitting) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+private fun queryDisplayName(context: Context, uri: Uri): String? {
+    return try {
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (nameIndex >= 0 && cursor.moveToFirst()) cursor.getString(nameIndex) else null
+        }
+    } catch (e: Exception) {
+        null
+    }
+}
+
+/**
+ * SAF document picks hand back a content:// Uri, not a filesystem path — copy
+ * it into the app's cache dir so uploadVerificationDocument has a real
+ * java.io.File to attach as multipart form data.
+ */
+private fun copyUriToCacheFile(context: Context, uri: Uri): File? {
+    return try {
+        val mimeType = context.contentResolver.getType(uri)
+        val extension = when (mimeType) {
+            "application/pdf" -> "pdf"
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            else -> "jpg"
+        }
+        val outputFile = File(context.cacheDir, "verification_${System.currentTimeMillis()}.$extension")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            FileOutputStream(outputFile).use { output -> input.copyTo(output) }
+        } ?: return null
+        outputFile
+    } catch (e: Exception) {
+        null
     }
 }
 

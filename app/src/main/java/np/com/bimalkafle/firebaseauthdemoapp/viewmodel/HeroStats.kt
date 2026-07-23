@@ -2,7 +2,12 @@ package np.com.bimalkafle.firebaseauthdemoapp.viewmodel
 
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 /**
  * Real, computed hero-section numbers for the influencer home screen — derived
@@ -146,4 +151,85 @@ fun computePerformanceStats(collaborations: List<Collaboration>, windowDays: Lon
         engagementRatePercent = engagementRate,
         impressions = impressions
     )
+}
+
+/** Weekly/Monthly/Yearly toggle for the brand home "Spend Breakdown" chart. */
+enum class SpendBucketPeriod { WEEKLY, MONTHLY, YEARLY }
+
+/** One bar in the spend breakdown chart. */
+data class SpendBucket(val label: String, val amount: Double)
+
+/**
+ * Buckets a brand's paid collaboration spend into a fixed, zero-filled window
+ * (last 8 weeks / 6 months / 5 years) so the chart shape stays stable as data
+ * arrives instead of jumping around — same "fixed window" style the backend's
+ * getAdminMonthlyTrend (admin-analytics module) uses. Pure re-slice of the
+ * same already-fetched collaborations list computeBrandHeroStats reads from —
+ * no extra network call. Direct port of connect_flutter's
+ * computeBrandSpendBuckets (features/collaboration/domain/hero_stats.dart);
+ * dates are bucketed in UTC (matching the 'Z'-suffixed updatedAt/createdAt
+ * timestamps the backend sends) so bucket boundaries are deterministic
+ * regardless of the device's local time zone.
+ */
+fun computeBrandSpendBuckets(collaborations: List<Collaboration>, period: SpendBucketPeriod): List<SpendBucket> {
+    val today = LocalDate.now(ZoneOffset.UTC)
+    val paid = collaborations.filter { it.paymentStatus == "paid" }
+
+    fun dateOf(c: Collaboration): LocalDate? {
+        val raw = c.updatedAt.ifBlank { c.createdAt }
+        return try {
+            Instant.parse(raw).atZone(ZoneOffset.UTC).toLocalDate()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    return when (period) {
+        SpendBucketPeriod.WEEKLY -> {
+            val weekCount = 8
+            // Monday-start week, matching the backend's own weekly bucketing convention.
+            val thisWeekStart = today.minusDays((today.dayOfWeek.value - 1).toLong())
+            val weekStarts = (0 until weekCount).map { i -> thisWeekStart.minusWeeks((weekCount - 1 - i).toLong()) }
+            val totals = DoubleArray(weekCount)
+            for (c in paid) {
+                val date = dateOf(c) ?: continue
+                for (i in weekStarts.indices.reversed()) {
+                    val start = weekStarts[i]
+                    val end = start.plusDays(7)
+                    if (!date.isBefore(start) && date.isBefore(end)) {
+                        totals[i] += c.bestKnownAmount()
+                        break
+                    }
+                }
+            }
+            val labelFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
+            (0 until weekCount).map { i -> SpendBucket(weekStarts[i].format(labelFormatter), totals[i]) }
+        }
+
+        SpendBucketPeriod.MONTHLY -> {
+            val monthCount = 6
+            val thisMonth = YearMonth.from(today)
+            val months = (0 until monthCount).map { i -> thisMonth.minusMonths((monthCount - 1 - i).toLong()) }
+            val totals = DoubleArray(monthCount)
+            for (c in paid) {
+                val date = dateOf(c) ?: continue
+                val idx = months.indexOf(YearMonth.from(date))
+                if (idx != -1) totals[idx] += c.bestKnownAmount()
+            }
+            val labelFormatter = DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
+            (0 until monthCount).map { i -> SpendBucket(months[i].atDay(1).format(labelFormatter), totals[i]) }
+        }
+
+        SpendBucketPeriod.YEARLY -> {
+            val yearCount = 5
+            val years = (0 until yearCount).map { i -> today.year - (yearCount - 1 - i) }
+            val totals = DoubleArray(yearCount)
+            for (c in paid) {
+                val date = dateOf(c) ?: continue
+                val idx = years.indexOf(date.year)
+                if (idx != -1) totals[idx] += c.bestKnownAmount()
+            }
+            (0 until yearCount).map { i -> SpendBucket(years[i].toString(), totals[i]) }
+        }
+    }
 }

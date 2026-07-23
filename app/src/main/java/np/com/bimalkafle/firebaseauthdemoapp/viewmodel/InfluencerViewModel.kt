@@ -1023,6 +1023,16 @@ class InfluencerViewModel : ViewModel() {
                     viewsGrowthSincePosting
                     selectedInstagramProfileId
                     hasReviewed
+                    cancellationRequest {
+                      requestedBy
+                      requestedByRole
+                      reason
+                      status
+                      requestedAt
+                      resolvedAt
+                      resolvedBy
+                      adminNote
+                    }
                   }
                 }
             """.trimIndent()
@@ -1229,6 +1239,8 @@ class InfluencerViewModel : ViewModel() {
                 }
             }
 
+            val cancellationRequest = parseCancellationRequest(obj.optJSONObject("cancellationRequest"))
+
             list.add(
                 Collaboration(
                     id = obj.optString("id"),
@@ -1257,11 +1269,26 @@ class InfluencerViewModel : ViewModel() {
                     totalViewsDelivered = if (obj.isNull("totalViewsDelivered")) null else obj.optInt("totalViewsDelivered"),
                     viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting"),
                     selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() },
-                    hasReviewed = if (obj.isNull("hasReviewed")) null else obj.optBoolean("hasReviewed")
+                    hasReviewed = if (obj.isNull("hasReviewed")) null else obj.optBoolean("hasReviewed"),
+                    cancellationRequest = cancellationRequest
                 )
             )
         }
         return list
+    }
+
+    private fun parseCancellationRequest(obj: JSONObject?): CancellationRequest? {
+        if (obj == null) return null
+        return CancellationRequest(
+            requestedBy = obj.optString("requestedBy"),
+            requestedByRole = obj.optString("requestedByRole"),
+            reason = obj.optString("reason"),
+            status = obj.optString("status"),
+            requestedAt = obj.optString("requestedAt"),
+            resolvedAt = if (obj.isNull("resolvedAt")) null else obj.optString("resolvedAt"),
+            resolvedBy = if (obj.isNull("resolvedBy")) null else obj.optString("resolvedBy"),
+            adminNote = if (obj.isNull("adminNote")) null else obj.optString("adminNote")
+        )
     }
 
     /**
@@ -1473,6 +1500,48 @@ class InfluencerViewModel : ViewModel() {
             _loading.postValue(false)
         }
     }
+
+    /**
+     * Asks an admin to end a collaboration that has already passed ACCEPTED
+     * (requestCollaborationCancellation mutation, src/graphql/modules/collaboration/index.js).
+     * This does not change the collaboration's status itself — only an admin's
+     * separate review can do that — so we just refresh collaborations on success
+     * so the new PENDING cancellationRequest shows up in the status banner.
+     * onComplete receives null on success, or a human-readable error message
+     * (e.g. "A cancellation request is already pending admin review for this
+     * collaboration") on failure.
+     */
+    fun requestCollaborationCancellation(
+        token: String,
+        collaborationId: String,
+        reason: String,
+        onComplete: (String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val mutation = """
+                mutation RequestCollaborationCancellation(${'$'}collaborationId: ID!, ${'$'}reason: String!) {
+                  requestCollaborationCancellation(collaborationId: ${'$'}collaborationId, reason: ${'$'}reason) {
+                    id
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf(
+                "collaborationId" to collaborationId,
+                "reason" to reason
+            )
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess {
+                fetchCollaborations(token, force = true)
+                onComplete(null)
+            }.onFailure {
+                Log.e("InfluencerViewModel", "Error requesting collaboration cancellation", it)
+                onComplete(it.message ?: "Failed to send cancellation request. Please try again.")
+            }
+        }
+    }
+
     private fun pushCollaborationStatusUpdate(collaborationId: String, status: String) {
         val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
         FirebaseFirestore.getInstance()
