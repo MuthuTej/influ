@@ -65,7 +65,9 @@ data class AiInsights(
     val strengths: List<String>?,
     val weaknesses: List<String>?,
     val professionalSummary: String?,
-    val aiSummary: String?
+    val aiSummary: String?,
+    val weightingLabel: String? = null,
+    val summarySource: String? = null
 )
 
 data class InstagramProfile(
@@ -75,7 +77,8 @@ data class InstagramProfile(
     val followers: Int?,
     val isDefault: Boolean,
     val connectedAt: String,
-    val metrics: InstagramMetrics?
+    val metrics: InstagramMetrics?,
+    val aiInsights: AiInsights? = null
 )
 
 data class InstagramMetrics(
