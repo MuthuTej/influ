@@ -53,6 +53,38 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 
+// ── Engagement Categorization Logic ──────────────────────────────────────────
+data class EngagementCategory(val label: String, val color: Color)
+
+private fun getEngagementCategory(rate: Float?): EngagementCategory {
+    if (rate == null) return EngagementCategory("N/A", Color.Gray)
+    return when {
+        rate < 1.0f -> EngagementCategory("LOW", Color(0xFF757575))
+        rate < 3.0f -> EngagementCategory("MEDIUM", Color(0xFF1976D2))
+        rate < 6.0f -> EngagementCategory("HIGH", Color(0xFF388E3C))
+        else        -> EngagementCategory("VIRAL", Color(0xFF7B1FA2))
+    }
+}
+
+@Composable
+private fun EngagementBadge(rate: Float?, modifier: Modifier = Modifier) {
+    val category = getEngagementCategory(rate)
+    Surface(
+        color = category.color.copy(alpha = 0.1f),
+        shape = RoundedCornerShape(4.dp),
+        border = BorderStroke(0.5.dp, category.color.copy(alpha = 0.5f)),
+        modifier = modifier
+    ) {
+        Text(
+            text = category.label,
+            color = category.color,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+    }
+}
+
 @Composable
 fun InfluencerProfileScreen(
     modifier: Modifier = Modifier,
@@ -61,16 +93,20 @@ fun InfluencerProfileScreen(
     influencerViewModel: InfluencerViewModel
 ) {
     val influencerProfile by influencerViewModel.influencerProfile.observeAsState()
+    val activeInstagramProfile by influencerViewModel.activeInstagramProfile.observeAsState()
     val isLoading by influencerViewModel.loading.observeAsState(initial = false)
     val error by influencerViewModel.error.observeAsState()
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
-        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-            val firebaseToken = result.token
-            if (firebaseToken != null) {
-                influencerViewModel.fetchInfluencerDetails(firebaseToken, force = true)
-                clearCoilCache(context)
+        FirebaseAuth.getInstance().currentUser?.let { user ->
+            influencerViewModel.loadActiveProfile(context, user.uid)
+            user.getIdToken(true)?.addOnSuccessListener { result ->
+                val firebaseToken = result.token
+                if (firebaseToken != null) {
+                    influencerViewModel.fetchInfluencerDetails(firebaseToken, force = true)
+                    clearCoilCache(context)
+                }
             }
         }
     }
@@ -85,6 +121,7 @@ fun InfluencerProfileScreen(
     InfluencerProfileContent(
         modifier = modifier,
         influencerProfile = influencerProfile,
+        activeInstagramProfile = activeInstagramProfile,
         isLoading = isLoading,
         onSignOut = {
             authViewModel.signout()
@@ -138,6 +175,11 @@ fun InfluencerProfileScreen(
                 }
             }
         },
+        onProfileSelected = { profileId ->
+            FirebaseAuth.getInstance().currentUser?.let { user ->
+                influencerViewModel.switchProfile(context, user.uid, profileId)
+            }
+        },
         bottomBar = {
             Surface(
                 color = Color.White,
@@ -169,9 +211,12 @@ fun InfluencerProfileContent(
     onRemoveInstagramProfile: (profileId: String) -> Unit = {},
     onSetDefaultInstagramProfile: (profileId: String) -> Unit = {},
     onRefreshInstagramProfile: (profileId: String, onResult: (Boolean, String?) -> Unit) -> Unit = { _, _ -> },
+    onProfileSelected: (String) -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
-    floatingActionButton: @Composable () -> Unit = {}
+    floatingActionButton: @Composable () -> Unit = {},
+    activeInstagramProfile: InstagramProfile? = null
 ) {
+
     var isEditMode by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -394,23 +439,41 @@ fun InfluencerProfileContent(
                 Column(modifier = Modifier.padding(20.dp)) {
                     
                     // AI Summary Card
-                    influencerProfile.aiInsights?.aiSummary?.let { summary ->
-                        InfluencerDetailSection(icon = Icons.Default.AutoAwesome, title = "AI Profile Summary") {
-                            Text(
-                                text = summary,
-                                color = Color.Black,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Normal,
-                                lineHeight = 21.sp,
-                                maxLines = 8,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Justify
-                            )
+                    val displayInsights = activeInstagramProfile?.aiInsights ?: influencerProfile.aiInsights
+                    displayInsights?.let { insights ->
+                        val summaryText = insights.aiSummary ?: insights.professionalSummary
+                        if (!summaryText.isNullOrBlank()) {
+                            var isSummaryExpanded by remember { mutableStateOf(false) }
+                            InfluencerDetailSection(icon = Icons.Default.AutoAwesome, title = "AI Profile Summary") {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(
+                                        text = summaryText,
+                                        color = Color.Black,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        lineHeight = 21.sp,
+                                        maxLines = if (isSummaryExpanded) Int.MAX_VALUE else 5,
+                                        overflow = if (isSummaryExpanded) TextOverflow.Visible else TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Justify
+                                    )
+                                    TextButton(
+                                        onClick = { isSummaryExpanded = !isSummaryExpanded },
+                                        contentPadding = PaddingValues(horizontal = 0.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isSummaryExpanded) "Show less" else "Show more",
+                                            color = themeColor,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
                     // AI Insights Grid Section
-                    influencerProfile.aiInsights?.let { insights ->
+                    displayInsights?.let { insights ->
                         AIInsightsSection(insights, themeColor)
                     }
 
@@ -617,7 +680,8 @@ fun InfluencerProfileContent(
                         onAddProfile = onAddInstagramProfile,
                         onRemoveProfile = onRemoveInstagramProfile,
                         onSetDefault = onSetDefaultInstagramProfile,
-                        onRefresh = onRefreshInstagramProfile
+                        onRefresh = onRefreshInstagramProfile,
+                        onProfileSelected = onProfileSelected
                     )
                     Spacer(modifier = Modifier.height(20.dp))
 
@@ -897,7 +961,11 @@ fun AnalyticsSection(metrics: InstagramMetrics, themeColor: Color, platformsColo
                 ) {
                     Column {
                         Text("Engagement Rate", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text("Based on recent activity", color = Color.Gray, fontSize = 12.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Based on recent activity", color = Color.Gray, fontSize = 12.sp)
+                            Spacer(Modifier.width(8.dp))
+                            EngagementBadge(metrics.engagementRate)
+                        }
                     }
                     Text(
                         text = "${String.format("%.2f", metrics.engagementRate ?: 0f)}%",
@@ -1129,17 +1197,18 @@ private fun YouTubeDemographicsCard(demographics: List<YoutubeDemographics>, det
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InstagramProfilesSection(
-    profiles: List<InstagramProfile>,
-    legacyMetrics: InstagramMetrics?,
-    platformsColors: Map<String, Color>,
-    detailDarkerGray: Color,
-    detailSoftGray: Color,
-    onAddProfile: (String, (Boolean, String?) -> Unit) -> Unit,
-    onRemoveProfile: (String) -> Unit,
-    onSetDefault: (String) -> Unit,
-    onRefresh: (String, (Boolean, String?) -> Unit) -> Unit
-) {
+ private fun InstagramProfilesSection(
+     profiles: List<InstagramProfile>,
+     legacyMetrics: InstagramMetrics?,
+     platformsColors: Map<String, Color>,
+     detailDarkerGray: Color,
+     detailSoftGray: Color,
+     onAddProfile: (String, (Boolean, String?) -> Unit) -> Unit,
+     onRemoveProfile: (String) -> Unit,
+     onSetDefault: (String) -> Unit,
+     onRefresh: (String, (Boolean, String?) -> Unit) -> Unit,
+     onProfileSelected: (String) -> Unit = {}
+ ) {
     val instaColor = platformsColors["INSTAGRAM"] ?: Color(0xFFE1306C)
     var showAddDialog by remember { mutableStateOf(false) }
     var addUrl by remember { mutableStateOf("") }
@@ -1190,7 +1259,8 @@ private fun InstagramProfilesSection(
                     onRefresh = {
                         refreshingProfileId = profile.id
                         onRefresh(profile.id) { _, _ -> refreshingProfileId = null }
-                    }
+                    },
+                    onSelect = { onProfileSelected(profile.id) }
                 )
                 Spacer(Modifier.height(12.dp))
             }
@@ -1252,20 +1322,22 @@ private fun InstagramProfilesSection(
 }
 
 @Composable
-private fun InstagramProfileCard(
-    profile: InstagramProfile,
-    instaColor: Color,
-    detailDarkerGray: Color,
-    detailSoftGray: Color,
-    isRefreshing: Boolean,
-    onSetDefault: () -> Unit,
-    onRemove: () -> Unit,
-    onRefresh: () -> Unit
-) {
+ private fun InstagramProfileCard(
+     profile: InstagramProfile,
+     instaColor: Color,
+     detailDarkerGray: Color,
+     detailSoftGray: Color,
+     isRefreshing: Boolean,
+     onSetDefault: () -> Unit,
+     onRemove: () -> Unit,
+     onRefresh: () -> Unit,
+     onSelect: () -> Unit = {}
+ ) {
     var expanded by remember { mutableStateOf(profile.isDefault) }
-
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSelect() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = if (profile.isDefault) 4.dp else 2.dp),
@@ -1325,7 +1397,7 @@ private fun InstagramProfileCard(
                 }
             }
 
-            if (expanded) {
+                    if (expanded) {
                 Spacer(Modifier.height(12.dp))
                 HorizontalDivider(color = detailSoftGray)
                 Spacer(Modifier.height(12.dp))
@@ -1340,7 +1412,13 @@ private fun InstagramProfileCard(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MetricChip("📅 ${String.format("%.1f", m.postingFrequencyDays ?: 0f)}d", "Post Freq.", modifier = Modifier.weight(1f))
                         MetricChip("📊 ${m.totalPostsAnalyzed ?: 0}", "Posts Analyzed", modifier = Modifier.weight(1f))
-                        MetricChip("📈 ${String.format("%.1f", m.engagementRate ?: 0f)}%", "Eng. Rate", modifier = Modifier.weight(1f))
+                        Box(modifier = Modifier.weight(1f)) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                MetricChip("📈 ${String.format("%.1f", m.engagementRate ?: 0f)}%", "Eng. Rate")
+                                Spacer(Modifier.height(4.dp))
+                                EngagementBadge(m.engagementRate)
+                            }
+                        }
                     }
                 } ?: run {
                     Text("No analytics yet — tap Refresh to fetch metrics", color = detailDarkerGray, fontSize = 13.sp)
@@ -1503,7 +1581,7 @@ private fun InstagramInsightsSection(metrics: InstagramMetrics, platformsColors:
 
 @Composable
 private fun InstagramStatCard(label: String, value: String, modifier: Modifier = Modifier, detailDarkerGray: Color) {
-    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Image(painter = painterResource(id = R.drawable.instagram_logo), contentDescription = null, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.height(8.dp))

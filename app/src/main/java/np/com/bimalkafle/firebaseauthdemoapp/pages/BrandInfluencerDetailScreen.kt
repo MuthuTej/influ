@@ -61,6 +61,38 @@ private val platformsColors = mapOf(
     "TWITTER"   to Color(0xFF1DA1F2)
 )
 
+// ── Engagement Categorization ───────────────────────────────────────────────
+data class EngagementInfo(val label: String, val color: Color)
+
+private fun getEngagementCategory(rate: Float?): EngagementInfo {
+    if (rate == null) return EngagementInfo("N/A", Color.Gray)
+    return when {
+        rate < 3.0f -> EngagementInfo("LOW", Color(0xFF757575))
+        rate < 6.0f -> EngagementInfo("MEDIUM", Color(0xFF1976D2))
+        rate < 10.0f -> EngagementInfo("HIGH", Color(0xFF388E3C))
+        else        -> EngagementInfo("VIRAL", Color(0xFF7B1FA2))
+    }
+}
+
+@Composable
+private fun EngagementBadge(rate: Float?, modifier: Modifier = Modifier) {
+    val info = getEngagementCategory(rate)
+    Surface(
+        color = info.color.copy(alpha = 0.1f),
+        shape = RoundedCornerShape(4.dp),
+        border = BorderStroke(0.5.dp, info.color.copy(alpha = 0.5f)),
+        modifier = modifier
+    ) {
+        Text(
+            text = info.label,
+            color = info.color,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+        )
+    }
+}
+
 // ─── Avatar colour palette (hash-based, stable per influencer name) ─────────
 private val AvatarPalette = listOf(
     Color(0xFF5E4AE3),
@@ -152,13 +184,20 @@ fun BrandInfluencerDetailContent(
                             )
                         }
 
-                        influencer.aiInsights?.let { AiProfileSummarySection(it) }
+                        var selectedProfileId by remember { mutableStateOf<String?>(null) }
+                        val displayAiInsights = selectedProfileId?.let { id ->
+                            influencer.instagramProfiles?.firstOrNull { it.id == id }?.aiInsights
+                        } ?: influencer.instagramProfiles?.firstOrNull { it.aiInsights != null }?.aiInsights
+                            ?: influencer.aiInsights
+                        displayAiInsights?.let { AiProfileSummarySection(it) }
 
                         influencer.youtubeInsights?.let { YouTubeInsightsSection(it) }
 
                         val igProfiles = influencer.instagramProfiles
                         if (!igProfiles.isNullOrEmpty()) {
-                            BrandInstagramProfilesSection(igProfiles, influencer.followers)
+                            BrandInstagramProfilesSection(igProfiles, influencer.followers) { profileId ->
+                                selectedProfileId = profileId
+                            }
                         } else {
                             influencer.instagramMetrics?.let { InstagramInsightsSection(it) }
                         }
@@ -200,12 +239,12 @@ private fun ProfileHero(
     val postFreq     = influencer.instagramMetrics?.postingFrequencyDays
     val tier         = influencer.tier
 
-    data class HeroStat(val value: String, val label: String, val color: Color)
+    data class HeroStat(val value: String, val label: String, val color: Color, val rate: Float? = null)
     // Row 1: core reach   Row 2: engagement detail
     val statRows: List<List<HeroStat>> = listOf(
         listOf(
             HeroStat(formatInfluencerCount(totalFollowers), "Followers",   Color(0xFF1976D2)),
-            HeroStat(engRate?.let { "${"%.1f".format(it)}%" } ?: "—",     "Engagement",    Color(0xFF388E3C)),
+            HeroStat(engRate?.let { "${"%.1f".format(it)}%" } ?: "—",     "Engagement",    Color(0xFF388E3C), rate = engRate?.toFloat()),
             HeroStat(avgViews?.let { formatInfluencerCount(it.toInt()) } ?: "—", "Avg Views", Color(0xFF7B1FA2)),
             HeroStat(collabCount?.toString() ?: "—",                       "Collabs",       Color(0xFFE65100))
         ),
@@ -334,13 +373,19 @@ private fun ProfileHero(
                                     modifier            = Modifier.weight(1f),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Text(
-                                        text       = stat.value,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize   = 14.sp,
-                                        color      = stat.color,
-                                        maxLines   = 1
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                                        Text(
+                                            text       = stat.value,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize   = 14.sp,
+                                            color      = stat.color,
+                                            maxLines   = 1
+                                        )
+                                        if (stat.label == "Engagement" && stat.rate != null) {
+                                            Spacer(Modifier.width(4.dp))
+                                            EngagementBadge(stat.rate)
+                                        }
+                                    }
                                     Text(
                                         text      = stat.label,
                                         fontSize  = 9.5.sp,
@@ -611,7 +656,7 @@ private fun PlatformStatCard(label: String, value: String, modifier: Modifier = 
 
 // ── Instagram Profiles ────────────────────────────────────────────────────────
 @Composable
-private fun BrandInstagramProfilesSection(profiles: List<InstagramProfile>, primaryFollowers: Int? = null) {
+private fun BrandInstagramProfilesSection(profiles: List<InstagramProfile>, primaryFollowers: Int? = null, onProfileSelected: (String) -> Unit = {}) {
     val instaColor = Color(0xFFE1306C)
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column {
@@ -623,7 +668,9 @@ private fun BrandInstagramProfilesSection(profiles: List<InstagramProfile>, prim
         }
         profiles.forEach { profile ->
             Card(
-                modifier  = Modifier.fillMaxWidth(),
+                modifier  = Modifier
+                    .fillMaxWidth()
+                    .clickable { onProfileSelected(profile.id) },
                 shape     = RoundedCornerShape(16.dp),
                 colors    = CardDefaults.cardColors(containerColor = CardBg),
                 elevation = CardDefaults.cardElevation(if (profile.isDefault) 3.dp else 1.dp),
@@ -646,6 +693,8 @@ private fun BrandInstagramProfilesSection(profiles: List<InstagramProfile>, prim
                                         Text("PRIMARY", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
                                     }
                                 }
+                                Spacer(Modifier.width(6.dp))
+                                EngagementBadge(profile.metrics?.engagementRate)
                             }
                             val displayFollowers = profile.followers
                                 ?: if (profile.isDefault) primaryFollowers else null
@@ -703,6 +752,18 @@ private fun InstagramInsightsSection(metrics: np.com.bimalkafle.firebaseauthdemo
             PlatformStatCard("Avg Views",    formatInfluencerCount(metrics.avgViews?.toInt()    ?: 0), Modifier.weight(1f))
         }
         SectionCard {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text("Engagement Rate", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Average performance", color = SubLabel, fontSize = 12.sp)
+                        Spacer(Modifier.width(6.dp))
+                        EngagementBadge(metrics.engagementRate)
+                    }
+                }
+                Text("${"%.2f".format(metrics.engagementRate ?: 0f)}%", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = instaColor)
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = DividerColor)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Text("Posting Frequency", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
