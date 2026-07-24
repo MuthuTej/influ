@@ -82,25 +82,30 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                 if (uid != null) {
                     val isBrand = state.role.equals("BRAND", ignoreCase = true)
                     if (state.isProfileCompleted) {
-                        prefsManager.saveProfileCompleted(uid, true)
-                        val route = if (isBrand) "brand_home" else "influencer_home"
-                        navController.navigate(route) {
-                            popUpTo("login") { inclusive = true }
+                        // User exists and registration is complete - Send to Login/Home
+                        Toast.makeText(context, "User exists. Please sign in.", Toast.LENGTH_LONG).show()
+                        authViewModel.signout()
+                        navController.navigate("login") {
                             popUpTo("signup") { inclusive = true }
                         }
                     } else {
-                        // User exists but profile is incomplete - Go to registration
-                        val route = if (isBrand) "brand_registration" else "influencer_registration"
-                        navController.navigate(route) {
-                            popUpTo("login") { inclusive = true }
-                            popUpTo("signup") { inclusive = true }
+                        // User is authenticated in Firebase but backend registration is incomplete.
+                        // If they just clicked "Complete Account", they should have a name and role.
+                        if (name.isNotBlank()) {
+                            val route = if (isBrand) "brand_registration" else "influencer_registration"
+                            navController.navigate(route) {
+                                popUpTo("signup") { inclusive = true }
+                            }
+                        } else {
+                            // User logged in but no name/role yet, stay here to collect them
+                            email = FirebaseAuth.getInstance().currentUser?.email ?: ""
                         }
                     }
                 }
             }
             is AuthState.GoogleNewUser -> {
                 email = state.email
-                // Do NOT auto-fill name from Google, user must fill it manually
+                // name is NOT auto-filled as requested
             }
             is AuthState.Error -> {
                 Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
@@ -148,7 +153,9 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                     Toast.makeText(context, "${if (role == "BRAND") "Brand Name" else "Name"} is mandatory", Toast.LENGTH_SHORT).show()
                     return@SignupPageContent
                 }
-                if (authState.value is AuthState.GoogleNewUser) {
+
+                val currentState = authState.value
+                if (currentState is AuthState.GoogleNewUser || (currentState is AuthState.Authenticated && !currentState.isProfileCompleted)) {
                     authViewModel.completeBackendSignup(name, role)
                 } else {
                     if (email.isBlank() || password.isBlank()) {
@@ -162,17 +169,15 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
                 if (name.isBlank()) {
                     Toast.makeText(context, "Please enter ${if (role == "BRAND") "Brand Name" else "Name"} first", Toast.LENGTH_SHORT).show()
                 } else {
-                    // Force account picker
                     googleSignInClient.signOut().addOnCompleteListener {
                         launcher.launch(googleSignInClient.signInIntent)
                     }
                 }
             },
             onLoginClick = { 
-                if (!navController.popBackStack("login", inclusive = false)) {
-                    navController.navigate("login") {
-                        popUpTo("signup") { inclusive = true }
-                    }
+                authViewModel.signout()
+                navController.navigate("login") {
+                    popUpTo("signup") { inclusive = true }
                 }
             },
             headerTopPadding = topPadding
@@ -203,7 +208,10 @@ fun SignupPageContent(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     val roles = listOf("BRAND", "INFLUENCER")
+
     val isGoogleUser = authState is AuthState.GoogleNewUser
+    val isAuthIncomplete = authState is AuthState.Authenticated && !authState.isProfileCompleted
+    val hideCredentials = isGoogleUser || isAuthIncomplete
 
     val themeColor = MaterialTheme.colorScheme.primary
 
@@ -218,7 +226,7 @@ fun SignupPageContent(
                 contentDescription = "Header background",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.35f),
+                    .height(240.dp),
                 contentScale = ContentScale.FillBounds
             )
             Text(
@@ -273,7 +281,7 @@ fun SignupPageContent(
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColor)
             )
 
-            if (!isGoogleUser) {
+            if (!hideCredentials) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
@@ -344,7 +352,7 @@ fun SignupPageContent(
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
                     Text(
-                        text = if (isGoogleUser) "Complete Account" else "Create Account",
+                        text = if (hideCredentials) "Complete Account" else "Create Account",
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
@@ -352,7 +360,7 @@ fun SignupPageContent(
                 }
             }
 
-            if (!isGoogleUser) {
+            if (!hideCredentials) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Google Signup Button
