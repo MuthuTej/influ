@@ -23,6 +23,7 @@ data class InfluencerProfile(
     val logoUrl: String?,
     val averageRating: Float? = null,
     val isVerified: Boolean? = false,
+    val instagramConnected: Boolean? = false,
     val youtubeInsights: YouTubeInsights? = null,
     val instagramMetrics: InstagramMetrics? = null,
     val instagramProfiles: List<InstagramProfile>? = null,
@@ -77,6 +78,9 @@ data class InstagramProfile(
     val followers: Int?,
     val isDefault: Boolean,
     val connectedAt: String,
+    // "oauth" for real Instagram Login connections, "scrape"/null otherwise —
+    // see InfluencerRegistrationScreen's Connect Instagram Account button.
+    val source: String? = null,
     val metrics: InstagramMetrics?,
     val aiInsights: AiInsights? = null
 )

@@ -8,6 +8,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
+data class InstagramProfileSummary(val username: String, val followers: Int?, val source: String?)
+
 object BackendRepository {
     private val BACKEND_URL = BuildConfig.BACKEND_BASE_URL
 
@@ -499,6 +501,134 @@ object BackendRepository {
             Result.failure(e)
         }
     }
+
+    // query { instagramAuthUrl } -> String! — starts real Instagram OAuth
+    // ("Instagram API with Instagram Login"). The backend records a
+    // single-use state doc for this influencer and returns the full Meta
+    // authorize URL; launch it in a Custom Tab and wait for the
+    // np.com.bimalkafle.firebaseauthdemoapp://instagram-callback redirect
+    // (see MainActivity.onNewIntent / InstagramAuthResult).
+    suspend fun instagramAuthUrl(token: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                query InstagramAuthUrl {
+                    instagramAuthUrl
+                }
+            """.trimIndent()
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    val authUrl = jsonResponse.optJSONObject("data")?.optString("instagramAuthUrl")
+                    if (authUrl.isNullOrBlank()) {
+                        Result.failure(Exception("No Instagram authorization URL returned"))
+                    } else {
+                        Result.success(authUrl)
+                    }
+                }
+            } else {
+                val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Log.e("BackendRepository", "instagramAuthUrl Error Response: $errorResponse")
+                Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
+            }
+        } catch (e: Exception) {
+            Log.e("BackendRepository", "instagramAuthUrl Exception: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    // Lightweight refetch used right after an Instagram OAuth redirect
+    // completes, so InfluencerRegistrationScreen can show the real connected
+    // username/source without pulling in the full InfluencerViewModel (this
+    // screen talks to BackendRepository directly, same as connectYouTube above).
+    suspend fun fetchInstagramProfiles(token: String): Result<List<InstagramProfileSummary>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val url = URL(BACKEND_URL)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Authorization", "Bearer $token")
+                connection.doOutput = true
+
+                val query = """
+                    query FetchInstagramProfiles {
+                        me {
+                            ... on Influencer {
+                                instagramProfiles { username followers source }
+                            }
+                        }
+                    }
+                """.trimIndent()
+
+                val requestBody = JSONObject().apply { put("query", query) }.toString()
+                connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+                val responseCode = connection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                    SessionManager.notifySessionExpired()
+                    return@withContext Result.failure(UnauthorizedException())
+                }
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    val jsonResponse = JSONObject(response)
+
+                    if (jsonResponse.has("errors")) {
+                        val errors = jsonResponse.getJSONArray("errors")
+                        Result.failure(Exception(errors.getJSONObject(0).getString("message")))
+                    } else {
+                        val profilesArray = jsonResponse.optJSONObject("data")
+                            ?.optJSONObject("me")
+                            ?.optJSONArray("instagramProfiles")
+                        val profiles = mutableListOf<InstagramProfileSummary>()
+                        if (profilesArray != null) {
+                            for (i in 0 until profilesArray.length()) {
+                                val p = profilesArray.optJSONObject(i) ?: continue
+                                profiles.add(
+                                    InstagramProfileSummary(
+                                        username = p.optString("username"),
+                                        followers = if (p.has("followers") && !p.isNull("followers")) p.optInt("followers") else null,
+                                        source = if (p.has("source") && !p.isNull("source")) p.optString("source") else null
+                                    )
+                                )
+                            }
+                        }
+                        Result.success(profiles)
+                    }
+                } else {
+                    val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                    Log.e("BackendRepository", "fetchInstagramProfiles Error Response: $errorResponse")
+                    Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
+                }
+            } catch (e: Exception) {
+                Log.e("BackendRepository", "fetchInstagramProfiles Exception: ${e.message}", e)
+                Result.failure(e)
+            }
+        }
 
     suspend fun connectYouTube(authCode: String, token: String): Result<Boolean> =
         withContext(Dispatchers.IO) {

@@ -142,6 +142,7 @@ class InfluencerViewModel : ViewModel() {
             followers = if (json.has("followers") && !json.isNull("followers")) json.optInt("followers") else null,
             isDefault = json.optBoolean("isDefault", false),
             connectedAt = json.optString("connectedAt"),
+            source = if (json.has("source") && !json.isNull("source")) json.optString("source") else null,
             metrics = metrics
         )
     }
@@ -249,6 +250,7 @@ class InfluencerViewModel : ViewModel() {
         availability
         logoUrl
         isVerified
+        instagramConnected
         averageRating
         youtubeInsights {
           channelId
@@ -280,6 +282,7 @@ class InfluencerViewModel : ViewModel() {
           followers
           isDefault
           connectedAt
+          source
           metrics {
             avgLikes
             avgComments
@@ -381,6 +384,7 @@ class InfluencerViewModel : ViewModel() {
                       availability
                       logoUrl
                       isVerified
+                      instagramConnected
                       averageRating
                       youtubeInsights {
                         channelId
@@ -411,6 +415,7 @@ class InfluencerViewModel : ViewModel() {
                         followers
                         isDefault
                         connectedAt
+                        source
                         metrics {
                           avgLikes
                           avgComments
@@ -526,6 +531,7 @@ class InfluencerViewModel : ViewModel() {
                     availability
                     logoUrl
                     isVerified
+                    instagramConnected
                     averageRating
                     youtubeInsights {
                       channelId
@@ -556,6 +562,7 @@ class InfluencerViewModel : ViewModel() {
                       followers
                       isDefault
                       connectedAt
+                      source
                       metrics {
                         avgLikes
                         avgComments
@@ -833,6 +840,7 @@ class InfluencerViewModel : ViewModel() {
                     followers = if (p.has("followers") && !p.isNull("followers")) p.optInt("followers") else null,
                     isDefault = p.optBoolean("isDefault", false),
                     connectedAt = p.optString("connectedAt"),
+                    source = if (p.has("source") && !p.isNull("source")) p.optString("source") else null,
                     metrics = metrics,
                     aiInsights = p.optJSONObject("aiInsights")?.let { ai ->
                         AiInsights(
@@ -901,6 +909,7 @@ class InfluencerViewModel : ViewModel() {
             availability = if (obj.has("availability")) obj.optBoolean("availability") else null,
             logoUrl = obj.optString("logoUrl"),
             isVerified = if (obj.has("isVerified")) obj.optBoolean("isVerified") else null,
+            instagramConnected = if (obj.has("instagramConnected")) obj.optBoolean("instagramConnected") else null,
             averageRating = if (obj.has("averageRating")) obj.optDouble("averageRating").toFloat() else null,
             youtubeInsights = youtubeInsights,
             instagramMetrics = instagramMetrics,
