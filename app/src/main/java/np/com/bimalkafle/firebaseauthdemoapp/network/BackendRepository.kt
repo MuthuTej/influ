@@ -13,6 +13,98 @@ data class InstagramProfileSummary(val username: String, val followers: Int?, va
 object BackendRepository {
     private val BACKEND_URL = BuildConfig.BACKEND_BASE_URL
 
+    suspend fun fetchInfluencerDashboard(token: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val query = """
+            query GetInfluencerDashboard {
+              getInfluencerDashboard {
+                profile {
+                  id email name role profileCompleted updatedAt bio location gender motherTongue languagesKnown
+                  categories { category subCategories }
+                  platforms { platform profileUrl followers avgViews engagement formats connected }
+                  strengths pricing { platform deliverable price currency }
+                  availability logoUrl isVerified averageRating
+                  youtubeInsights { channelId title description subscribers totalViews totalVideos demographics { ageGroup gender percentage } lastSynced }
+                  instagramMetrics { avgComments avgLikes avgViews postingFrequencyDays totalPostsAnalyzed updatedAt engagementRate }
+                  instagramProfiles { id profileUrl username followers isDefault connectedAt metrics { avgLikes avgComments avgViews postingFrequencyDays totalPostsAnalyzed updatedAt engagementRate } aiInsights { primaryNiche brandSuitability aiSummary } }
+                  aiInsights { primaryNiche secondaryNiche tone brandSuitability aiSummary }
+                }
+                collaborations {
+                  id status message pricing { platform deliverable price currency } initiatedBy createdAt updatedAt paymentStatus totalAmount
+                  brand { id name logoUrl }
+                  campaign { id title status }
+                  selectedInstagramProfileId
+                }
+                recommendedCampaigns {
+                  id title description brandId budgetMin budgetMax createdAt aiScore
+                  categories { category subCategories }
+                  platforms { platform formats }
+                }
+                unreadNotificationCount
+              }
+            }
+        """.trimIndent()
+        GraphQLClient.query(query = query, token = token)
+    }
+
+    suspend fun fetchBrandDashboard(token: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val query = """
+            query GetBrandDashboard {
+              getBrandDashboard {
+                profile {
+                  id email name role profileCompleted updatedAt about profileUrl logoUrl averageRating isVerified
+                  brandCategories { category subCategories }
+                }
+                collaborations {
+                  id status message pricing { platform deliverable price currency } initiatedBy createdAt updatedAt paymentStatus totalAmount
+                  campaign { id title status }
+                  influencer { name logoUrl }
+                }
+                topPicks {
+                  id name bio location logoUrl isVerified averageRating tier totalFollowers engagementRate
+                  categories { category subCategories }
+                  platforms { platform followers engagement }
+                  aiInsights { primaryNiche brandSuitability aiSummary }
+                }
+                activity {
+                  id title body isRead createdAt
+                }
+              }
+            }
+        """.trimIndent()
+        GraphQLClient.query(query = query, token = token)
+    }
+
+    suspend fun fetchInfluencerHomeDashboard(token: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val query = """
+            query GetInfluencerHomeDashboard {
+              me {
+                id name email role profileCompleted updatedAt bio location gender motherTongue languagesKnown
+                categories { category subCategories }
+                platforms { platform profileUrl followers avgViews engagement formats connected }
+                strengths pricing { platform deliverable price currency }
+                availability logoUrl isVerified averageRating
+                youtubeInsights { channelId title description subscribers totalViews totalVideos demographics { ageGroup gender percentage } lastSynced }
+                instagramMetrics { avgComments avgLikes avgViews postingFrequencyDays totalPostsAnalyzed updatedAt }
+                instagramProfiles { id profileUrl username followers isDefault connectedAt metrics { avgLikes avgComments avgViews postingFrequencyDays totalPostsAnalyzed updatedAt } }
+              }
+              getCollaborations {
+                id status message pricing { platform deliverable price currency } initiatedBy createdAt updatedAt paymentStatus totalAmount
+                brand { id name logoUrl }
+                campaign { id title status }
+                selectedInstagramProfileId
+              }
+              getCampaigns(limit: 5) {
+                id title description budgetMin budgetMax startDate endDate status createdAt
+                brand { name logoUrl averageRating isVerified }
+                categories { category }
+                platforms { platform }
+              }
+              getUnreadNotificationCount
+            }
+        """.trimIndent()
+        GraphQLClient.query(query = query, token = token)
+    }
+
     suspend fun signUp(name: String, role: String, token: String): Result<String> = withContext(Dispatchers.IO) {
         try {
             val url = URL(BACKEND_URL)

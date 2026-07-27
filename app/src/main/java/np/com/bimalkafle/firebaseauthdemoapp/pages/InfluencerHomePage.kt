@@ -86,29 +86,21 @@ fun InfluencerHomePage(
 ) {
     val authState = authViewModel.authState.observeAsState()
     val collaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
+    // Uses dashboardCampaigns from unified dashboard fetch
+    val dashboardCampaigns by influencerViewModel.dashboardCampaigns.observeAsState(initial = emptyList())
     val campaigns by campaignViewModel.campaigns.observeAsState(initial = emptyList())
     
-    // Recommended Campaign streams
     val overallRecommendedCampaigns by campaignViewModel.overallRecommendedCampaigns.observeAsState(initial = emptyList())
     val youtubeRecommendedCampaigns by campaignViewModel.youtubeRecommendedCampaigns.observeAsState(initial = emptyList())
     val instagramRecommendedCampaigns by campaignViewModel.instagramRecommendedCampaigns.observeAsState(initial = emptyList())
     
-    // Combine loading states
-    val isInfluencerLoading by influencerViewModel.loading.observeAsState(initial = false)
-    val isCampaignLoading by campaignViewModel.loading.observeAsState(initial = false)
-    val isLoading = isInfluencerLoading || isCampaignLoading
-    
-    // Combine error states
+    val isLoading by influencerViewModel.loading.observeAsState(initial = false)
     val influencerError by influencerViewModel.error.observeAsState()
-    val campaignError by campaignViewModel.error.observeAsState()
-    
     val influencerProfile by influencerViewModel.influencerProfile.observeAsState()
     val wishlistedCampaigns by campaignViewModel.wishlistedCampaigns.observeAsState(initial = emptyList())
     var firebaseToken by remember { mutableStateOf<String?>(null) }
-    val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
-
-    // State to handle debug visibility
-    var showDebugInfo by remember { mutableStateOf(false) }
+    // unreadCount is now part of the unified influencerViewModel fetch
+    val unreadCount by influencerViewModel.unreadCount.observeAsState(0)
 
     LaunchedEffect(Unit) {
         val currentUser = FirebaseAuth.getInstance().currentUser
@@ -116,21 +108,10 @@ fun InfluencerHomePage(
             ?.addOnSuccessListener { result ->
                 firebaseToken = result.token
                 firebaseToken?.let { token ->
-                    influencerViewModel.fetchInfluencerDetails(token)
-                    influencerViewModel.fetchCollaborations(token)
-                    campaignViewModel.fetchCampaigns(token)
-                    notificationViewModel.fetchUnreadCount(currentUser.uid, token)
+                    // Unified call replacing 4 separate fetches
+                    influencerViewModel.fetchHomeDashboard(token)
                 }
             }
-    }
-
-    // Effect to show debug info briefly when an error occurs or data is empty
-    LaunchedEffect(influencerError, campaignError, collaborations, campaigns) {
-        if (influencerError != null || campaignError != null || collaborations.isEmpty() || campaigns.isEmpty()) {
-            showDebugInfo = true
-            delay(100) // Show for 100ms (as close to "a millisecond" while still being visible/removable)
-            showDebugInfo = false
-        }
     }
 
     LaunchedEffect(authState.value) {
@@ -145,17 +126,19 @@ fun InfluencerHomePage(
     var selectedPlatform by remember { mutableStateOf("All") }
     val platforms = listOf("All", "YouTube", "Instagram", "Facebook")
 
-    val filteredCampaigns = remember(selectedPlatform, campaigns, overallRecommendedCampaigns, youtubeRecommendedCampaigns, instagramRecommendedCampaigns) {
+    val effectiveCampaigns = dashboardCampaigns.ifEmpty { campaigns }
+
+    val filteredCampaigns = remember(selectedPlatform, effectiveCampaigns, overallRecommendedCampaigns, youtubeRecommendedCampaigns, instagramRecommendedCampaigns) {
         val list = when (selectedPlatform) {
-            "All" -> overallRecommendedCampaigns.ifEmpty { campaigns }
+            "All" -> overallRecommendedCampaigns.ifEmpty { effectiveCampaigns }
             "YouTube" -> youtubeRecommendedCampaigns.ifEmpty {
-                campaigns.filter { it.platforms?.any { p -> p.platform.equals("YouTube", true) } == true }
+                effectiveCampaigns.filter { it.platforms?.any { p -> p.platform.equals("YouTube", true) } == true }
             }
             "Instagram" -> instagramRecommendedCampaigns.ifEmpty {
-                campaigns.filter { it.platforms?.any { p -> p.platform.equals("Instagram", true) } == true }
+                effectiveCampaigns.filter { it.platforms?.any { p -> p.platform.equals("Instagram", true) } == true }
             }
-            "Facebook" -> campaigns.filter { it.platforms?.any { p -> p.platform.equals("Facebook", true) } == true }
-            else -> campaigns
+            "Facebook" -> effectiveCampaigns.filter { it.platforms?.any { p -> p.platform.equals("Facebook", true) } == true }
+            else -> effectiveCampaigns
         }
         list.take(10)
     }
@@ -179,7 +162,7 @@ fun InfluencerHomePage(
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
 
-        if (isLoading && campaigns.isEmpty() && collaborations.isEmpty()) {
+        if (isLoading && effectiveCampaigns.isEmpty() && collaborations.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 LoadingState(message = "Loading your dashboard…")
             }
@@ -191,10 +174,7 @@ fun InfluencerHomePage(
                     currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                         firebaseToken = result.token
                         firebaseToken?.let { token ->
-                            influencerViewModel.fetchInfluencerDetails(token, force = true)
-                            influencerViewModel.fetchCollaborations(token, force = true)
-                            campaignViewModel.fetchCampaigns(token, force = true)
-                            notificationViewModel.fetchUnreadCount(currentUser.uid, token, force = true)
+                            influencerViewModel.fetchHomeDashboard(token, force = true)
                         }
                     }
                 },
@@ -220,20 +200,6 @@ fun InfluencerHomePage(
                             engagementRatePercent = performanceStats.engagementRatePercent,
                             impressions = performanceStats.impressions
                         )
-                    }
-
-                    // Checklist item for debugging - Controlled by showDebugInfo
-                    item {
-                        if (showDebugInfo) {
-                            FetchStatusChecklist(
-                                influencerId = influencerProfile?.id,
-                                tokenPresent = firebaseToken != null,
-                                collabCount = collaborations.size,
-                                campaignCount = campaigns.size,
-                                influencerError = influencerError,
-                                campaignError = campaignError
-                            )
-                        }
                     }
 
                     item {
@@ -333,7 +299,7 @@ fun InfluencerHomePage(
                             EmptyState(
                                 icon = Icons.Default.Campaign,
                                 title = "No campaigns yet",
-                                subtitle = if (campaigns.isEmpty()) "Check back soon for new campaigns." else "No campaigns found for $selectedPlatform."
+                                subtitle = if (effectiveCampaigns.isEmpty()) "Check back soon for new campaigns." else "No campaigns found for $selectedPlatform."
                             )
                         }
                     } else {
@@ -362,56 +328,6 @@ fun InfluencerHomePage(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun FetchStatusChecklist(
-    influencerId: String?,
-    tokenPresent: Boolean,
-    collabCount: Int,
-    campaignCount: Int,
-    influencerError: String?,
-    campaignError: String?
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
-        border = BorderStroke(1.dp, Color(0xFFFFB74D))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Debug: Fetch Status", fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
-            Spacer(modifier = Modifier.height(8.dp))
-            StatusItem("Influencer ID Detected", influencerId != null)
-            StatusItem("Auth Token Present", tokenPresent)
-            StatusItem("Collaborations Count", collabCount > 0, suffix = ": $collabCount")
-            StatusItem("Campaigns Count", campaignCount > 0, suffix = ": $campaignCount")
-            
-            if (influencerError != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Influencer Error: $influencerError", color = Color.Red, fontSize = 12.sp)
-            }
-            if (campaignError != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Campaign Error: $campaignError", color = Color.Red, fontSize = 12.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun StatusItem(label: String, success: Boolean, suffix: String = "") {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            if (success) Icons.Default.CheckCircle else Icons.Default.Cancel,
-            contentDescription = null,
-            tint = if (success) Color(0xFF4CAF50) else Color.Red,
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = "$label$suffix", fontSize = 14.sp)
     }
 }
 

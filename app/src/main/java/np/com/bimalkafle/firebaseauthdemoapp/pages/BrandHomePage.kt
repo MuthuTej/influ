@@ -67,6 +67,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 
 private val brandThemeColor: Color
     @Composable get() = MaterialTheme.colorScheme.primary
+
 @Composable
 fun BrandHomePage(
     modifier: Modifier = Modifier,
@@ -88,14 +89,13 @@ fun BrandHomePage(
     
     var firebaseToken by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    // Note: Activity feed can also be unified, but keep notification unread count separately if needed
     val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
     val brandProfile by brandViewModel.brandProfile.observeAsState()
 
     LaunchedEffect(errorMsg) {
-        errorMsg?.let {
-            if (it.isNotEmpty()) {
-                Toast.makeText(context, "Server Error: $it", Toast.LENGTH_LONG).show()
-            }
+        if (!errorMsg.isNullOrBlank()) {
+            Toast.makeText(context, "Server Error: $errorMsg", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -105,10 +105,8 @@ fun BrandHomePage(
             ?.addOnSuccessListener { result ->
                 firebaseToken = result.token
                 firebaseToken?.let { token ->
-                    brandViewModel.fetchCollaborations(token)
-                    brandViewModel.fetchHomeRecommendations(token)
-                    brandViewModel.fetchBrandDetails(token)
-                    notificationViewModel.fetchNotifications(currentUser.uid, token)
+                    // Unified dashboard call
+                    brandViewModel.fetchHomeDashboard(token)
                 }
             }
     }
@@ -158,10 +156,7 @@ fun BrandHomePage(
                     currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                         firebaseToken = result.token
                         firebaseToken?.let { token ->
-                            brandViewModel.fetchCollaborations(token, force = true)
-                            brandViewModel.fetchHomeRecommendations(token, force = true)
-                            brandViewModel.fetchBrandDetails(token, force = true)
-                            notificationViewModel.fetchNotifications(currentUser.uid, token, force = true)
+                            brandViewModel.fetchHomeDashboard(token, force = true)
                         }
                     }
                 },
@@ -252,179 +247,13 @@ fun BrandHeaderAndReachSection(
                 navController.navigate("all_campaigns?filter=COMPLETED")
             }
         ),
-        ctaLabel = "Find Influencer",
-        onCtaClick = { navController.navigate("brand_search") },
-        onHeartClick = { navController.navigate("brand_wishlist") },
-        onBellClick = { navController.navigate("notifications") },
-        leadingIcons = {
-            Surface(
-                shape = CircleShape,
-                color = Color.White.copy(alpha = 0.22f),
-                modifier = Modifier.size(48.dp).clickable { navController.navigate("all_campaigns") }
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Campaign, contentDescription = "View all campaigns", tint = Color.White, modifier = Modifier.size(20.dp))
-                }
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-        }
+        ctaLabel = "Launch Campaign",
+        onCtaClick = { navController.navigate("create_campaign") },
+        onHeartClick = { navController.navigate("wishlist") },
+        onBellClick = { navController.navigate("notifications") }
     )
 }
 
-// ── Spend Breakdown ──────────────────────────────────────────────────────────
-// Weekly/Monthly/Yearly re-slice of the same paid-collaboration data the hero
-// card's single "Total Spend" number already reads (computeBrandSpendBuckets,
-// viewmodel/HeroStats.kt) — no extra network call. Direct port of
-// connect_flutter's SpendBreakdownSection widget; no charting library
-// dependency exists in this app (checked app/build.gradle.kts), so the bar
-// chart below is hand-rolled from Boxes, same as the Flutter version's
-// FractionallySizedBox approach.
-
-private val spendPeriodOptions = listOf(
-    SpendBucketPeriod.WEEKLY to "Weekly",
-    SpendBucketPeriod.MONTHLY to "Monthly",
-    SpendBucketPeriod.YEARLY to "Yearly"
-)
-
-@Composable
-fun SpendBreakdownSection(collaborations: List<Collaboration>) {
-    var period by remember { mutableStateOf(SpendBucketPeriod.MONTHLY) }
-    val themeColor = brandThemeColor
-    val buckets = remember(collaborations, period) { computeBrandSpendBuckets(collaborations, period) }
-    val maxAmount = buckets.maxOfOrNull { it.amount } ?: 0.0
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        shadowElevation = 2.dp
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Spend Breakdown", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-                SpendPeriodToggle(selected = period, onSelected = { period = it }, themeColor = themeColor)
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            if (maxAmount <= 0.0) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("No paid spend in this window yet", color = Color.Gray, fontSize = 13.sp)
-                }
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    buckets.forEach { bucket ->
-                        SpendBar(
-                            bucket = bucket,
-                            maxAmount = maxAmount,
-                            color = themeColor,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SpendPeriodToggle(
-    selected: SpendBucketPeriod,
-    onSelected: (SpendBucketPeriod) -> Unit,
-    themeColor: Color
-) {
-    Surface(
-        color = themeColor.copy(alpha = 0.08f),
-        shape = RoundedCornerShape(10.dp)
-    ) {
-        Row(modifier = Modifier.padding(3.dp)) {
-            spendPeriodOptions.forEach { (optionPeriod, label) ->
-                val isSelected = optionPeriod == selected
-                Surface(
-                    color = if (isSelected) themeColor else Color.Transparent,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.clickable { onSelected(optionPeriod) }
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isSelected) Color.White else Color(0xFF616161),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SpendBar(
-    bucket: SpendBucket,
-    maxAmount: Double,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    val rawFraction = if (maxAmount > 0) (bucket.amount / maxAmount).toFloat().coerceIn(0f, 1f) else 0f
-    // A non-zero bucket always shows at least a sliver of a bar so it doesn't
-    // visually disappear next to a much larger neighbor.
-    val heightFraction = if (rawFraction < 0.04f && bucket.amount > 0) 0.04f else rawFraction
-
-    Column(
-        modifier = modifier.padding(horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = if (bucket.amount > 0) formatCompactCount(bucket.amount.toLong()) else "",
-            fontSize = 9.sp,
-            color = Color.Gray,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(heightFraction)
-                    .background(
-                        color = if (bucket.amount > 0) color else color.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
-                    )
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = bucket.label,
-            fontSize = 9.sp,
-            color = Color(0xFF616161),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ActiveCampaignSection(
     collaborations: List<Collaboration>,
@@ -433,12 +262,28 @@ fun ActiveCampaignSection(
     onCollaborationClick: (String) -> Unit,
     onViewAllClick: () -> Unit
 ) {
+    val activeCollabs = collaborations.filter { it.status == "ACCEPTED" || it.status == "IN_PROGRESS" }
+    
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
-            Text("Active Collaborations", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
+            Text(text = "Active Collaborations", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(modifier = Modifier.width(8.dp))
-            Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(brandThemeColor.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
-                Text(collaborations.size.toString(), color = brandThemeColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(brandThemeColor.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = activeCollabs.size.toString(),
+                    color = brandThemeColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
             }
             Spacer(modifier = Modifier.weight(1f))
             Text(
@@ -449,51 +294,37 @@ fun ActiveCampaignSection(
                 modifier = Modifier.clickable { onViewAllClick() }
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        if (collaborations.isEmpty()) {
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (activeCollabs.isEmpty()) {
             EmptyState(
                 icon = Icons.Default.Campaign,
-                title = "No active collaborations yet",
-                subtitle = "Find an influencer to start your first campaign."
+                title = "No active campaigns",
+                subtitle = "Invite influencers to your campaigns to see them here."
             )
         } else {
             val configuration = LocalConfiguration.current
             val screenWidth = configuration.screenWidthDp.dp
             val cardWidth = (screenWidth * 0.85f).coerceIn(280.dp, 320.dp)
+
             LazyRow(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp).padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 150.dp).padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(collaborations) { collaboration ->
+                items(activeCollabs) { collaboration ->
                     val pricing = collaboration.pricing?.firstOrNull()
-                    val updatedAt = collaboration.influencer.updatedAt
-                    fun calculateDaysAgo(updatedAt: String?): String {
-                        return try {
-                            val instant = Instant.parse(updatedAt)
-                            val updatedDate = instant.atZone(ZoneId.systemDefault()).toLocalDate()
-                            val today = LocalDateTime.now().toLocalDate()
-                            val days = ChronoUnit.DAYS.between(updatedDate, LocalDateTime.now().toLocalDate())
-                            when {
-                                days == 0L -> "Today"
-                                days == 1L -> "1 day ago"
-                                else -> "$days days ago"
-                            }
-                        } catch (e: Exception) { "Recently" }
-                    }
                     Box(modifier = Modifier.width(cardWidth)) {
-                        CampaignItem(
-                            collaborationId = collaboration.id,
-                            influencerName = collaboration.influencer.name,
-                            influencerLogo = collaboration.influencer.logoUrl,
+                        CollaborationItem(
+                            brandName = brandName,
+                            brandLogo = null,
                             campaignTitle = collaboration.campaign.title,
                             status = collaboration.status,
                             deliverable = pricing?.deliverable ?: "N/A",
                             platform = pricing?.platform ?: "N/A",
                             price = pricing?.price ?: 0,
                             currency = pricing?.currency ?: "USD",
-                            time = calculateDaysAgo(updatedAt),
-                            brandViewModel = brandViewModel,
-                            brandName = brandName,
+                            time = "Updated ${formatTime(collaboration.updatedAt)}",
                             onClick = { onCollaborationClick(collaboration.id) }
                         )
                     }
@@ -503,67 +334,18 @@ fun ActiveCampaignSection(
     }
 }
 
-@Composable
-fun CampaignItem(
-    collaborationId: String,
-    influencerName: String,
-    campaignTitle: String,
-    status: String,
-    deliverable: String,
-    platform: String,
-    price: Int,
-    currency: String,
-    time: String,
-    influencerLogo: String?,
-    brandViewModel: BrandViewModel,
-    brandName: String,
-    onClick: () -> Unit
-) {
-    val statusColor = when (status) {
-        "ACCEPTED" -> Color(0xFF4CAF50)
-        "PENDING" -> Color(0xFFFFB74D)
-        "REJECTED" -> Color(0xFFE57373)
-        "IN_PROGRESS" -> Color(0xFF42A5F5)
-        "COMPLETED" -> Color(0xFF66BB6A)
-        else -> Color.Gray
-    }
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(shape = CircleShape, color = brandThemeColor.copy(alpha = 0.15f), modifier = Modifier.size(40.dp)) {
-                         if (!influencerLogo.isNullOrEmpty()) {
-                            AsyncImage(model = influencerLogo, contentDescription = influencerName, modifier = Modifier.fillMaxSize().clip(CircleShape), contentScale = ContentScale.Crop)
-                        } else {
-                            Box(contentAlignment = Alignment.Center) { Text(text = influencerName.firstOrNull()?.uppercase() ?: "I", color = brandThemeColor, fontWeight = FontWeight.Bold) }
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = influencerName, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(text = campaignTitle, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Surface(shape = RoundedCornerShape(25), color = statusColor.copy(alpha = 0.15f)) {
-                    Text(text = status, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 8.sp, fontWeight = FontWeight.Bold, color = statusColor)
-                }
-            }
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "$deliverable • $platform", fontWeight = FontWeight.Medium, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(text = "$currency $price", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = brandThemeColor)
-                }
-                Text(text = time, fontSize = 10.sp, color = Color.Gray)
-            }
+private fun formatTime(updatedAt: String?): String {
+    return try {
+        val instant = Instant.parse(updatedAt)
+        val updatedDate = instant.atZone(ZoneId.systemDefault()).toLocalDate()
+        val today = LocalDateTime.now().toLocalDate()
+        val days = ChronoUnit.DAYS.between(updatedDate, today)
+        when {
+            days == 0L -> "Today"
+            days == 1L -> "1 day ago"
+            else -> "$days days ago"
         }
-    }
+    } catch (e: Exception) { "Recently" }
 }
 
 @Composable
@@ -574,127 +356,161 @@ fun TopPicksSectionBrand(
     wishlistedInfluencers: List<InfluencerProfile>,
     onWishlistToggle: (InfluencerProfile) -> Unit,
     navController: NavController,
-    brandCategories: List<String> = emptyList()
+    brandCategories: List<String>
 ) {
     var selectedPlatform by remember { mutableStateOf("All") }
-    val platforms = listOf("All", "YouTube", "Instagram", "Facebook")
-    
-    val filteredInfluencers = remember(selectedPlatform, overallTopInfluencers, youtubeTopInfluencers, instagramTopInfluencers) {
-        when (selectedPlatform) {
-            "YouTube" -> youtubeTopInfluencers
-            "Instagram" -> instagramTopInfluencers
-            "All" -> overallTopInfluencers
-            else -> overallTopInfluencers // Default or fallback
-        }
-    }
-    
-    val youtubeColor = Color(0xFFFF0000)
-    val instagramColor = Color(0xFFE1306C)
-    val facebookColor = Color(0xFF1877F2)
+    val platforms = listOf("All", "YouTube", "Instagram")
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Top Influencers", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(
-                text = "See All",
-                color = brandThemeColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                modifier = Modifier.clickable {
-                    // Top Picks above is filtered to this brand's own category, so "See
-                    // All" should land on the full, paginated, same-category results
-                    // rather than an unfiltered search — pre-seed the search screen's
-                    // category filter the same way.
-                    if (brandCategories.isNotEmpty()) {
-                        val encoded = brandCategories.joinToString(",") { Uri.encode(it) }
-                        navController.navigate("brand_search?categories=$encoded")
-                    } else {
-                        navController.navigate("brand_search")
-                    }
-                }
-            )
-        }
+    val influencersToShow = when (selectedPlatform) {
+        "YouTube" -> youtubeTopInfluencers
+        "Instagram" -> instagramTopInfluencers
+        else -> overallTopInfluencers
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) {
+        Text(
+            text = "Influencer Picks for You",
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        
         Spacer(modifier = Modifier.height(16.dp))
-        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
             TabRow(
-                selectedTabIndex = platforms.indexOf(selectedPlatform), 
-                containerColor = Color.Transparent, 
+                selectedTabIndex = platforms.indexOf(selectedPlatform),
+                containerColor = Color.Transparent,
                 indicator = { tabPositions ->
-                    val currentTabColor = when (selectedPlatform) {
-                        "YouTube" -> youtubeColor
-                        "Instagram" -> instagramColor
-                        "Facebook" -> facebookColor
-                        else -> brandThemeColor
-                    }
                     TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(tabPositions[platforms.indexOf(selectedPlatform)]), 
-                        color = currentTabColor
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[platforms.indexOf(selectedPlatform)]),
+                        color = brandThemeColor
                     )
                 }
             ) {
                 platforms.forEach { platform ->
-                    val iconRes = when (platform) {
-                        "YouTube" -> R.drawable.youtube_logo
-                        "Instagram" -> R.drawable.instagram_logo
-                        "Facebook" -> R.drawable.ic_facebook
-                        else -> R.drawable.vector 
-                    }
-                    val iconColor = when (platform) {
-                        "YouTube" -> youtubeColor
-                        "Instagram" -> instagramColor
-                        "Facebook" -> facebookColor
-                        else -> brandThemeColor
-                    }
                     Tab(
-                        selected = selectedPlatform == platform, 
-                        onClick = { selectedPlatform = platform }, 
-                        icon = { 
+                        selected = selectedPlatform == platform,
+                        onClick = { selectedPlatform = platform },
+                        text = { Text(text = platform, fontWeight = FontWeight.Medium) },
+                        icon = {
                             if (platform == "All") {
-                                Icon(Icons.Default.Groups, contentDescription = "All", modifier = Modifier.size(24.dp), tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f))
-                            } else if (platform == "YouTube" || platform == "Instagram") {
-                                Image(
-                                    painter = painterResource(id = iconRes),
-                                    contentDescription = platform,
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .alpha(if (selectedPlatform == platform) 1f else 0.5f)
-                                )
+                                Icon(Icons.Default.Star, contentDescription = null)
                             } else {
-                                Icon(
-                                    painter = painterResource(id = iconRes), 
-                                    contentDescription = platform, 
-                                    modifier = Modifier.size(24.dp),
-                                    tint = if (selectedPlatform == platform) iconColor else iconColor.copy(alpha = 0.5f)
-                                ) 
+                                Image(
+                                    painter = painterResource(id = if (platform == "YouTube") R.drawable.youtube_logo else R.drawable.instagram_logo),
+                                    contentDescription = platform,
+                                    modifier = Modifier.size(20.dp).alpha(if (selectedPlatform == platform) 1f else 0.5f)
+                                )
                             }
-                        },
-                        text = { Text(platform, fontSize = 10.sp, fontWeight = if (selectedPlatform == platform) FontWeight.Bold else FontWeight.Normal) }
+                        }
                     )
                 }
             }
         }
+
         Spacer(modifier = Modifier.height(16.dp))
-        if (filteredInfluencers.isEmpty()) {
+
+        if (influencersToShow.isEmpty()) {
             EmptyState(
-                icon = Icons.Default.Groups,
+                icon = Icons.Default.PersonSearch,
                 title = "No recommendations yet",
-                subtitle = "We couldn't find $selectedPlatform influencers to recommend right now."
+                subtitle = "Complete your brand profile to get personalized picks."
             )
         } else {
-            filteredInfluencers.forEach { influencer ->
+            influencersToShow.take(10).forEach { influencer ->
                 BrandCardBrand(
                     influencer = influencer,
                     isWishlisted = wishlistedInfluencers.any { it.id == influencer.id },
                     onWishlistToggle = { onWishlistToggle(influencer) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    onCardClick = { navController.navigate("brand_influencer_detail/${influencer.id}") },
-                    selectedPlatform = if (selectedPlatform == "All") null else selectedPlatform
+                    onCardClick = { navController.navigate("influencer_detail/${influencer.id}") },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
+            
+            Button(
+                onClick = { navController.navigate("brand_influencer_search") },
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = brandThemeColor)
+            ) {
+                Text("Explore More Influencers")
+            }
+        }
+    }
+}
+
+@Composable
+fun SpendBreakdownSection(collaborations: List<Collaboration>) {
+    var selectedPeriod by remember { mutableStateOf(SpendBucketPeriod.MONTHLY) }
+    val buckets = remember(collaborations, selectedPeriod) { 
+        computeBrandSpendBuckets(collaborations, selectedPeriod) 
+    }
+    val totalAmount = remember(buckets) { buckets.sumOf { it.amount } }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "Spend Overview", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    TextButton(onClick = { expanded = true }) {
+                        Text(
+                            text = when(selectedPeriod) {
+                                SpendBucketPeriod.WEEKLY -> "Last 8 Weeks"
+                                SpendBucketPeriod.MONTHLY -> "Last 6 Months"
+                                SpendBucketPeriod.YEARLY -> "Last 5 Years"
+                            },
+                            color = brandThemeColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = brandThemeColor)
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        SpendBucketPeriod.values().forEach { period ->
+                            DropdownMenuItem(
+                                text = { Text(period.name.lowercase().capitalize()) },
+                                onClick = {
+                                    selectedPeriod = period
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = "₹${formatCompactCount(totalAmount.toInt())}",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.Black
+                )
+            }
+            
+            Text(
+                text = "Total spend in the selected period",
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
         }
     }
 }

@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 
 import np.com.bimalkafle.firebaseauthdemoapp.BuildConfig
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
+import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import np.com.bimalkafle.firebaseauthdemoapp.network.GraphQLClient
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -74,6 +75,34 @@ class BrandViewModel : ViewModel() {
     // data was fetched within the last minute, so switching tabs doesn't discard
     // good cached data. Pass force = true (e.g. pull-to-refresh) to bypass it.
     private val fetchThrottle = FetchThrottle()
+
+    // ── Unified Brand Dashboard Fetch ────────────────────────────────────────
+
+    fun fetchHomeDashboard(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("brandDashboard", force)) return
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val result = BackendRepository.fetchBrandDashboard(token)
+            result.onSuccess { json ->
+                val data = json.optJSONObject("data")?.optJSONObject("getBrandDashboard")
+                if (data != null) {
+                    // 1. Parse Profile
+                    data.optJSONObject("profile")?.let { _brandProfile.postValue(parseBrand(it)) }
+                    // 2. Parse Collaborations
+                    data.optJSONArray("collaborations")?.let { _collaborations.postValue(parseCollaborations(it)) }
+                    // 3. Parse Top Picks
+                    data.optJSONArray("topPicks")?.let { _overallTopInfluencers.postValue(parseInfluencers(it)) }
+                    // Activity/Notifications can be handled here or separately
+                }
+                _loading.postValue(false)
+            }.onFailure {
+                Log.e("BrandViewModel", "Dashboard fetch error", it)
+                _error.postValue(it.message)
+                _loading.postValue(false)
+            }
+        }
+    }
 
     fun fetchInfluencerRecommendations(token: String, allInfluencers: List<InfluencerProfile>? = null) {
         viewModelScope.launch {
