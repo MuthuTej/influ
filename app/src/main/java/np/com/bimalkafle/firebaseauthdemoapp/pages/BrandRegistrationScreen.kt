@@ -402,7 +402,7 @@ fun BrandRegistrationScreen(
             OutlinedTextField(
                 value = logoUrl,
                 onValueChange = { logoUrl = it },
-                label = { Text("Logo URL") },
+                label = { Text("Logo URL (optional — leave blank to keep your signup photo)") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary)

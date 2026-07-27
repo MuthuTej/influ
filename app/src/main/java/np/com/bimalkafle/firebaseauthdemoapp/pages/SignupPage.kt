@@ -1,5 +1,10 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,9 +15,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -37,14 +44,54 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
+import java.io.ByteArrayOutputStream
+
+/**
+ * Downscales the picked image to at most 512px on the long edge and compresses it to
+ * JPEG ~80% quality before base64-encoding — keeps the GraphQL request body small and
+ * keeps Firebase Storage bandwidth/cost down regardless of the original photo's size.
+ */
+private suspend fun encodeImageForUpload(context: Context, uri: Uri): Pair<String, String>? =
+    withContext(Dispatchers.IO) {
+        try {
+            val original = context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream)
+            } ?: return@withContext null
+
+            val maxDimension = 512
+            val largestSide = maxOf(original.width, original.height)
+            val scale = if (largestSide > maxDimension) maxDimension.toFloat() / largestSide else 1f
+            val resized = if (scale < 1f) {
+                Bitmap.createScaledBitmap(
+                    original,
+                    (original.width * scale).toInt().coerceAtLeast(1),
+                    (original.height * scale).toInt().coerceAtLeast(1),
+                    true
+                )
+            } else {
+                original
+            }
+
+            val outputStream = ByteArrayOutputStream()
+            resized.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+            val base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+            base64 to "image/jpeg"
+        } catch (e: Exception) {
+            null
+        }
+    }
 
 @Composable
 fun SignupPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
@@ -53,10 +100,16 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
     var confirmPassword by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("BRAND") } // Default role
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
 
     val authState = authViewModel.authState.observeAsState()
     val context = LocalContext.current
     val prefsManager = PrefsManager(context)
+    val coroutineScope = rememberCoroutineScope()
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) photoUri = uri
+    }
 
     // Google Sign In configuration
     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -142,20 +195,25 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
             onConfirmPasswordChange = { confirmPassword = it },
             role = role,
             onRoleChange = { role = it },
+            photoUri = photoUri,
+            onPickPhotoClick = { photoPickerLauncher.launch("image/*") },
             authState = authState.value,
-            onSignupClick = { 
+            onSignupClick = {
                 if (name.isBlank()) {
                     Toast.makeText(context, "${if (role == "BRAND") "Brand Name" else "Name"} is mandatory", Toast.LENGTH_SHORT).show()
                     return@SignupPageContent
                 }
-                if (authState.value is AuthState.GoogleNewUser) {
-                    authViewModel.completeBackendSignup(name, role)
-                } else {
-                    if (email.isBlank() || password.isBlank()) {
-                        Toast.makeText(context, "Email and password are required", Toast.LENGTH_SHORT).show()
-                        return@SignupPageContent
+                if (authState.value !is AuthState.GoogleNewUser && (email.isBlank() || password.isBlank())) {
+                    Toast.makeText(context, "Email and password are required", Toast.LENGTH_SHORT).show()
+                    return@SignupPageContent
+                }
+                coroutineScope.launch {
+                    val photoData = photoUri?.let { encodeImageForUpload(context, it) }
+                    if (authState.value is AuthState.GoogleNewUser) {
+                        authViewModel.completeBackendSignup(name, role, photoData?.first, photoData?.second)
+                    } else {
+                        authViewModel.signup(email, password, confirmPassword, name, role, photoData?.first, photoData?.second)
                     }
-                    authViewModel.signup(email, password, confirmPassword, name, role)
                 }
             },
             onGoogleSignupClick = {
@@ -194,6 +252,8 @@ fun SignupPageContent(
     onConfirmPasswordChange: (String) -> Unit,
     role: String,
     onRoleChange: (String) -> Unit,
+    photoUri: Uri?,
+    onPickPhotoClick: () -> Unit,
     authState: AuthState?,
     onSignupClick: () -> Unit,
     onGoogleSignupClick: () -> Unit,
@@ -260,6 +320,44 @@ fun SignupPageContent(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray.copy(alpha = 0.25f))
+                    .clickable { onPickPhotoClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                if (photoUri != null) {
+                    AsyncImage(
+                        model = photoUri,
+                        contentDescription = "Selected profile photo",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.AddAPhoto,
+                        contentDescription = "Add profile photo",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = if (photoUri != null) "Change photo" else "Add a profile photo (optional)",
+                fontSize = 12.sp,
+                color = Color.Gray,
+                modifier = Modifier.clickable { onPickPhotoClick() }
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -418,6 +516,8 @@ fun SignupPagePreview() {
         onConfirmPasswordChange = {},
         role = "BRAND",
         onRoleChange = {},
+        photoUri = null,
+        onPickPhotoClick = {},
         authState = null,
         onSignupClick = {},
         onGoogleSignupClick = {},

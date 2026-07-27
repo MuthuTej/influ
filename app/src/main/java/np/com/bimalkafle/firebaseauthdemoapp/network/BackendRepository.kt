@@ -71,6 +71,23 @@ object BackendRepository {
         }
     }
 
+    suspend fun uploadProfilePhoto(imageBase64: String, mimeType: String, token: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                val mutation = """
+                    mutation UploadProfilePhoto(${'$'}imageBase64: String!, ${'$'}mimeType: String!) {
+                        uploadProfilePhoto(imageBase64: ${'$'}imageBase64, mimeType: ${'$'}mimeType)
+                    }
+                """.trimIndent()
+                val variables = mapOf("imageBase64" to imageBase64, "mimeType" to mimeType)
+                val result = GraphQLClient.query(mutation, variables, token)
+                result.map { json -> json.getJSONObject("data").getString("uploadProfilePhoto") }
+            } catch (e: Exception) {
+                Log.e("BackendRepository", "uploadProfilePhoto: ${e.message}", e)
+                Result.failure(e)
+            }
+        }
+
     suspend fun getUserRole(token: String): Result<String> = withContext(Dispatchers.IO) {
         try {
             val url = URL(BACKEND_URL)
