@@ -8,8 +8,102 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
+data class InstagramProfileSummary(val username: String, val followers: Int?, val source: String?)
+
 object BackendRepository {
     private val BACKEND_URL = BuildConfig.BACKEND_BASE_URL
+
+    suspend fun fetchInfluencerDashboard(token: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val query = """
+            query GetInfluencerDashboard {
+              getInfluencerDashboard {
+                profile {
+                  id email name role profileCompleted updatedAt bio location gender motherTongue languagesKnown
+                  categories { category subCategories }
+                  platforms { platform profileUrl followers avgViews engagement formats connected }
+                  strengths pricing { platform deliverable price currency }
+                  availability logoUrl isVerified averageRating
+                  youtubeInsights { channelId title description subscribers totalViews totalVideos demographics { ageGroup gender percentage } lastSynced }
+                  instagramMetrics { avgComments avgLikes avgViews postingFrequencyDays totalPostsAnalyzed updatedAt engagementRate }
+                  instagramProfiles { id profileUrl username followers isDefault connectedAt metrics { avgLikes avgComments avgViews postingFrequencyDays totalPostsAnalyzed updatedAt engagementRate } aiInsights { primaryNiche brandSuitability aiSummary } }
+                  aiInsights { primaryNiche secondaryNiche tone brandSuitability aiSummary }
+                }
+                collaborations {
+                  id status message pricing { platform deliverable price currency } initiatedBy createdAt updatedAt paymentStatus totalAmount
+                  brand { id name logoUrl }
+                  campaign { id title status }
+                  selectedInstagramProfileId
+                }
+                recommendedCampaigns {
+                  id title description brandId budgetMin budgetMax createdAt aiScore
+                  categories { category subCategories }
+                  platforms { platform formats }
+                }
+                unreadNotificationCount
+              }
+            }
+        """.trimIndent()
+        GraphQLClient.query(query = query, token = token)
+    }
+
+    suspend fun fetchBrandDashboard(token: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val query = """
+            query GetBrandDashboard {
+              getBrandDashboard {
+                profile {
+                  id email name role profileCompleted updatedAt about profileUrl logoUrl averageRating isVerified
+                  brandCategories { category subCategories }
+                }
+                collaborations {
+                  id status message pricing { platform deliverable price currency } initiatedBy createdAt updatedAt paymentStatus totalAmount
+                  campaign { id title status }
+                  influencer { name logoUrl }
+                }
+                topPicks {
+                  id name bio location logoUrl isVerified averageRating tier totalFollowers engagementRate
+                  categories { category subCategories }
+                  platforms { platform followers engagement }
+                  aiInsights { primaryNiche brandSuitability aiSummary }
+                }
+                activity {
+                  id title body isRead createdAt
+                }
+              }
+            }
+        """.trimIndent()
+        GraphQLClient.query(query = query, token = token)
+    }
+
+    suspend fun fetchInfluencerHomeDashboard(token: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val query = """
+            query GetInfluencerHomeDashboard {
+              me {
+                id name email role profileCompleted updatedAt bio location gender motherTongue languagesKnown
+                categories { category subCategories }
+                platforms { platform profileUrl followers avgViews engagement formats connected }
+                strengths pricing { platform deliverable price currency }
+                availability logoUrl isVerified averageRating
+                youtubeInsights { channelId title description subscribers totalViews totalVideos demographics { ageGroup gender percentage } lastSynced }
+                instagramMetrics { avgComments avgLikes avgViews postingFrequencyDays totalPostsAnalyzed updatedAt }
+                instagramProfiles { id profileUrl username followers isDefault connectedAt metrics { avgLikes avgComments avgViews postingFrequencyDays totalPostsAnalyzed updatedAt } }
+              }
+              getCollaborations {
+                id status message pricing { platform deliverable price currency } initiatedBy createdAt updatedAt paymentStatus totalAmount
+                brand { id name logoUrl }
+                campaign { id title status }
+                selectedInstagramProfileId
+              }
+              getCampaigns(limit: 5) {
+                id title description budgetMin budgetMax startDate endDate status createdAt
+                brand { name logoUrl averageRating isVerified }
+                categories { category }
+                platforms { platform }
+              }
+              getUnreadNotificationCount
+            }
+        """.trimIndent()
+        GraphQLClient.query(query = query, token = token)
+    }
 
     suspend fun signUp(name: String, role: String, token: String): Result<String> = withContext(Dispatchers.IO) {
         try {
@@ -516,6 +610,134 @@ object BackendRepository {
             Result.failure(e)
         }
     }
+
+    // query { instagramAuthUrl } -> String! — starts real Instagram OAuth
+    // ("Instagram API with Instagram Login"). The backend records a
+    // single-use state doc for this influencer and returns the full Meta
+    // authorize URL; launch it in a Custom Tab and wait for the
+    // np.com.bimalkafle.firebaseauthdemoapp://instagram-callback redirect
+    // (see MainActivity.onNewIntent / InstagramAuthResult).
+    suspend fun instagramAuthUrl(token: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                query InstagramAuthUrl {
+                    instagramAuthUrl
+                }
+            """.trimIndent()
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    val authUrl = jsonResponse.optJSONObject("data")?.optString("instagramAuthUrl")
+                    if (authUrl.isNullOrBlank()) {
+                        Result.failure(Exception("No Instagram authorization URL returned"))
+                    } else {
+                        Result.success(authUrl)
+                    }
+                }
+            } else {
+                val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                Log.e("BackendRepository", "instagramAuthUrl Error Response: $errorResponse")
+                Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
+            }
+        } catch (e: Exception) {
+            Log.e("BackendRepository", "instagramAuthUrl Exception: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    // Lightweight refetch used right after an Instagram OAuth redirect
+    // completes, so InfluencerRegistrationScreen can show the real connected
+    // username/source without pulling in the full InfluencerViewModel (this
+    // screen talks to BackendRepository directly, same as connectYouTube above).
+    suspend fun fetchInstagramProfiles(token: String): Result<List<InstagramProfileSummary>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val url = URL(BACKEND_URL)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Authorization", "Bearer $token")
+                connection.doOutput = true
+
+                val query = """
+                    query FetchInstagramProfiles {
+                        me {
+                            ... on Influencer {
+                                instagramProfiles { username followers source }
+                            }
+                        }
+                    }
+                """.trimIndent()
+
+                val requestBody = JSONObject().apply { put("query", query) }.toString()
+                connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+                val responseCode = connection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                    SessionManager.notifySessionExpired()
+                    return@withContext Result.failure(UnauthorizedException())
+                }
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    val jsonResponse = JSONObject(response)
+
+                    if (jsonResponse.has("errors")) {
+                        val errors = jsonResponse.getJSONArray("errors")
+                        Result.failure(Exception(errors.getJSONObject(0).getString("message")))
+                    } else {
+                        val profilesArray = jsonResponse.optJSONObject("data")
+                            ?.optJSONObject("me")
+                            ?.optJSONArray("instagramProfiles")
+                        val profiles = mutableListOf<InstagramProfileSummary>()
+                        if (profilesArray != null) {
+                            for (i in 0 until profilesArray.length()) {
+                                val p = profilesArray.optJSONObject(i) ?: continue
+                                profiles.add(
+                                    InstagramProfileSummary(
+                                        username = p.optString("username"),
+                                        followers = if (p.has("followers") && !p.isNull("followers")) p.optInt("followers") else null,
+                                        source = if (p.has("source") && !p.isNull("source")) p.optString("source") else null
+                                    )
+                                )
+                            }
+                        }
+                        Result.success(profiles)
+                    }
+                } else {
+                    val errorResponse = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "Unknown error"
+                    Log.e("BackendRepository", "fetchInstagramProfiles Error Response: $errorResponse")
+                    Result.failure(Exception("Server returned code $responseCode: $errorResponse"))
+                }
+            } catch (e: Exception) {
+                Log.e("BackendRepository", "fetchInstagramProfiles Exception: ${e.message}", e)
+                Result.failure(e)
+            }
+        }
 
     suspend fun connectYouTube(authCode: String, token: String): Result<Boolean> =
         withContext(Dispatchers.IO) {

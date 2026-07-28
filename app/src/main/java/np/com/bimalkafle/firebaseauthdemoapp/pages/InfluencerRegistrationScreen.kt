@@ -3,6 +3,7 @@ package np.com.bimalkafle.firebaseauthdemoapp.pages
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -37,10 +38,12 @@ import androidx.navigation.NavController
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import androidx.compose.ui.platform.LocalContext
 import android.app.Activity
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.browser.customtabs.CustomTabsIntent
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -48,11 +51,21 @@ import com.google.android.gms.common.api.Scope
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
+import np.com.bimalkafle.firebaseauthdemoapp.network.InstagramAuthResult
 import org.json.JSONArray
 import org.json.JSONObject
 import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
 import np.com.bimalkafle.firebaseauthdemoapp.utils.IndianLocations
 import np.com.bimalkafle.firebaseauthdemoapp.utils.IndianLanguages
+
+/** One "Instagram Profiles" row's state — either OAuth-verified or scrape-fallback. */
+data class InstagramSlot(
+    val url: String = "",
+    val connected: Boolean = false,
+    val username: String? = null,
+    val source: String? = null,
+    val fallbackVisible: Boolean = false
+)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -95,7 +108,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
     var youtubeAuthCode by remember { mutableStateOf<String?>(null) }
     
     // --- Instagram Connection State ---
-    val instagramEntries = remember { mutableStateListOf(Pair("", false)) }
+    val instagramEntries = remember { mutableStateListOf(InstagramSlot()) }
     var connectingIndex by remember { mutableStateOf<Int?>(null) }
 
     // --- Facebook Connection State ---
@@ -137,6 +150,69 @@ fun InfluencerRegistrationScreen(navController: NavController) {
             }
         }
         isYouTubeConnecting = false
+    }
+
+    // Real Instagram OAuth ("Instagram API with Instagram Login"): a Custom
+    // Tab is launched to Meta's consent screen; connect-backend's
+    // /auth/instagram/callback finishes the token exchange server-side and
+    // redirects back to np.com.bimalkafle.firebaseauthdemoapp://instagram-callback,
+    // which MainActivity.onNewIntent picks up and republishes here via
+    // InstagramAuthResult (Compose can't receive onNewIntent directly).
+    fun connectInstagramProfile(index: Int) {
+        connectingIndex = index
+        auth.currentUser?.getIdToken(false)?.addOnSuccessListener { res ->
+            val token = res.token
+            if (token == null) {
+                connectingIndex = null
+                return@addOnSuccessListener
+            }
+            coroutineScope.launch {
+                BackendRepository.instagramAuthUrl(token)
+                    .onSuccess { authUrl ->
+                        CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(authUrl))
+                        // connectingIndex stays set until the LaunchedEffect
+                        // below observes the redirect result.
+                    }
+                    .onFailure {
+                        connectingIndex = null
+                        Toast.makeText(context, "Failed: ${it.message}", Toast.LENGTH_LONG).show()
+                    }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        InstagramAuthResult.result.collect { result ->
+            val index = connectingIndex ?: return@collect
+            if (result.status == "success") {
+                auth.currentUser?.getIdToken(false)?.addOnSuccessListener { res ->
+                    val token = res.token
+                    if (token == null) {
+                        connectingIndex = null
+                        return@addOnSuccessListener
+                    }
+                    coroutineScope.launch {
+                        BackendRepository.fetchInstagramProfiles(token)
+                            .onSuccess { profiles ->
+                                val connected = profiles.lastOrNull()
+                                instagramEntries[index] = instagramEntries[index].copy(
+                                    connected = true,
+                                    username = connected?.username,
+                                    source = connected?.source
+                                )
+                                Toast.makeText(context, "Instagram Connected & Saved", Toast.LENGTH_SHORT).show()
+                            }
+                            .onFailure {
+                                Toast.makeText(context, "Connected, but refreshing profile failed: ${it.message}", Toast.LENGTH_LONG).show()
+                            }
+                        connectingIndex = null
+                    }
+                }
+            } else {
+                Toast.makeText(context, result.message ?: "Instagram connection failed", Toast.LENGTH_LONG).show()
+                connectingIndex = null
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -570,52 +646,101 @@ fun InfluencerRegistrationScreen(navController: NavController) {
             if (selectedPlatforms.contains("Instagram")) {
                 Text("Instagram Profiles", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFFE1306C))
                 Spacer(modifier = Modifier.height(8.dp))
-                instagramEntries.forEachIndexed { index, (url, connected) ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = url,
-                            onValueChange = { instagramEntries[index] = Pair(it, false) },
-                            label = { Text("Profile URL ${index + 1}") },
-                            modifier = Modifier.weight(1f),
+                instagramEntries.forEachIndexed { index, entry ->
+                    if (entry.connected) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(BorderStroke(1.dp, Color(0xFF4CAF50)), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF4CAF50))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                entry.username?.let { "@$it" } ?: "Connected",
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                if (entry.source == "oauth") "Verified" else "Estimated",
+                                fontSize = 12.sp,
+                                color = if (entry.source == "oauth") Color(0xFF4CAF50) else Color.Gray
+                            )
+                        }
+                    } else {
+                        Button(
+                            onClick = { connectInstagramProfile(index) },
+                            modifier = Modifier.fillMaxWidth().height(46.dp),
+                            enabled = connectingIndex == null,
                             shape = RoundedCornerShape(12.dp),
-                            enabled = !connected && connectingIndex != index,
-                            singleLine = true,
-                            trailingIcon = {
-                                if (connected) Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF4CAF50))
-                            }
-                        )
-                        if (!connected) {
-                            Button(
-                                onClick = {
-                                    if (url.isBlank()) return@Button
-                                    connectingIndex = index
-                                    auth.currentUser?.getIdToken(false)?.addOnSuccessListener { res ->
-                                        res.token?.let { token ->
-                                            coroutineScope.launch {
-                                                BackendRepository.scrapeInstagramProfile(url.trim(), auth.currentUser!!.uid, token)
-                                                    .onSuccess { ok -> if (ok) instagramEntries[index] = Pair(url, true) }
-                                                connectingIndex = null
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C))
+                        ) {
+                            if (connectingIndex == index) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            else Text("Connect Instagram Account", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                        TextButton(
+                            onClick = { instagramEntries[index] = entry.copy(fallbackVisible = !entry.fallbackVisible) },
+                            enabled = connectingIndex == null
+                        ) {
+                            Text(
+                                if (entry.fallbackVisible) "Cancel" else "Personal account? Paste your profile URL instead",
+                                color = Color.Gray,
+                                fontSize = 12.sp
+                            )
+                        }
+                        if (entry.fallbackVisible) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = entry.url,
+                                    onValueChange = { instagramEntries[index] = entry.copy(url = it) },
+                                    label = { Text("Profile URL ${index + 1}") },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = connectingIndex != index,
+                                    singleLine = true
+                                )
+                                Button(
+                                    onClick = {
+                                        val url = entry.url.trim()
+                                        if (url.isBlank()) return@Button
+                                        connectingIndex = index
+                                        auth.currentUser?.getIdToken(false)?.addOnSuccessListener { res ->
+                                            res.token?.let { token ->
+                                                coroutineScope.launch {
+                                                    BackendRepository.scrapeInstagramProfile(url, auth.currentUser!!.uid, token)
+                                                        .onSuccess { ok ->
+                                                            if (ok) {
+                                                                instagramEntries[index] = entry.copy(
+                                                                    connected = true,
+                                                                    username = url,
+                                                                    source = "scrape"
+                                                                )
+                                                            }
+                                                        }
+                                                    connectingIndex = null
+                                                }
                                             }
                                         }
-                                    }
-                                },
-                                enabled = connectingIndex == null,
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C))
-                            ) {
-                                if (connectingIndex == index) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                else Text("Link", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    },
+                                    enabled = connectingIndex == null,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                                ) {
+                                    if (connectingIndex == index) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    else Text("Link", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
                             }
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 if (instagramEntries.size < 5) {
-                    TextButton(onClick = { instagramEntries.add(Pair("", false)) }, enabled = connectingIndex == null) {
+                    TextButton(onClick = { instagramEntries.add(InstagramSlot()) }, enabled = connectingIndex == null) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFFE1306C))
                         Spacer(Modifier.width(4.dp))
                         Text("Add another Instagram profile", color = Color(0xFFE1306C), fontSize = 13.sp)
@@ -664,7 +789,14 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                         selectedPlatforms.forEach { plat ->
                                             platformsJson.put(JSONObject().apply {
                                                 put("platform", plat)
-                                                put("profileUrl", if (plat == "Instagram") instagramEntries.firstOrNull()?.first ?: "" else "")
+                                                put("profileUrl", if (plat == "Instagram") {
+                                                    val connected = instagramEntries.firstOrNull()
+                                                    when {
+                                                        connected?.source == "oauth" -> "https://instagram.com/${connected.username}"
+                                                        connected != null -> connected.username ?: connected.url
+                                                        else -> ""
+                                                    }
+                                                } else "")
                                                 put("followers", 0)
                                                 put("avgViews", 0)
                                                 put("engagement", 0.0)

@@ -30,6 +30,16 @@ class InfluencerViewModel : ViewModel() {
 
     fun clearError() { _error.value = null }
 
+    // Dashboard-specific data for unified fetch
+    private val _dashboardCollaborations = MutableLiveData<List<Collaboration>>()
+    val dashboardCollaborations: LiveData<List<Collaboration>> = _dashboardCollaborations
+
+    private val _dashboardCampaigns = MutableLiveData<List<CampaignDetail>>()
+    val dashboardCampaigns: LiveData<List<CampaignDetail>> = _dashboardCampaigns
+
+    private val _unreadCount = MutableLiveData<Int>(0)
+    val unreadCount: LiveData<Int> = _unreadCount
+
     // ── Active Instagram Profile (account switcher) ───────────────────────────
 
     private val _activeInstagramProfileId = MutableLiveData<String?>(null)
@@ -56,6 +66,80 @@ class InfluencerViewModel : ViewModel() {
         _activeInstagramProfileId.value = profileId
     }
 
+    // ── Unified Dashboard Fetch ──────────────────────────────────────────────
+
+    fun fetchHomeDashboard(token: String, force: Boolean = false) {
+        if (!fetchThrottle.shouldFetch("homeDashboard", force)) return
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            val result = BackendRepository.fetchInfluencerDashboard(token)
+            result.onSuccess { json ->
+                val data = json.optJSONObject("data")?.optJSONObject("getInfluencerDashboard")
+                if (data != null) {
+                    // 1. Parse Profile
+                    data.optJSONObject("profile")?.let { _influencerProfile.postValue(parseInfluencer(it)) }
+                    // 2. Parse Collaborations
+                    data.optJSONArray("collaborations")?.let { _collaborations.postValue(parseCollaborations(it)) }
+                    // 3. Parse Recommended Campaigns
+                    data.optJSONArray("recommendedCampaigns")?.let { _dashboardCampaigns.postValue(parseRecommendedCampaigns(it)) }
+                    // 4. Parse Unread Notification Count
+                    _unreadCount.postValue(data.optInt("unreadNotificationCount", 0))
+                }
+                _loading.postValue(false)
+            }.onFailure {
+                Log.e("InfluencerViewModel", "Dashboard fetch error", it)
+                _error.postValue(it.message)
+                _loading.postValue(false)
+            }
+        }
+    }
+
+    private fun parseRecommendedCampaigns(jsonArray: JSONArray): List<CampaignDetail> {
+        val list = mutableListOf<CampaignDetail>()
+        for (i in 0 until jsonArray.length()) {
+            val obj = jsonArray.optJSONObject(i) ?: continue
+            val audienceObj = obj.optJSONObject("targetAudience")
+            val targetAudience = if (audienceObj != null) {
+                CampaignAudienceResponse(
+                    ageMin = if (audienceObj.isNull("ageMin")) null else audienceObj.optInt("ageMin"),
+                    ageMax = if (audienceObj.isNull("ageMax")) null else audienceObj.optInt("ageMax"),
+                    gender = if (audienceObj.isNull("gender")) null else audienceObj.optString("gender"),
+                    locations = audienceObj.optJSONArray("locations")?.let { arr ->
+                        (0 until arr.length()).map { arr.getString(it) }
+                    }
+                )
+            } else null
+
+            list.add(
+                CampaignDetail(
+                    id = obj.optString("id"),
+                    title = obj.optString("title"),
+                    description = obj.optString("description"),
+                    budgetMin = if (obj.isNull("budgetMin")) null else obj.optInt("budgetMin"),
+                    budgetMax = if (obj.isNull("budgetMax")) null else obj.optInt("budgetMax"),
+                    startDate = if (obj.isNull("startDate")) null else obj.optString("startDate"),
+                    endDate = if (obj.isNull("endDate")) null else obj.optString("endDate"),
+                    status = obj.optString("status", "ACTIVE"),
+                    createdAt = obj.optString("createdAt"),
+                    targetAudience = targetAudience,
+                    platforms = obj.optJSONArray("platforms")?.let { arr ->
+                        (0 until arr.length()).mapNotNull { j ->
+                            arr.optJSONObject(j)?.let { Platform(it.optString("platform"), "", null, null, null, emptyList(), null) }
+                        }
+                    },
+                    brand = null, // Unified query might not return full brand here, or pass brandId
+                    categories = obj.optJSONArray("categories")?.let { arr ->
+                        (0 until arr.length()).mapNotNull { j ->
+                            arr.optJSONObject(j)?.let { BrandCategory(it.optString("category"), emptyList()) }
+                        }
+                    }
+                )
+            )
+        }
+        return list
+    }
+
     // ── Instagram Profile Management ──────────────────────────────────────────
 
     fun addInstagramProfile(token: String, profileUrl: String, onComplete: (Boolean, String?) -> Unit) {
@@ -67,8 +151,6 @@ class InfluencerViewModel : ViewModel() {
                 val updated = (current.instagramProfiles ?: emptyList()) + newProfile
                 _influencerProfile.postValue(current.copy(instagramProfiles = updated))
                 onComplete(true, null)
-                // AI summary is generated by a background pipeline after the mutation returns.
-                // Wait for it to finish then re-fetch the full profile so aiInsights appears.
                 delay(15_000)
                 fetchInfluencerDetails(token, force = true)
             }.onFailure {
@@ -83,7 +165,6 @@ class InfluencerViewModel : ViewModel() {
             result.onSuccess {
                 val current = _influencerProfile.value ?: run { onComplete(false); return@launch }
                 val updated = current.instagramProfiles?.filter { it.id != profileId }
-                // If we removed the default, mark the first remaining as default
                 val reIndexed = if (updated != null && updated.isNotEmpty() && updated.none { it.isDefault }) {
                     listOf(updated[0].copy(isDefault = true)) + updated.drop(1)
                 } else updated
@@ -114,8 +195,6 @@ class InfluencerViewModel : ViewModel() {
                 val updated = current.instagramProfiles?.map { if (it.id == profileId) refreshed else it }
                 _influencerProfile.postValue(current.copy(instagramProfiles = updated))
                 onComplete(true, null)
-                // AI summary is generated by a background pipeline after the mutation returns.
-                // Wait for it to finish then re-fetch the full profile so aiInsights appears.
                 delay(15_000)
                 fetchInfluencerDetails(token, force = true)
             }.onFailure {
@@ -142,6 +221,7 @@ class InfluencerViewModel : ViewModel() {
             followers = if (json.has("followers") && !json.isNull("followers")) json.optInt("followers") else null,
             isDefault = json.optBoolean("isDefault", false),
             connectedAt = json.optString("connectedAt"),
+            source = if (json.has("source") && !json.isNull("source")) json.optString("source") else null,
             metrics = metrics
         )
     }
@@ -159,9 +239,6 @@ class InfluencerViewModel : ViewModel() {
     private val _instagramRecommendedBrands = MutableLiveData<List<Brand>>()
     val instagramRecommendedBrands: LiveData<List<Brand>> = _instagramRecommendedBrands
 
-    // See FetchThrottle.kt — skips a refetch (and its loading flash) if the same
-    // data was fetched within the last minute, so switching tabs doesn't discard
-    // good cached data. Pass force = true (e.g. pull-to-refresh) to bypass it.
     private val fetchThrottle = FetchThrottle()
 
     fun fetchRecommendedBrands(token: String, allBrands: List<Brand>? = null) {
@@ -211,127 +288,6 @@ class InfluencerViewModel : ViewModel() {
             .sortedByDescending { idToScore[it.id] }
     }
 
-    private val INFLUENCER_FIELDS = """
-        id
-        email
-        name
-        role
-        profileCompleted
-        updatedAt
-        bio
-        location
-        username
-        followers
-        following
-        totalPosts
-        website
-        languages
-        categories {
-          category
-          subCategories
-        }
-        platforms {
-          platform
-          profileUrl
-          followers
-          avgViews
-          engagement
-          formats
-          connected
-        }
-        strengths
-        pricing {
-          platform
-          deliverable
-          price
-          currency
-        }
-        availability
-        logoUrl
-        isVerified
-        averageRating
-        youtubeInsights {
-          channelId
-          title
-          description
-          subscribers
-          totalViews
-          totalVideos
-          demographics {
-            ageGroup
-            gender
-            percentage
-          }
-          lastSynced
-        }
-        instagramMetrics {
-          avgComments
-          avgLikes
-          avgViews
-          postingFrequencyDays
-          totalPostsAnalyzed
-          updatedAt
-          engagementRate
-        }
-        instagramProfiles {
-          id
-          profileUrl
-          username
-          followers
-          isDefault
-          connectedAt
-          metrics {
-            avgLikes
-            avgComments
-            avgViews
-            postingFrequencyDays
-            totalPostsAnalyzed
-            updatedAt
-            engagementRate
-          }
-          aiInsights {
-            primaryNiche
-            secondaryNiche
-            contentStyle
-            tone
-            audienceInterests
-            topics
-            brandSuitability
-            strengths
-            weaknesses
-            professionalSummary
-            aiSummary
-            weightingLabel
-            summarySource
-          }
-        }
-        recentPosts {
-          id
-          thumbnail
-          caption
-          likes
-          comments
-          views
-          uploadDate
-          url
-        }
-        aiInsights {
-          primaryNiche
-          secondaryNiche
-          contentStyle
-          tone
-          audienceInterests
-          topics
-          brandSuitability
-          strengths
-          weaknesses
-          professionalSummary
-          aiSummary
-          weightingLabel
-          summarySource
-        }
-    """.trimIndent()
-
     fun fetchInfluencerDetails(token: String, force: Boolean = false) {
         if (!fetchThrottle.shouldFetch("influencerDetails", force)) return
         _loading.value = true
@@ -340,116 +296,18 @@ class InfluencerViewModel : ViewModel() {
             val query = """
                 query GetMe {
                   me {
-                    id
-                    name
-                    profileCompleted
-                    email
-                    role
-                    updatedAt
+                    id name profileCompleted email role updatedAt
                     ... on Influencer {
-                      id
-                      email
-                      name
-                      role
-                      profileCompleted
-                      updatedAt
-                      bio
-                      location
-                      gender
-                      motherTongue
-                      languagesKnown
-                      categories {
-                        category
-                        subCategories
-                      }
-                      platforms {
-                        platform
-                        profileUrl
-                        followers
-                        avgViews
-                        engagement
-                        formats
-                        connected
-                      }
+                      id email name role profileCompleted updatedAt bio location gender motherTongue languagesKnown
+                      categories { category subCategories }
+                      platforms { platform profileUrl followers avgViews engagement formats connected }
                       strengths
-                      pricing {
-                        platform
-                        deliverable
-                        price
-                        currency
-                      }
-                      availability
-                      logoUrl
-                      isVerified
-                      averageRating
-                      youtubeInsights {
-                        channelId
-                        title
-                        description
-                        subscribers
-                        totalViews
-                        totalVideos
-                        demographics {
-                          ageGroup
-                          gender
-                          percentage
-                        }
-                        lastSynced
-                      }
-                      instagramMetrics {
-                        avgComments
-                        avgLikes
-                        avgViews
-                        postingFrequencyDays
-                        totalPostsAnalyzed
-                        updatedAt
-                      }
-                      instagramProfiles {
-                        id
-                        profileUrl
-                        username
-                        followers
-                        isDefault
-                        connectedAt
-                        metrics {
-                          avgLikes
-                          avgComments
-                          avgViews
-                          postingFrequencyDays
-                          totalPostsAnalyzed
-                          updatedAt
-                        }
-                        aiInsights {
-                          primaryNiche
-                          secondaryNiche
-                          contentStyle
-                          tone
-                          audienceInterests
-                          topics
-                          brandSuitability
-                          strengths
-                          weaknesses
-                          professionalSummary
-                          aiSummary
-                          weightingLabel
-                          summarySource
-                        }
-                      }
-                      aiInsights {
-                        primaryNiche
-                        secondaryNiche
-                        contentStyle
-                        tone
-                        audienceInterests
-                        topics
-                        brandSuitability
-                        strengths
-                        weaknesses
-                        professionalSummary
-                        aiSummary
-                        weightingLabel
-                        summarySource
-                      }
+                      pricing { platform deliverable price currency }
+                      availability logoUrl isVerified averageRating
+                      youtubeInsights { channelId title description subscribers totalViews totalVideos demographics { ageGroup gender percentage } lastSynced }
+                      instagramMetrics { avgComments avgLikes avgViews postingFrequencyDays totalPostsAnalyzed updatedAt }
+                      instagramProfiles { id profileUrl username followers isDefault connectedAt metrics { avgLikes avgComments avgViews postingFrequencyDays totalPostsAnalyzed updatedAt } aiInsights { primaryNiche secondaryNiche contentStyle tone audienceInterests topics brandSuitability strengths weaknesses professionalSummary aiSummary weightingLabel summarySource } }
+                      aiInsights { primaryNiche secondaryNiche contentStyle tone audienceInterests topics brandSuitability strengths weaknesses professionalSummary aiSummary weightingLabel summarySource }
                     }
                   }
                 }
@@ -490,115 +348,18 @@ class InfluencerViewModel : ViewModel() {
             val query = """
                 query GetInfluencerById(${'$'}id: ID!) {
                   getInfluencerById(id: ${'$'}id) {
-                    id
-                    email
-                    name
-                    role
-                    profileCompleted
-                    updatedAt
-                    bio
-                    about
-                    creatorName
-                    location
-                    gender
-                    motherTongue
-                    languagesKnown
-                    categories {
-                      category
-                      subCategories
-                    }
-                    platforms {
-                      platform
-                      profileUrl
-                      followers
-                      avgViews
-                      engagement
-                      formats
-                      connected
-                    }
-                    strengths
-                    pricing {
-                      platform
-                      deliverable
-                      price
-                      currency
-                    }
-                    availability
-                    logoUrl
-                    isVerified
-                    averageRating
-                    youtubeInsights {
-                      channelId
-                      title
-                      description
-                      subscribers
-                      totalViews
-                      totalVideos
-                      demographics {
-                        ageGroup
-                        gender
-                        percentage
-                      }
-                      lastSynced
-                    }
-                    instagramMetrics {
-                      avgComments
-                      avgLikes
-                      avgViews
-                      postingFrequencyDays
-                      totalPostsAnalyzed
-                      updatedAt
-                    }
-                    instagramProfiles {
-                      id
-                      profileUrl
-                      username
-                      followers
-                      isDefault
-                      connectedAt
-                      metrics {
-                        avgLikes
-                        avgComments
-                        avgViews
-                        postingFrequencyDays
-                        totalPostsAnalyzed
-                        updatedAt
-                        engagementRate
-                      }
-                      aiInsights {
-                        primaryNiche
-                        secondaryNiche
-                        contentStyle
-                        tone
-                        audienceInterests
-                        topics
-                        brandSuitability
-                        strengths
-                        weaknesses
-                        professionalSummary
-                        aiSummary
-                        weightingLabel
-                        summarySource
-                      }
-                    }
-                    audienceInsights {
-                      topLocations { city country percentage }
-                      genderSplit { male female }
-                      ageGroups { range percentage }
-                    }
-                    recentPosts {
-                      id thumbnail caption likes comments views uploadDate url
-                    }
-                    aiInsights {
-                      primaryNiche secondaryNiche contentStyle tone audienceInterests
-                      topics brandSuitability strengths weaknesses professionalSummary aiSummary
-                      weightingLabel summarySource
-                    }
-                    followers
-                    totalFollowers
-                    engagementRate
-                    collaborationCount
-                    tier
+                    id email name role profileCompleted updatedAt bio about creatorName location gender motherTongue languagesKnown
+                    categories { category subCategories }
+                    platforms { platform profileUrl followers avgViews engagement formats connected }
+                    strengths pricing { platform deliverable price currency }
+                    availability logoUrl isVerified averageRating
+                    youtubeInsights { channelId title description subscribers totalViews totalVideos demographics { ageGroup gender percentage } lastSynced }
+                    instagramMetrics { avgComments avgLikes avgViews postingFrequencyDays totalPostsAnalyzed updatedAt }
+                    instagramProfiles { id profileUrl username followers isDefault connectedAt metrics { avgLikes avgComments avgViews postingFrequencyDays totalPostsAnalyzed updatedAt engagementRate } aiInsights { primaryNiche secondaryNiche contentStyle tone audienceInterests topics brandSuitability strengths weaknesses professionalSummary aiSummary weightingLabel summarySource } }
+                    audienceInsights { topLocations { city country percentage } genderSplit { male female } ageGroups { range percentage } }
+                    recentPosts { id thumbnail caption likes comments views uploadDate url }
+                    aiInsights { primaryNiche secondaryNiche contentStyle tone audienceInterests topics brandSuitability strengths weaknesses professionalSummary aiSummary weightingLabel summarySource }
+                    followers totalFollowers engagementRate collaborationCount tier
                   }
                 }
             """.trimIndent()
@@ -640,20 +401,9 @@ class InfluencerViewModel : ViewModel() {
             val query = """
                 query GetBrands {
                   getBrands {
-                    id
-                    email
-                    name
-                    role
-                    profileCompleted
-                    updatedAt
-                    brandCategories {
-                      category
-                      subCategories
-                    }
-                    about
-                    profileUrl
-                    logoUrl
-                    averageRating
+                    id email name role profileCompleted updatedAt
+                    brandCategories { category subCategories }
+                    about profileUrl logoUrl averageRating
                   }
                 }
             """.trimIndent()
@@ -683,31 +433,37 @@ class InfluencerViewModel : ViewModel() {
         for (i in 0 until jsonArray.length()) {
             val obj = jsonArray.optJSONObject(i) ?: continue
             val categoriesArray = obj.optJSONArray("brandCategories")
-            val brandCategories = mutableListOf<BrandCategory>()
+            val categoriesList = mutableListOf<BrandCategory>()
             if (categoriesArray != null) {
                 for (j in 0 until categoriesArray.length()) {
-                    val catObj = categoriesArray.optJSONObject(j)
+                    val catObj = categoriesArray.optJSONObject(j) ?: continue
                     val subCatsArray = catObj.optJSONArray("subCategories")
                     val subCats = mutableListOf<String>()
                     if (subCatsArray != null) {
-                        for (k in 0 until subCatsArray.length()) { subCats.add(subCatsArray.getString(k)) }
+                        for (k in 0 until subCatsArray.length()) {
+                            subCats.add(subCatsArray.getString(k))
+                        }
                     }
-                    brandCategories.add(BrandCategory(catObj.optString("category"), subCats))
+                    categoriesList.add(BrandCategory(catObj.optString("category"), subCats))
                 }
             }
-            list.add(Brand(
-                id = obj.optString("id"),
-                email = obj.optString("email"),
-                name = obj.optString("name"),
-                role = obj.optString("role"),
-                profileCompleted = if(obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
-                updatedAt = obj.optString("updatedAt"),
-                brandCategories = brandCategories,
-                about = obj.optString("about"),
-                profileUrl = obj.optString("profileUrl"),
-                logoUrl = obj.optString("logoUrl"),
-                averageRating = if(obj.has("averageRating")) obj.optDouble("averageRating") else null
-            ))
+
+            list.add(
+                Brand(
+                    id = obj.optString("id"),
+                    email = obj.optString("email"),
+                    name = obj.optString("name"),
+                    role = obj.optString("role"),
+                    profileCompleted = if (obj.has("profileCompleted")) obj.optBoolean("profileCompleted") else null,
+                    updatedAt = obj.optString("updatedAt"),
+                    brandCategories = categoriesList,
+                    about = if (obj.isNull("about")) null else obj.optString("about"),
+                    profileUrl = if (obj.isNull("profileUrl")) null else obj.optString("profileUrl"),
+                    logoUrl = if (obj.isNull("logoUrl")) null else obj.optString("logoUrl"),
+                    averageRating = if (obj.has("averageRating") && !obj.isNull("averageRating")) obj.optDouble("averageRating") else null,
+                    isVerified = if (obj.has("isVerified") && !obj.isNull("isVerified")) obj.optBoolean("isVerified") else null
+                )
+            )
         }
         return list
     }
@@ -833,6 +589,7 @@ class InfluencerViewModel : ViewModel() {
                     followers = if (p.has("followers") && !p.isNull("followers")) p.optInt("followers") else null,
                     isDefault = p.optBoolean("isDefault", false),
                     connectedAt = p.optString("connectedAt"),
+                    source = if (p.has("source") && !p.isNull("source")) p.optString("source") else null,
                     metrics = metrics,
                     aiInsights = p.optJSONObject("aiInsights")?.let { ai ->
                         AiInsights(
@@ -901,6 +658,7 @@ class InfluencerViewModel : ViewModel() {
             availability = if (obj.has("availability")) obj.optBoolean("availability") else null,
             logoUrl = obj.optString("logoUrl"),
             isVerified = if (obj.has("isVerified")) obj.optBoolean("isVerified") else null,
+            instagramConnected = if (obj.has("instagramConnected")) obj.optBoolean("instagramConnected") else null,
             averageRating = if (obj.has("averageRating")) obj.optDouble("averageRating").toFloat() else null,
             youtubeInsights = youtubeInsights,
             instagramMetrics = instagramMetrics,
@@ -949,16 +707,6 @@ class InfluencerViewModel : ViewModel() {
             collaborationCount = if (obj.has("collaborationCount") && !obj.isNull("collaborationCount")) obj.optInt("collaborationCount") else null,
             tier = obj.optString("tier").takeIf { it.isNotBlank() }
         )
-    }
-
-    private fun parseStringList(array: JSONArray?): List<String> {
-        val list = mutableListOf<String>()
-        if (array != null) {
-            for (i in 0 until array.length()) {
-                list.add(array.getString(i))
-            }
-        }
-        return list
     }
 
     private val _collaborations = MutableLiveData<List<Collaboration>>()

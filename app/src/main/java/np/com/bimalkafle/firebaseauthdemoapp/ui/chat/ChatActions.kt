@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.ui.chat
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,10 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.StatusBadge
 import np.com.bimalkafle.firebaseauthdemoapp.ui.theme.Dimens
 
 import np.com.bimalkafle.firebaseauthdemoapp.model.Collaboration
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun RestrictedActionPanel(
@@ -597,16 +602,33 @@ fun TextInputDialog(
 /** Hosting collaborations only — the brand shares venue, timing, and a full
  * event description together as one submission (see CollaborationTimeline's
  * "Event Details" step), instead of the influencer submitting three separate
- * steps. */
+ * steps. Date/time are picked via calendar + clock pickers rather than typed
+ * in, so they can't be entered ambiguously or malformed. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventDetailsDialog(
     onDismiss: () -> Unit,
     onSend: (venue: String, time: String, details: String) -> Unit
 ) {
     var venue by remember { mutableStateOf("") }
-    var time by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
-    val isValid = venue.isNotBlank() && time.isNotBlank() && details.isNotBlank()
+    var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
+    var selectedHour by remember { mutableStateOf<Int?>(null) }
+    var selectedMinute by remember { mutableStateOf<Int?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    val dateText = selectedDateMillis?.let {
+        SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it))
+    } ?: "Select date"
+    val timeText = if (selectedHour != null && selectedMinute != null) {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, selectedHour!!)
+            set(Calendar.MINUTE, selectedMinute!!)
+        }
+        SimpleDateFormat("hh:mm a", Locale.getDefault()).format(cal.time)
+    } else "Select time"
+    val isValid = venue.isNotBlank() && selectedDateMillis != null && selectedHour != null && details.isNotBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -625,17 +647,35 @@ fun EventDetailsDialog(
                     )
                 )
                 Spacer(Modifier.height(12.dp))
-                TextField(
-                    value = time,
-                    onValueChange = { time = it },
-                    label = { Text("Event Date & Time") },
-                    singleLine = true,
+
+                Text("Event Date & Time", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Spacer(Modifier.height(4.dp))
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                        cursorColor = MaterialTheme.colorScheme.primary
-                    )
-                )
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color.LightGray)
+                    ) {
+                        Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                        Spacer(Modifier.width(6.dp))
+                        Text(dateText, maxLines = 1, fontSize = 13.sp)
+                    }
+                    OutlinedButton(
+                        onClick = { showTimePicker = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color.LightGray)
+                    ) {
+                        Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                        Spacer(Modifier.width(6.dp))
+                        Text(timeText, maxLines = 1, fontSize = 13.sp)
+                    }
+                }
+
                 Spacer(Modifier.height(12.dp))
                 TextField(
                     value = details,
@@ -653,7 +693,7 @@ fun EventDetailsDialog(
         },
         confirmButton = {
             Button(
-                onClick = { if (isValid) onSend(venue, time, details) },
+                onClick = { if (isValid) onSend(venue, "$dateText, $timeText", details) },
                 enabled = isValid,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
@@ -666,4 +706,59 @@ fun EventDetailsDialog(
             }
         }
     )
+
+    if (showDatePicker) {
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDateMillis ?: today,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis >= today
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDatePicker = false
+                    datePickerState.selectedDateMillis?.let { selectedDateMillis = it }
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) { DatePicker(state = datePickerState) }
+    }
+
+    if (showTimePicker) {
+        val now = Calendar.getInstance()
+        val timePickerState = rememberTimePickerState(
+            initialHour = selectedHour ?: now.get(Calendar.HOUR_OF_DAY),
+            initialMinute = selectedMinute ?: now.get(Calendar.MINUTE),
+            is24Hour = false
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Select Time") },
+            text = {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedHour = timePickerState.hour
+                    selectedMinute = timePickerState.minute
+                    showTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+            }
+        )
+    }
 }

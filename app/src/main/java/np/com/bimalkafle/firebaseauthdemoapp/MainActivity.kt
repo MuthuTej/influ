@@ -7,7 +7,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
+import np.com.bimalkafle.firebaseauthdemoapp.network.InstagramAuthResult
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -107,6 +109,26 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                 }
             }
         })
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleInstagramCallback(intent)
+    }
+
+    // Catches the np.com.bimalkafle.firebaseauthdemoapp://instagram-callback
+    // redirect connect-backend's /auth/instagram/callback sends the Custom
+    // Tab to once it finishes the Instagram OAuth token exchange
+    // server-side (see BackendRepository.instagramAuthUrl /
+    // InfluencerRegistrationScreen's Connect Instagram Account button).
+    private fun handleInstagramCallback(intent: Intent) {
+        val uri = intent.data ?: return
+        if (uri.scheme != "np.com.bimalkafle.firebaseauthdemoapp" || uri.host != "instagram-callback") return
+        InstagramAuthResult.notifyResult(
+            status = uri.getQueryParameter("status"),
+            message = uri.getQueryParameter("message")
+        )
     }
 
     override fun onPaymentSuccess(razorpayPaymentId: String?, data: PaymentData?) {
