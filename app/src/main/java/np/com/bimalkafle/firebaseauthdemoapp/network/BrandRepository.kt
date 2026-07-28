@@ -34,10 +34,9 @@ object BrandRepository {
 
         // AudienceInput.ageMin/ageMax are required (Int!) server-side, so they must always
         // be present here — the caller is responsible for validating both parse before calling.
-        val inputVariables = mapOf(
+        val inputVariables = mutableMapOf<String, Any>(
             "name" to name,
             "profileUrl" to (profileUrl ?: ""),
-            "logoUrl" to logoUrl,
             "location" to location,
             "about" to about,
             "brandCategories" to categories,
@@ -49,6 +48,10 @@ object BrandRepository {
                 "locations" to emptyList<String>()
             )
         )
+        // Only send logoUrl when the user actually typed one here — the server treats any
+        // provided value (including "") as an explicit overwrite, which would wipe out a
+        // photo already uploaded during signup.
+        if (logoUrl.isNotBlank()) inputVariables["logoUrl"] = logoUrl
 
         val variables = mapOf("input" to inputVariables)
 

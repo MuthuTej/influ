@@ -434,7 +434,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
             OutlinedTextField(
                 value = logoUrl,
                 onValueChange = { logoUrl = it },
-                label = { Text("Logo URL") },
+                label = { Text("Logo URL (optional — leave blank to keep your signup photo)") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
@@ -752,7 +752,7 @@ fun InfluencerRegistrationScreen(navController: NavController) {
 
             Button(
                 onClick = {
-                    if (name.isEmpty() || selectedState.isEmpty() || selectedCity.isEmpty() || bio.isEmpty() || logoUrl.isEmpty() || selectedCategories.isEmpty() || (selectedPlatforms.isEmpty() && !hostingSelected)) {
+                    if (name.isEmpty() || selectedState.isEmpty() || selectedCity.isEmpty() || bio.isEmpty() || selectedCategories.isEmpty() || (selectedPlatforms.isEmpty() && !hostingSelected)) {
                         Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
@@ -772,7 +772,10 @@ fun InfluencerRegistrationScreen(navController: NavController) {
                                         put("motherTongue", motherTongue)
                                         put("languagesKnown", JSONArray(selectedLanguages.toList()))
                                         put("availability", true)
-                                        put("logoUrl", logoUrl)
+                                        // Only send logoUrl when the user actually typed one here — the
+                                        // server treats any provided value (including "") as an explicit
+                                        // overwrite, which would wipe out a photo uploaded during signup.
+                                        if (logoUrl.isNotBlank()) put("logoUrl", logoUrl)
 
                                         val categoriesJson = JSONArray()
                                         selectedCategories.forEach { cat ->

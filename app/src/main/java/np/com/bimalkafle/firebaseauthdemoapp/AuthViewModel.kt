@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp
 
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -128,7 +129,15 @@ class AuthViewModel : ViewModel() {
             }
     }
 
-    fun signup(email: String, password: String, confirmPassword: String, name: String, role: String) {
+    fun signup(
+        email: String,
+        password: String,
+        confirmPassword: String,
+        name: String,
+        role: String,
+        photoBase64: String? = null,
+        photoMimeType: String? = null
+    ) {
         if (email.isEmpty() || password.isEmpty() || name.isEmpty() || role.isEmpty()) {
             _authState.value = AuthState.Error("All fields are required")
             return
@@ -141,14 +150,19 @@ class AuthViewModel : ViewModel() {
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    completeBackendSignup(name, role)
+                    completeBackendSignup(name, role, photoBase64, photoMimeType)
                 } else {
                     _authState.value = AuthState.Error(task.exception?.message ?: "Something went wrong")
                 }
             }
     }
 
-    fun completeBackendSignup(name: String, role: String) {
+    fun completeBackendSignup(
+        name: String,
+        role: String,
+        photoBase64: String? = null,
+        photoMimeType: String? = null
+    ) {
         _authState.value = AuthState.Loading
         val user = auth.currentUser
         user?.getIdToken(true)?.addOnCompleteListener { tokenTask ->
@@ -158,6 +172,14 @@ class AuthViewModel : ViewModel() {
                     viewModelScope.launch {
                         val result = BackendRepository.signUp(name, role, token)
                         result.onSuccess {
+                            // Best-effort: a failed photo upload shouldn't block account creation,
+                            // since the account already exists in Firebase Auth + Firestore at this point.
+                            if (photoBase64 != null && photoMimeType != null) {
+                                BackendRepository.uploadProfilePhoto(photoBase64, photoMimeType, token)
+                                    .onFailure {
+                                        Log.w("AuthViewModel", "Profile photo upload failed: ${it.message}")
+                                    }
+                            }
                             _authState.value = AuthState.Authenticated(role, false)
                         }.onFailure {
                             _authState.value = AuthState.Error(it.message ?: "Sync with backend failed")
