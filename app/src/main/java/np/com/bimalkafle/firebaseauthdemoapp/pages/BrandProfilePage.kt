@@ -37,8 +37,10 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.model.Brand
 import np.com.bimalkafle.firebaseauthdemoapp.model.BrandCategory
@@ -48,6 +50,7 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.components.StarRatingDisplay
+import np.com.bimalkafle.firebaseauthdemoapp.utils.encodeImageForUpload
 import java.io.File
 import java.io.FileOutputStream
 
@@ -171,6 +174,41 @@ fun BrandProfileContent(
     var ageMax by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.ageMax?.toString() ?: "") }
     var gender by remember(brandProfile) { mutableStateOf(brandProfile?.targetAudience?.gender ?: "Any") }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var isUploadingPhoto by remember { mutableStateOf(false) }
+
+    val photoContext = LocalContext.current
+    val photoCoroutineScope = rememberCoroutineScope()
+    val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        isUploadingPhoto = true
+        photoCoroutineScope.launch {
+            val photoData = encodeImageForUpload(photoContext, uri)
+            if (photoData == null) {
+                saveError = "Failed to read the selected photo. Please try again."
+                isUploadingPhoto = false
+                return@launch
+            }
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)
+                ?.addOnSuccessListener { result ->
+                    val token = result.token
+                    if (token == null) {
+                        saveError = "Not authenticated. Please sign in again."
+                        isUploadingPhoto = false
+                        return@addOnSuccessListener
+                    }
+                    photoCoroutineScope.launch {
+                        BackendRepository.uploadProfilePhoto(photoData.first, photoData.second, token)
+                            .onSuccess { url -> logoUrl = url }
+                            .onFailure { saveError = "Failed to upload photo: ${it.message}" }
+                        isUploadingPhoto = false
+                    }
+                }
+                ?.addOnFailureListener {
+                    saveError = "Not authenticated. Please sign in again."
+                    isUploadingPhoto = false
+                }
+        }
+    }
 
 
     val platformOptions = listOf("Instagram", "YouTube", "Facebook")
@@ -228,33 +266,63 @@ fun BrandProfileContent(
                             .statusBarsPadding()
                             .padding(top = 24.dp, bottom = 32.dp)
                     ) {
-                        Surface(
-                            modifier = Modifier.size(90.dp),
-                            shape = CircleShape,
-                            color = Color.White,
-                            shadowElevation = 8.dp
-                        ) {
-                            if (logoUrl.isNotEmpty()) {
-                                AsyncImage(
-                                    model = logoUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.Business,
+                        Box(contentAlignment = Alignment.BottomEnd) {
+                            Surface(
+                                modifier = Modifier
+                                    .size(90.dp)
+                                    .then(
+                                        if (isEditMode) Modifier.clickable { photoPickerLauncher.launch("image/*") }
+                                        else Modifier
+                                    ),
+                                shape = CircleShape,
+                                color = Color.White,
+                                shadowElevation = 8.dp
+                            ) {
+                                if (isUploadingPhoto) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        CircularProgressIndicator(modifier = Modifier.size(28.dp), color = themeColor)
+                                    }
+                                } else if (logoUrl.isNotEmpty()) {
+                                    AsyncImage(
+                                        model = logoUrl,
                                         contentDescription = null,
-                                        modifier = Modifier.size(40.dp),
-                                        tint = themeColor
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
                                     )
+                                } else {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Business,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(40.dp),
+                                            tint = themeColor
+                                        )
+                                    }
+                                }
+                            }
+                            if (isEditMode) {
+                                Surface(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clickable { photoPickerLauncher.launch("image/*") },
+                                    shape = CircleShape,
+                                    color = themeColor,
+                                    border = BorderStroke(2.dp, Color.White)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Edit,
+                                            contentDescription = "Change profile photo",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                         
                         if (isEditMode) {

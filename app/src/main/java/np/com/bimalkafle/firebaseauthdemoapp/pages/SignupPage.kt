@@ -1,10 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Base64
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,49 +45,12 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.AuthState
 import np.com.bimalkafle.firebaseauthdemoapp.R
 import np.com.bimalkafle.firebaseauthdemoapp.utils.PrefsManager
-import java.io.ByteArrayOutputStream
-
-/**
- * Downscales the picked image to at most 512px on the long edge and compresses it to
- * JPEG ~80% quality before base64-encoding — keeps the GraphQL request body small and
- * keeps Firebase Storage bandwidth/cost down regardless of the original photo's size.
- */
-private suspend fun encodeImageForUpload(context: Context, uri: Uri): Pair<String, String>? =
-    withContext(Dispatchers.IO) {
-        try {
-            val original = context.contentResolver.openInputStream(uri)?.use { stream ->
-                BitmapFactory.decodeStream(stream)
-            } ?: return@withContext null
-
-            val maxDimension = 512
-            val largestSide = maxOf(original.width, original.height)
-            val scale = if (largestSide > maxDimension) maxDimension.toFloat() / largestSide else 1f
-            val resized = if (scale < 1f) {
-                Bitmap.createScaledBitmap(
-                    original,
-                    (original.width * scale).toInt().coerceAtLeast(1),
-                    (original.height * scale).toInt().coerceAtLeast(1),
-                    true
-                )
-            } else {
-                original
-            }
-
-            val outputStream = ByteArrayOutputStream()
-            resized.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
-            val base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
-            base64 to "image/jpeg"
-        } catch (e: Exception) {
-            null
-        }
-    }
+import np.com.bimalkafle.firebaseauthdemoapp.utils.encodeImageForUpload
 
 @Composable
 fun SignupPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {

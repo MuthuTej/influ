@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -40,14 +42,17 @@ import androidx.navigation.NavController
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.AuthViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.R
+import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.model.*
 import np.com.bimalkafle.firebaseauthdemoapp.components.AiChatFab
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.utils.IndianLocations
+import np.com.bimalkafle.firebaseauthdemoapp.utils.encodeImageForUpload
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -233,6 +238,48 @@ fun InfluencerProfileContent(
     val location = if (selectedCity.isNotEmpty() && selectedState.isNotEmpty()) "$selectedCity, $selectedState" else ""
     var logoUrl by remember(influencerProfile) { mutableStateOf(influencerProfile?.logoUrl ?: "") }
     var availability by remember(influencerProfile) { mutableStateOf(influencerProfile?.availability ?: true) }
+    var isUploadingPhoto by remember { mutableStateOf(false) }
+    var photoError by remember { mutableStateOf<String?>(null) }
+
+    val photoCoroutineScope = rememberCoroutineScope()
+    val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        isUploadingPhoto = true
+        photoCoroutineScope.launch {
+            val photoData = encodeImageForUpload(context, uri)
+            if (photoData == null) {
+                photoError = "Failed to read the selected photo. Please try again."
+                isUploadingPhoto = false
+                return@launch
+            }
+            FirebaseAuth.getInstance().currentUser?.getIdToken(true)
+                ?.addOnSuccessListener { result ->
+                    val token = result.token
+                    if (token == null) {
+                        photoError = "Not authenticated. Please sign in again."
+                        isUploadingPhoto = false
+                        return@addOnSuccessListener
+                    }
+                    photoCoroutineScope.launch {
+                        BackendRepository.uploadProfilePhoto(photoData.first, photoData.second, token)
+                            .onSuccess { url -> logoUrl = url }
+                            .onFailure { photoError = "Failed to upload photo: ${it.message}" }
+                        isUploadingPhoto = false
+                    }
+                }
+                ?.addOnFailureListener {
+                    photoError = "Not authenticated. Please sign in again."
+                    isUploadingPhoto = false
+                }
+        }
+    }
+
+    LaunchedEffect(photoError) {
+        photoError?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            photoError = null
+        }
+    }
     
     val editableCategories = remember(influencerProfile) {
         mutableStateListOf<Category>().apply {
@@ -329,12 +376,21 @@ fun InfluencerProfileContent(
                         // Profile Picture with Verified Badge
                         Box(contentAlignment = Alignment.BottomEnd) {
                             Surface(
-                                modifier = Modifier.size(90.dp),
+                                modifier = Modifier
+                                    .size(90.dp)
+                                    .then(
+                                        if (isEditMode) Modifier.clickable { photoPickerLauncher.launch("image/*") }
+                                        else Modifier
+                                    ),
                                 shape = CircleShape,
                                 color = Color.White,
                                 shadowElevation = 8.dp
                             ) {
-                                if (!logoUrl.isNullOrEmpty()) {
+                                if (isUploadingPhoto) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        CircularProgressIndicator(modifier = Modifier.size(28.dp), color = themeColor)
+                                    }
+                                } else if (!logoUrl.isNullOrEmpty()) {
                                     AsyncImage(
                                         model = logoUrl,
                                         contentDescription = null,
@@ -367,6 +423,26 @@ fun InfluencerProfileContent(
                                         tint = Color(0xFF1DA1F2),
                                         modifier = Modifier.padding(2.dp)
                                     )
+                                }
+                            }
+                            if (isEditMode) {
+                                Surface(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .size(28.dp)
+                                        .clickable { photoPickerLauncher.launch("image/*") },
+                                    shape = CircleShape,
+                                    color = themeColor,
+                                    border = BorderStroke(2.dp, Color.White)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Edit,
+                                            contentDescription = "Change profile photo",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
