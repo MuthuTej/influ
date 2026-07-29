@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +44,13 @@ import np.com.bimalkafle.firebaseauthdemoapp.model.InstagramProfile
 import np.com.bimalkafle.firebaseauthdemoapp.model.InfluencerProfile
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import kotlin.math.abs
+
+// ── Period Definition ────────────────────────────────────────────────────────
+enum class StatsPeriod(val label: String, val weighting: String) {
+    THIRTY_DAYS("30 Days", "30d"),
+    NINETY_DAYS("90 Days", "90d"),
+    ONE_YEAR("1 Year", "1y")
+}
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 private val influencerDetailThemeColor: Color
@@ -116,7 +124,7 @@ private fun initialsFor(name: String): String {
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrandInfluencerDetailScreen(
     influencerId: String,
@@ -161,12 +169,22 @@ fun BrandInfluencerDetailContent(
             isLoading        -> Box(Modifier.fillMaxSize(), Alignment.Center) { LoadingState(message = "Loading profile…") }
             error != null    -> Box(Modifier.fillMaxSize(), Alignment.Center) { ErrorState(message = error) }
             influencer != null -> {
+                // Time Period State - Managed at Content level to update both Hero and Sections
+                var selectedPeriod by remember { mutableStateOf(StatsPeriod.THIRTY_DAYS) }
+                
+                // Filtering Logic: Find profile matching the weighting label
+                val activeProfile = influencer.instagramProfiles?.firstOrNull { 
+                    it.aiInsights?.weightingLabel == selectedPeriod.weighting 
+                } ?: influencer.instagramProfiles?.firstOrNull { it.isDefault } 
+                  ?: influencer.instagramProfiles?.firstOrNull()
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                 ) {
-                    ProfileHero(influencer, onBack, onCreateProposal)
+                    // Profile Hero now changes stats based on the activeProfile
+                    ProfileHero(influencer, onBack, onCreateProposal, activeProfile)
 
                     Column(
                         modifier = Modifier
@@ -184,22 +202,26 @@ fun BrandInfluencerDetailContent(
                             )
                         }
 
-                        var selectedProfileId by remember { mutableStateOf<String?>(null) }
-                        val displayAiInsights = selectedProfileId?.let { id ->
-                            influencer.instagramProfiles?.firstOrNull { it.id == id }?.aiInsights
-                        } ?: influencer.instagramProfiles?.firstOrNull { it.aiInsights != null }?.aiInsights
-                            ?: influencer.aiInsights
+                        // Time Period Subheading Selector - Changes the weighting for the summary below
+                        StatsPeriodSelector(
+                            selectedPeriod = selectedPeriod,
+                            onPeriodSelected = { selectedPeriod = it }
+                        )
+
+                        // Dynamic AI Summary based on weighting label
+                        val displayAiInsights = activeProfile?.aiInsights ?: influencer.aiInsights
                         displayAiInsights?.let { AiProfileSummarySection(it) }
 
                         influencer.youtubeInsights?.let { YouTubeInsightsSection(it) }
 
                         val igProfiles = influencer.instagramProfiles
                         if (!igProfiles.isNullOrEmpty()) {
-                            BrandInstagramProfilesSection(igProfiles, influencer.followers) { profileId ->
-                                selectedProfileId = profileId
-                            }
+                            // Optionally highlight selected period profile in the list
+                            BrandInstagramProfilesSection(igProfiles, influencer.followers) { profileId -> }
                         } else {
-                            influencer.instagramMetrics?.let { InstagramInsightsSection(it) }
+                            (activeProfile?.metrics ?: influencer.instagramMetrics)?.let { 
+                                InstagramInsightsSection(it) 
+                            }
                         }
 
                         if (!influencer.strengths.isNullOrEmpty()) {
@@ -216,27 +238,75 @@ fun BrandInfluencerDetailContent(
     }
 }
 
+@Composable
+private fun StatsPeriodSelector(
+    selectedPeriod: StatsPeriod,
+    onPeriodSelected: (StatsPeriod) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        StatsPeriod.entries.forEachIndexed { index, period ->
+            val isSelected = selectedPeriod == period
+            val textColor = if (isSelected) influencerDetailThemeColor else SubLabel
+            val fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold
+
+            Text(
+                text = period.label.uppercase(),
+                color = textColor,
+                fontSize = 11.sp,
+                fontWeight = fontWeight,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onPeriodSelected(period) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+
+            if (index < StatsPeriod.entries.size - 1) {
+                Text(
+                    text = "|",
+                    color = DividerColor.copy(alpha = 0.3f),
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 2.dp)
+                )
+            }
+        }
+    }
+}
+
 // ── Profile hero ──────────────────────────────────────────────────────────────
 @Composable
 private fun ProfileHero(
     influencer: InfluencerProfile,
     onBack: () -> Unit,
-    onCreateProposal: () -> Unit
+    onCreateProposal: () -> Unit,
+    activeProfile: InstagramProfile? = null
 ) {
     val themeColor = influencerDetailThemeColor
+    
+    // Dynamic metrics switching
+    val metrics = activeProfile?.metrics ?: influencer.instagramMetrics
 
     // Precompute all stats for the unified 4×2 grid
-    val totalFollowers = influencer.totalFollowers
+    val totalFollowers = activeProfile?.followers
+        ?: influencer.totalFollowers
         ?: influencer.followers
         ?: influencer.platforms?.sumOf { it.followers ?: 0 }
         ?: 0
-    val engRate      = influencer.engagementRate
-    val avgViews     = influencer.instagramMetrics?.avgViews?.toLong()
+    val engRate      = metrics?.engagementRate?.toDouble() ?: influencer.engagementRate
+    val avgViews     = metrics?.avgViews?.toLong()
         ?: influencer.platforms?.firstOrNull()?.avgViews?.toLong()
     val collabCount  = influencer.collaborationCount
-    val avgLikes     = influencer.instagramMetrics?.avgLikes?.toInt()
-    val avgComments  = influencer.instagramMetrics?.avgComments?.toInt()
-    val postFreq     = influencer.instagramMetrics?.postingFrequencyDays
+    val avgLikes     = metrics?.avgLikes?.toInt()
+    val avgComments  = metrics?.avgComments?.toInt()
+    val postFreq     = metrics?.postingFrequencyDays
     val tier         = influencer.tier
 
     data class HeroStat(val value: String, val label: String, val color: Color, val rate: Float? = null)
@@ -256,7 +326,7 @@ private fun ProfileHero(
         )
     )
 
-    val handle = influencer.instagramProfiles?.firstOrNull()?.username
+    val handle = activeProfile?.username ?: influencer.instagramProfiles?.firstOrNull()?.username
     val initials = remember(influencer.name) { initialsFor(influencer.name) }
     val avatarBg = remember(influencer.name) { avatarColorFor(influencer.name) }
 
@@ -317,7 +387,7 @@ private fun ProfileHero(
                         if (!category.isNullOrBlank()) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Box(Modifier.size(6.dp).background(themeColor, CircleShape))
-                                Text(category.lowercase().replaceFirstChar { it.uppercase() }, fontSize = 10.5.sp, fontWeight = FontWeight.ExtraBold,
+                                Text(category.uppercase(), fontSize = 10.5.sp, fontWeight = FontWeight.ExtraBold,
                                     color = themeColor, letterSpacing = 0.5.sp)
                             }
                             Spacer(Modifier.height(2.dp))
@@ -647,7 +717,7 @@ private fun PlatformStatCard(label: String, value: String, modifier: Modifier = 
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+            Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(Modifier.height(2.dp))
             Text(label, fontSize = 11.sp, color = SubLabel, textAlign = TextAlign.Center, lineHeight = 14.sp)
         }
@@ -686,11 +756,11 @@ private fun BrandInstagramProfilesSection(profiles: List<InstagramProfile>, prim
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("@${profile.username}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("@${profile.username}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 if (profile.isDefault) {
                                     Spacer(Modifier.width(6.dp))
                                     Surface(shape = RoundedCornerShape(4.dp), color = instaColor) {
-                                        Text("Primary", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
+                                        Text("PRIMARY", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
                                     }
                                 }
                                 Spacer(Modifier.width(6.dp))
