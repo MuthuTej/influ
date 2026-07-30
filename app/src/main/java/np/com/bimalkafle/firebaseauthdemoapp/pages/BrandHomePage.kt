@@ -428,7 +428,7 @@ fun TopPicksSectionBrand(
                     influencer = influencer,
                     isWishlisted = wishlistedInfluencers.any { it.id == influencer.id },
                     onWishlistToggle = { onWishlistToggle(influencer) },
-                    onCardClick = { navController.navigate("influencer_detail/${influencer.id}") },
+                    onCardClick = { navController.navigate("brand_influencer_detail/${influencer.id}") },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
