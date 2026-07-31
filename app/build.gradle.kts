@@ -21,7 +21,7 @@ val localProperties = Properties().apply {
 fun localOrDefault(key: String, default: String): String =
     localProperties.getProperty(key) ?: System.getenv(key) ?: default
 
-val backendBaseUrlRelease = localOrDefault("BACKEND_BASE_URL_RELEASE", "https://connect-backend-e22a.onrender.com/graphql")
+val backendBaseUrlRelease = localOrDefault("BACKEND_BASE_URL_RELEASE", "https://connect-backend-uon0.onrender.com/graphql")
 val backendBaseUrlDebug = localOrDefault("BACKEND_BASE_URL_DEBUG", backendBaseUrlRelease)
 val razorpayKeyIdRelease = localOrDefault("RAZORPAY_KEY_ID_RELEASE", "rzp_test_SDi8IlcjLgcYQE")
 val razorpayKeyIdDebug = localOrDefault("RAZORPAY_KEY_ID_DEBUG", razorpayKeyIdRelease)
