@@ -683,8 +683,11 @@ fun CollaborationTimeline(
         eventRejectionMessage != null &&
         (eventMessage == null || eventRejectionMessage.timestamp > eventMessage.timestamp)
 
-    val paymentActive    = status == "WAITING_FOR_PAYMENT"
-    val paymentDone      = statusIndex >= statusOrder.indexOf("IN_PROGRESS")
+    // Brand confirms the collaboration is starting here — no payment involved.
+    // Payment now happens later, once content is submitted (see the "Release
+    // Payment" actions in the Content Delivery / Hosting Day steps below).
+    val confirmationActive = status == "WAITING_FOR_PAYMENT"
+    val confirmationDone   = statusIndex >= statusOrder.indexOf("IN_PROGRESS")
     val contentDeliveryActive = !isHosting && status == "IN_PROGRESS"
     val contentDeliveryDone   = !isHosting && status == "COMPLETED"
     // Content stays IN_PROGRESS through the whole review cycle (so the
@@ -697,6 +700,35 @@ fun CollaborationTimeline(
     // itself happening, so the brand's Accept is the only action.
     val hostingDayActive = isHosting && status == "IN_PROGRESS"
     val hostingDayDone   = isHosting && status == "COMPLETED"
+
+    // The brand already paid at Collaboration Confirmation (money went to the
+    // platform, not the influencer). "Release Payment" doesn't charge anything
+    // new — it just asks an admin to release those already-collected funds to
+    // the influencer; only the admin's approval (resolvePaymentReleaseRequest,
+    // in the Connect-Admin webapp) actually completes the collaboration.
+    val releaseContext = LocalContext.current
+    var isRequestingRelease by remember { mutableStateOf(false) }
+    val paymentReleaseRequest = collaboration.paymentReleaseRequest
+    val releasePending = paymentReleaseRequest?.status == "PENDING"
+    val requestPaymentRelease: () -> Unit = request@{
+        if (isRequestingRelease || releasePending || brandViewModel == null) return@request
+        isRequestingRelease = true
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)
+            ?.addOnSuccessListener { result ->
+                val token = result.token
+                if (token == null) {
+                    isRequestingRelease = false
+                    return@addOnSuccessListener
+                }
+                brandViewModel.requestPaymentRelease(token, collaboration.id) { errorMessage ->
+                    isRequestingRelease = false
+                    val toastMessage = errorMessage
+                        ?: "Payment release requested — our team will review it shortly."
+                    android.widget.Toast.makeText(releaseContext, toastMessage, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+            ?.addOnFailureListener { isRequestingRelease = false }
+    }
 
     Column(
         modifier = modifier
@@ -1307,25 +1339,28 @@ fun CollaborationTimeline(
             }
         }
 
-        // ── Step 4: Final Payment ────────────────────────────────────────
+        // ── Step 4: Collaboration Confirmation ───────────────────────────
+        // No payment happens here anymore — the brand just confirms the deal
+        // is starting. Payment moves to the Content Delivery / Hosting Day
+        // step below, released only after content is submitted and reviewed.
         TimelineStepCard(
-            title = "Final Payment",
+            title = "Collaboration Confirmation",
             time = "",
-            isActive = paymentActive,
-            isDone = paymentDone,
-            isLocked = !paymentActive && !paymentDone,
+            isActive = confirmationActive,
+            isDone = confirmationDone,
+            isLocked = !confirmationActive && !confirmationDone,
             isLast = false,
-            badge = if (paymentDone) "PAID" else null
+            badge = if (confirmationDone) "CONFIRMED" else null
         ) {
             when {
-                paymentDone -> Text(
-                    "Payment completed. Collaboration is in progress.",
+                confirmationDone -> Text(
+                    "Collaboration confirmed. Work is in progress.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFF555555)
                 )
-                paymentActive -> {
+                confirmationActive -> {
                     Text(
-                        "Script approved. Complete the payment to start work.",
+                        "Script approved. Confirm and pay to start work.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFF555555)
                     )
@@ -1370,13 +1405,13 @@ fun CollaborationTimeline(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                Text("Pay Now", fontWeight = FontWeight.Bold)
+                                Text("Confirm & Pay", fontWeight = FontWeight.Bold)
                             }
                         }
                     } else if (!isBrand) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Awaiting brand payment to begin work.",
+                            "Awaiting brand confirmation to begin work.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.Gray
                         )
@@ -1422,45 +1457,58 @@ fun CollaborationTimeline(
                     )
                     Spacer(Modifier.height(6.dp))
                     if (isBrand) {
-                        Text(
-                            "Review the submitted content above and accept or reject it.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF333333)
-                        )
-                        Spacer(Modifier.height(14.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Button(
-                                onClick = { onStatusUpdate("COMPLETED") },
-                                enabled = !isActionLoading,
-                                colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
-                                shape = RoundedCornerShape(20.dp),
-                                modifier = Modifier.weight(1f)
+                        if (releasePending) {
+                            Text(
+                                "Payment release requested — awaiting admin approval.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF333333)
+                            )
+                        } else {
+                            Text(
+                                "Review the submitted content above, then release payment to complete the collaboration.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF333333)
+                            )
+                            Spacer(Modifier.height(14.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                if (isActionLoading) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Accept", fontWeight = FontWeight.Bold)
+                                Button(
+                                    onClick = requestPaymentRelease,
+                                    enabled = !isRequestingRelease,
+                                    colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
+                                    shape = RoundedCornerShape(20.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    if (isRequestingRelease) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Release Payment", fontWeight = FontWeight.Bold)
+                                    }
                                 }
-                            }
-                            Button(
-                                onClick = { showRejectContentDialog = true },
-                                enabled = !isActionLoading,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
-                                shape = RoundedCornerShape(20.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Request Correction", fontWeight = FontWeight.Bold)
+                                Button(
+                                    onClick = { showRejectContentDialog = true },
+                                    enabled = !isActionLoading,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
+                                    shape = RoundedCornerShape(20.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Request Correction", fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     } else {
-                        Text("Waiting for brand to review your submission.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        Text(
+                            if (releasePending) "Payment release requested — awaiting admin approval."
+                            else "Waiting for brand to review your submission.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
                     }
                 }
                 contentRejectedPendingResubmit -> {
@@ -1522,7 +1570,7 @@ fun CollaborationTimeline(
                         Text("Waiting for influencer to deliver content.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                     }
                 }
-                else -> Text("Available after payment", style = MaterialTheme.typography.bodySmall, color = TlGray)
+                else -> Text("Available after collaboration is confirmed", style = MaterialTheme.typography.bodySmall, color = TlGray)
             }
         }
         } else {
@@ -1546,32 +1594,45 @@ fun CollaborationTimeline(
                     )
                     hostingDayActive -> {
                         if (isBrand) {
-                            Text(
-                                "Once the event has taken place, mark this collaboration as completed.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF333333)
-                            )
-                            Spacer(Modifier.height(14.dp))
-                            Button(
-                                onClick = { onStatusUpdate("COMPLETED") },
-                                enabled = !isActionLoading,
-                                colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                if (isActionLoading) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Mark Completed", fontWeight = FontWeight.Bold)
+                            if (releasePending) {
+                                Text(
+                                    "Payment release requested — awaiting admin approval.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color(0xFF333333)
+                                )
+                            } else {
+                                Text(
+                                    "Once the event has taken place, release payment to complete the collaboration.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color(0xFF333333)
+                                )
+                                Spacer(Modifier.height(14.dp))
+                                Button(
+                                    onClick = requestPaymentRelease,
+                                    enabled = !isRequestingRelease,
+                                    colors = ButtonDefaults.buttonColors(containerColor = TlGreen),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (isRequestingRelease) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Release Payment", fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         } else {
-                            Text("Waiting for brand to confirm the event took place.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text(
+                                if (releasePending) "Payment release requested — awaiting admin approval."
+                                else "Waiting for brand to confirm the event took place.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
                         }
                     }
-                    else -> Text("Available after payment", style = MaterialTheme.typography.bodySmall, color = TlGray)
+                    else -> Text("Available after collaboration is confirmed", style = MaterialTheme.typography.bodySmall, color = TlGray)
                 }
             }
         }
