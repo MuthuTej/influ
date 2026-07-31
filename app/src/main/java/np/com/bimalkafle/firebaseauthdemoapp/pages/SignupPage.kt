@@ -165,26 +165,22 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController, auth
             onSignupClick = {
                 if (name.isBlank()) {
                     Toast.makeText(context, "${if (role == "BRAND") "Brand Name" else "Name"} is mandatory", Toast.LENGTH_SHORT).show()
-                    return@SignupPageContent
-                }
-                if (authState.value !is AuthState.GoogleNewUser && (email.isBlank() || password.isBlank())) {
-                    Toast.makeText(context, "Email and password are required", Toast.LENGTH_SHORT).show()
-                    return@SignupPageContent
-                }
-                coroutineScope.launch {
-                    val photoData = photoUri?.let { encodeImageForUpload(context, it) }
-                    if (authState.value is AuthState.GoogleNewUser) {
-                        authViewModel.completeBackendSignup(name, role, photoData?.first, photoData?.second)
-                    } else {
-                        authViewModel.signup(email, password, confirmPassword, name, role, photoData?.first, photoData?.second)
-
-                val currentState = authState.value
-                if (currentState is AuthState.GoogleNewUser || (currentState is AuthState.Authenticated && !currentState.isProfileCompleted)) {
-                    authViewModel.completeBackendSignup(name, role)
                 } else {
-                    if (email.isBlank() || password.isBlank()) {
+                    val currentState = authState.value
+                    val isCompletingAccount = currentState is AuthState.GoogleNewUser ||
+                            (currentState is AuthState.Authenticated && !currentState.isProfileCompleted)
+
+                    if (!isCompletingAccount && (email.isBlank() || password.isBlank())) {
                         Toast.makeText(context, "Email and password are required", Toast.LENGTH_SHORT).show()
-                        return@SignupPageContent
+                    } else {
+                        coroutineScope.launch {
+                            val photoData = photoUri?.let { encodeImageForUpload(context, it) }
+                            if (isCompletingAccount) {
+                                authViewModel.completeBackendSignup(name, role, photoData?.first, photoData?.second)
+                            } else {
+                                authViewModel.signup(email, password, confirmPassword, name, role, photoData?.first, photoData?.second)
+                            }
+                        }
                     }
                 }
             },
