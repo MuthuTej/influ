@@ -781,6 +781,14 @@ class InfluencerViewModel : ViewModel() {
                       resolvedBy
                       adminNote
                     }
+                    paymentReleaseRequest {
+                      requestedBy
+                      status
+                      requestedAt
+                      resolvedAt
+                      resolvedBy
+                      adminNote
+                    }
                   }
                 }
             """.trimIndent()
@@ -988,6 +996,7 @@ class InfluencerViewModel : ViewModel() {
             }
 
             val cancellationRequest = parseCancellationRequest(obj.optJSONObject("cancellationRequest"))
+            val paymentReleaseRequest = parsePaymentReleaseRequest(obj.optJSONObject("paymentReleaseRequest"))
 
             list.add(
                 Collaboration(
@@ -1018,7 +1027,8 @@ class InfluencerViewModel : ViewModel() {
                     viewsGrowthSincePosting = if (obj.isNull("viewsGrowthSincePosting")) null else obj.optInt("viewsGrowthSincePosting"),
                     selectedInstagramProfileId = obj.optString("selectedInstagramProfileId").takeIf { it.isNotBlank() },
                     hasReviewed = if (obj.isNull("hasReviewed")) null else obj.optBoolean("hasReviewed"),
-                    cancellationRequest = cancellationRequest
+                    cancellationRequest = cancellationRequest,
+                    paymentReleaseRequest = paymentReleaseRequest
                 )
             )
         }
@@ -1031,6 +1041,18 @@ class InfluencerViewModel : ViewModel() {
             requestedBy = obj.optString("requestedBy"),
             requestedByRole = obj.optString("requestedByRole"),
             reason = obj.optString("reason"),
+            status = obj.optString("status"),
+            requestedAt = obj.optString("requestedAt"),
+            resolvedAt = if (obj.isNull("resolvedAt")) null else obj.optString("resolvedAt"),
+            resolvedBy = if (obj.isNull("resolvedBy")) null else obj.optString("resolvedBy"),
+            adminNote = if (obj.isNull("adminNote")) null else obj.optString("adminNote")
+        )
+    }
+
+    private fun parsePaymentReleaseRequest(obj: JSONObject?): PaymentReleaseRequest? {
+        if (obj == null) return null
+        return PaymentReleaseRequest(
+            requestedBy = obj.optString("requestedBy"),
             status = obj.optString("status"),
             requestedAt = obj.optString("requestedAt"),
             resolvedAt = if (obj.isNull("resolvedAt")) null else obj.optString("resolvedAt"),

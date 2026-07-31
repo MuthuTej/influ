@@ -876,6 +876,14 @@ class BrandViewModel : ViewModel() {
                       resolvedBy
                       adminNote
                     }
+                    paymentReleaseRequest {
+                      requestedBy
+                      status
+                      requestedAt
+                      resolvedAt
+                      resolvedBy
+                      adminNote
+                    }
                   }
                 }
             """.trimIndent()
@@ -1097,6 +1105,7 @@ class BrandViewModel : ViewModel() {
             val performanceTargets = parsePerformanceTargets(obj.optJSONObject("performanceTargets"))
             val performanceTracking = parsePerformanceTracking(obj.optJSONObject("performanceTracking"))
             val cancellationRequest = parseCancellationRequest(obj.optJSONObject("cancellationRequest"))
+            val paymentReleaseRequest = parsePaymentReleaseRequest(obj.optJSONObject("paymentReleaseRequest"))
 
             list.add(
                 Collaboration(
@@ -1129,11 +1138,24 @@ class BrandViewModel : ViewModel() {
                     performanceTargets = performanceTargets,
                     performanceTracking = performanceTracking,
                     hasReviewed = if (obj.isNull("hasReviewed")) null else obj.optBoolean("hasReviewed"),
-                    cancellationRequest = cancellationRequest
+                    cancellationRequest = cancellationRequest,
+                    paymentReleaseRequest = paymentReleaseRequest
                 )
             )
         }
         return list
+    }
+
+    private fun parsePaymentReleaseRequest(obj: JSONObject?): PaymentReleaseRequest? {
+        if (obj == null) return null
+        return PaymentReleaseRequest(
+            requestedBy = obj.optString("requestedBy"),
+            status = obj.optString("status"),
+            requestedAt = obj.optString("requestedAt"),
+            resolvedAt = if (obj.isNull("resolvedAt")) null else obj.optString("resolvedAt"),
+            resolvedBy = if (obj.isNull("resolvedBy")) null else obj.optString("resolvedBy"),
+            adminNote = if (obj.isNull("adminNote")) null else obj.optString("adminNote")
+        )
     }
 
     private fun parseCancellationRequest(obj: JSONObject?): CancellationRequest? {
@@ -1611,6 +1633,44 @@ class BrandViewModel : ViewModel() {
             }.onFailure {
                 Log.e("BrandViewModel", "Error requesting collaboration cancellation", it)
                 onComplete(it.message ?: "Failed to send cancellation request. Please try again.")
+            }
+        }
+    }
+
+    /**
+     * Asks an admin to release the already-collected payment to the influencer
+     * (requestPaymentRelease mutation, src/graphql/modules/collaboration/index.js).
+     * This does not move any money or change the collaboration's status itself —
+     * only an admin's separate approval (resolvePaymentReleaseRequest) does that —
+     * so we just refresh collaborations on success so the new PENDING
+     * paymentReleaseRequest shows up in the timeline.
+     * onComplete receives null on success, or a human-readable error message
+     * (e.g. "A payment release request is already pending admin review for this
+     * collaboration") on failure.
+     */
+    fun requestPaymentRelease(
+        token: String,
+        collaborationId: String,
+        onComplete: (String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val mutation = """
+                mutation RequestPaymentRelease(${'$'}collaborationId: ID!) {
+                  requestPaymentRelease(collaborationId: ${'$'}collaborationId) {
+                    id
+                  }
+                }
+            """.trimIndent()
+
+            val variables = mapOf("collaborationId" to collaborationId)
+
+            val result = GraphQLClient.query(query = mutation, variables = variables, token = token)
+            result.onSuccess {
+                fetchCollaborations(token, force = true)
+                onComplete(null)
+            }.onFailure {
+                Log.e("BrandViewModel", "Error requesting payment release", it)
+                onComplete(it.message ?: "Failed to request payment release. Please try again.")
             }
         }
     }
