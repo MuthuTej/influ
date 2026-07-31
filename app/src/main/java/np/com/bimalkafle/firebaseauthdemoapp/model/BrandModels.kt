@@ -179,7 +179,11 @@ data class Collaboration(
     // Set while a BRAND or INFLUENCER participant has asked an admin to end
     // this collaboration (requestCollaborationCancellation mutation). Null
     // when no request has ever been made.
-    val cancellationRequest: CancellationRequest? = null
+    val cancellationRequest: CancellationRequest? = null,
+    // Set while the brand has asked an admin to release the already-collected
+    // payment to the influencer (requestPaymentRelease mutation). Null when
+    // no release has ever been requested.
+    val paymentReleaseRequest: PaymentReleaseRequest? = null
 )
 
 // Mirrors the backend's CancellationRequest type (collaboration module) —
@@ -190,6 +194,19 @@ data class CancellationRequest(
     val requestedBy: String,
     val requestedByRole: String,
     val reason: String,
+    val status: String,
+    val requestedAt: String,
+    val resolvedAt: String? = null,
+    val resolvedBy: String? = null,
+    val adminNote: String? = null
+)
+
+// Mirrors the backend's PaymentReleaseRequest type (collaboration module) —
+// an admin-reviewed request to release the already-collected payment to the
+// influencer. Requesting it does not move any money by itself; only the
+// admin's resolvePaymentReleaseRequest mutation (admin webapp) resolves it.
+data class PaymentReleaseRequest(
+    val requestedBy: String,
     val status: String,
     val requestedAt: String,
     val resolvedAt: String? = null,
