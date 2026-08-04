@@ -124,7 +124,7 @@ fun BrandHomePage(
     Scaffold(
         bottomBar = {
             CmnBottomNavigationBar(
-                selectedItem = selectedBottomNavItem,
+                selectedItem = "Home",
                 onItemSelected = { selectedBottomNavItem = it },
                 navController = navController,
                 isBrand = true
@@ -143,7 +143,7 @@ fun BrandHomePage(
             }
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
-    ) { padding ->
+    ) { paddingValues ->
         if (isLoading && collaborations.isEmpty() && overallTopInfluencers.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 LoadingState(message = "Loading your dashboard…")
@@ -165,7 +165,7 @@ fun BrandHomePage(
                 LazyColumn(
                     modifier = modifier
                         .fillMaxSize()
-                        .padding(bottom = padding.calculateBottomPadding())
+                        .padding(bottom = paddingValues.calculateBottomPadding())
                         .background(Color(0xFFF8F9FE))
                 ) {
                     item {
@@ -249,7 +249,7 @@ fun BrandHeaderAndReachSection(
         ),
         ctaLabel = "Launch Campaign",
         onCtaClick = { navController.navigate("create_campaign") },
-        onHeartClick = { navController.navigate("wishlist") },
+        onHeartClick = { navController.navigate("brand_wishlist") },
         onBellClick = { navController.navigate("notifications") }
     )
 }
@@ -315,7 +315,7 @@ fun ActiveCampaignSection(
                 items(activeCollabs) { collaboration ->
                     val pricing = collaboration.pricing?.firstOrNull()
                     Box(modifier = Modifier.width(cardWidth)) {
-                        CollaborationItem(
+                        CollaborationItemBrand(
                             brandName = brandName,
                             brandLogo = null,
                             campaignTitle = collaboration.campaign.title,
@@ -329,6 +329,109 @@ fun ActiveCampaignSection(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun CollaborationItemBrand(
+    brandName: String,
+    brandLogo: String?,
+    campaignTitle: String,
+    status: String,
+    deliverable: String,
+    platform: String,
+    price: Int,
+    currency: String,
+    time: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    shape = CircleShape,
+                    color = brandThemeColor.copy(alpha = 0.1f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = brandName.take(1).uppercase(),
+                            color = brandThemeColor,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = brandName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Surface(
+                    color = when (status) {
+                        "ACCEPTED" -> Color(0xFFE8F5E9)
+                        "IN_PROGRESS" -> Color(0xFFE3F2FD)
+                        else -> Color(0xFFF5F5F5)
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = status.replace("_", " "),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = when (status) {
+                            "ACCEPTED" -> Color(0xFF2E7D32)
+                            "IN_PROGRESS" -> Color(0xFF1976D2)
+                            else -> Color.Gray
+                        }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = campaignTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "$deliverable on $platform",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "$currency $price",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = brandThemeColor
+                )
+                Text(
+                    text = time,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.LightGray
+                )
             }
         }
     }
@@ -434,7 +537,7 @@ fun TopPicksSectionBrand(
             }
             
             Button(
-                onClick = { navController.navigate("brand_influencer_search") },
+                onClick = { navController.navigate("brand_search") },
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = brandThemeColor)
@@ -484,7 +587,7 @@ fun SpendBreakdownSection(collaborations: List<Collaboration>) {
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         SpendBucketPeriod.values().forEach { period ->
                             DropdownMenuItem(
-                                text = { Text(period.name.lowercase().capitalize()) },
+                                text = { Text(period.name.lowercase().replaceFirstChar { it.uppercase() }) },
                                 onClick = {
                                     selectedPeriod = period
                                     expanded = false
