@@ -28,7 +28,7 @@ class InfluencerViewModel : ViewModel() {
     private val _error = MutableLiveData<String?>()
     val error: LiveData<String?> = _error
 
-    fun clearError() { _error.value = null }+`
+    fun clearError() { _error.value = null }
 
     // Dashboard-specific data for unified fetch
     private val _dashboardCollaborations = MutableLiveData<List<Collaboration>>()
