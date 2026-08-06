@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="de38c14b-4cd1-4e37-9626-f0632a528ead" />
+    <option name="activeSessionId" value="bcdff531-e7ab-4bbd-a9ee-3a4ac35a0cbf" />
     <option name="openSessionIds">
       <list>
-        <option value="de38c14b-4cd1-4e37-9626-f0632a528ead" />
+        <option value="bcdff531-e7ab-4bbd-a9ee-3a4ac35a0cbf" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
-        <entry key="de38c14b-4cd1-4e37-9626-f0632a528ead" value="/switch-account" />
+        <entry key="bcdff531-e7ab-4bbd-a9ee-3a4ac35a0cbf" value="/sessions/c18c00ad-aedf-4f1a-a6c4-78cb5287ca85" />
       </map>
     </option>
     <option name="sessionTitles">
       <map>
-        <entry key="de38c14b-4cd1-4e37-9626-f0632a528ead" value="localhost:57284/switch-account?workingDir=C%3A%2FUsers%2Fmaddy%2FStudioProjects%2Finflu&amp;panelId=7802de93-d43a-4044-b06d-747ada0470a7&amp;theme=dark" />
+        <entry key="bcdff531-e7ab-4bbd-a9ee-3a4ac35a0cbf" value="@app/src/main/java/np/com/bimalkafle/firebaseauthd" />
       </map>
     </option>
   </component>

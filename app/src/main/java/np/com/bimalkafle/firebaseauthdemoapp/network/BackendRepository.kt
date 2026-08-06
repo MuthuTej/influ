@@ -1442,6 +1442,25 @@ object BackendRepository {
         }
     }
 
+    // Used to resolve a notification's collaborationId into the chat partner's id/name
+    // (see notification/NotificationRouter.kt) — getCollaborationById already authorizes
+    // either participant (brand or influencer) on the collaboration.
+    suspend fun getCollaborationById(collaborationId: String, token: String): Result<JSONObject> {
+        val query = """
+            query GetCollaborationById(${'$'}id: ID!) {
+                getCollaborationById(id: ${'$'}id) {
+                    id
+                    brandId
+                    influencerId
+                    brand { name }
+                    influencer { name }
+                }
+            }
+        """.trimIndent()
+        val result = GraphQLClient.query(query, mapOf("id" to collaborationId), token)
+        return result.mapCatching { it.getJSONObject("data").getJSONObject("getCollaborationById") }
+    }
+
     suspend fun sendChatMessage(
         receiverId: String,
         text: String,

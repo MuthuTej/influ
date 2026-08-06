@@ -64,8 +64,14 @@ fun CreateCampaignScreen2(
                       campaignViewModel.budgetMax > 0 && 
                       campaignViewModel.budgetMin > campaignViewModel.budgetMax
 
+    val ageError = campaignViewModel.ageMin > 0 &&
+                   campaignViewModel.ageMax > 0 &&
+                   campaignViewModel.ageMin > campaignViewModel.ageMax
+
     val isFormValid = campaignViewModel.budgetMin > 0 && 
                       campaignViewModel.budgetMax >= campaignViewModel.budgetMin &&
+                      campaignViewModel.ageMin > 0 &&
+                      campaignViewModel.ageMax >= campaignViewModel.ageMin &&
                       campaignViewModel.selectedLocations.isNotEmpty() &&
                       campaignViewModel.selectedGender.isNotBlank()
 
@@ -271,31 +277,54 @@ fun CreateCampaignScreen2(
 
             // Age Group
             Text("Age group *", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "${campaignViewModel.ageMin} - ${campaignViewModel.ageMax} years",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary
-            )
-            RangeSlider(
-                value = campaignViewModel.ageMin.toFloat()..campaignViewModel.ageMax.toFloat(),
-                onValueChange = { 
-                    campaignViewModel.ageMin = it.start.toInt()
-                    campaignViewModel.ageMax = it.endInclusive.toInt()
-                },
-                valueRange = 1f..100f,
-                modifier = Modifier.fillMaxWidth(),
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                OutlinedTextField(
+                    value = if (campaignViewModel.ageMin == 0) "" else campaignViewModel.ageMin.toString(),
+                    onValueChange = { 
+                        val newVal = it.filter { char -> char.isDigit() }.toIntOrNull() ?: 0
+                        campaignViewModel.ageMin = newVal
+                    },
+                    label = { Text("Min Age") },
+                    isError = ageError,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        errorBorderColor = Color.Red
+                    )
                 )
-            )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("min", fontSize = 12.sp, color = Color.Gray)
-                Text("max", fontSize = 12.sp, color = Color.Gray)
+                OutlinedTextField(
+                    value = if (campaignViewModel.ageMax == 0) "" else campaignViewModel.ageMax.toString(),
+                    onValueChange = { 
+                        val newVal = it.filter { char -> char.isDigit() }.toIntOrNull() ?: 0
+                        campaignViewModel.ageMax = newVal
+                    },
+                    label = { Text("Max Age") },
+                    isError = ageError,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        errorBorderColor = Color.Red
+                    )
+                )
+            }
+            if (ageError) {
+                Text(
+                    text = "Min age must be less than Max age",
+                    color = Color.Red,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                )
             }
 
 

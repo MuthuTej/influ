@@ -8,6 +8,8 @@ import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.launch
 import np.com.bimalkafle.firebaseauthdemoapp.network.BackendRepository
 import np.com.bimalkafle.firebaseauthdemoapp.network.InstagramAuthResult
+import np.com.bimalkafle.firebaseauthdemoapp.notification.NotificationNavigationEvent
+import np.com.bimalkafle.firebaseauthdemoapp.notification.NotificationRouter
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -74,7 +76,9 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                 )
             }
         }
-        
+
+        handleNotificationTap(intent)
+
         FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w("FCM", "Fetching FCM registration token failed", task.exception)
@@ -115,6 +119,31 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         super.onNewIntent(intent)
         setIntent(intent)
         handleInstagramCallback(intent)
+        handleNotificationTap(intent)
+    }
+
+    // Reads the data payload MyFirebaseMessagingService attaches to a notification's tap
+    // Intent (see EXTRA_NOTIFICATION_DATA) and asks NotificationRouter where that
+    // notification's originating page is, so MyAppNavigation can redirect there. Resolving
+    // collaboration-related types into a specific chat route needs a backend lookup, so this
+    // fetches a fresh ID token first (same pattern as the FCM-token-upload flow below).
+    @Suppress("UNCHECKED_CAST", "DEPRECATION")
+    private fun handleNotificationTap(intent: Intent) {
+        val data = (
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                intent.getSerializableExtra(MyFirebaseMessagingService.EXTRA_NOTIFICATION_DATA, HashMap::class.java)
+            else
+                intent.getSerializableExtra(MyFirebaseMessagingService.EXTRA_NOTIFICATION_DATA)
+        ) as? HashMap<String, String> ?: return
+
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+            lifecycleScope.launch {
+                val route = NotificationRouter.resolveRoute(data["type"], data, result.token)
+                if (route != null) {
+                    NotificationNavigationEvent.notify(route)
+                }
+            }
+        }
     }
 
     // Catches the np.com.bimalkafle.firebaseauthdemoapp://instagram-callback
