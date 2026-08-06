@@ -1,5 +1,6 @@
 package np.com.bimalkafle.firebaseauthdemoapp
 
+import android.net.Uri
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -171,7 +172,7 @@ fun MyAppNavigation(
                 influencerId = influencerId,
                 onBack = { navController.popBackStack() },
                 onCreateProposal = { id -> navController.navigate("influencer_create_proposal/$id") },
-                onConnect = { id, name -> navController.navigate("chat/$id/$name") },
+                onConnect = { id, name -> navController.navigate("chat/${Uri.encode(id)}/${Uri.encode(name)}") },
                 influencerViewModel = influencerViewModel
             )
         }
@@ -222,7 +223,7 @@ fun MyAppNavigation(
         composable("chatList") {
             ChatListScreen(
                 onChatClick = { chatId, chatName, collaborationId ->
-                    navController.navigate("chat/$chatId/$chatName?collaborationId=$collaborationId")
+                    navController.navigate("chat/${Uri.encode(chatId)}/${Uri.encode(chatName)}?collaborationId=${Uri.encode(collaborationId)}")
                 },
                 navController = navController
             )

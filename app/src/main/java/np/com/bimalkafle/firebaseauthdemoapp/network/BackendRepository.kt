@@ -30,6 +30,7 @@ object BackendRepository {
                 }
                 collaborations {
                   id status message pricing { platform deliverable price currency } initiatedBy createdAt updatedAt paymentStatus totalAmount
+                  brandId influencerId
                   brand { id name logoUrl }
                   campaign { id title status }
                   selectedInstagramProfileId
@@ -56,6 +57,7 @@ object BackendRepository {
                 }
                 collaborations {
                   id status message pricing { platform deliverable price currency } initiatedBy createdAt updatedAt paymentStatus totalAmount
+                  brandId influencerId
                   campaign { id title status }
                   influencer { name logoUrl }
                 }

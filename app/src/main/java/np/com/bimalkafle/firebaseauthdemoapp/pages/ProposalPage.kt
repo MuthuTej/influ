@@ -47,6 +47,8 @@ import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.BrandViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.InfluencerViewModel
 import np.com.bimalkafle.firebaseauthdemoapp.utils.RazorpayService
 import android.app.Activity
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 
 import np.com.bimalkafle.firebaseauthdemoapp.components.CmnBottomNavigationBar
@@ -133,6 +135,7 @@ fun ProposalPage(
 ) {
     var selectedTab by remember { mutableStateOf(ProposalType.RECEIVED) }
     var selectedStatus by remember { mutableStateOf<ProposalStatus?>(null) }
+    val context = LocalContext.current
 
     val authState = authViewModel.authState.observeAsState()
     var isBrand by remember { mutableStateOf(false) }
@@ -383,7 +386,11 @@ fun ProposalPage(
                                         onChat = {
                                             val otherUserId = if (isBrand) proposal.influencerId else proposal.brandId
                                             val otherUserName = proposal.otherPartyName
-                                            navController.navigate("chat/$otherUserId/$otherUserName?collaborationId=${proposal.id}")
+                                            if (otherUserId.isBlank()) {
+                                                Toast.makeText(context, "Still loading this collaboration, please try again", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                navController.navigate("chat/${Uri.encode(otherUserId)}/${Uri.encode(otherUserName)}?collaborationId=${Uri.encode(proposal.id)}")
+                                            }
                                         },
                                         onAction = { status ->
                                             FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
