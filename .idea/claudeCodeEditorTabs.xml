@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="de38c14b-4cd1-4e37-9626-f0632a528ead" />
+    <option name="activeSessionId" value="bcdff531-e7ab-4bbd-a9ee-3a4ac35a0cbf" />
     <option name="openSessionIds">
       <list>
-        <option value="de38c14b-4cd1-4e37-9626-f0632a528ead" />
+        <option value="bcdff531-e7ab-4bbd-a9ee-3a4ac35a0cbf" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
-        <entry key="de38c14b-4cd1-4e37-9626-f0632a528ead" value="/sessions/f90c12c1-cc20-46d7-9f6b-bde69f790db6" />
+        <entry key="bcdff531-e7ab-4bbd-a9ee-3a4ac35a0cbf" value="/sessions/c18c00ad-aedf-4f1a-a6c4-78cb5287ca85" />
       </map>
     </option>
     <option name="sessionTitles">
       <map>
-        <entry key="de38c14b-4cd1-4e37-9626-f0632a528ead" value="chnsge the backend url to https://connect-backend-" />
+        <entry key="bcdff531-e7ab-4bbd-a9ee-3a4ac35a0cbf" value="@app/src/main/java/np/com/bimalkafle/firebaseauthd" />
       </map>
     </option>
   </component>

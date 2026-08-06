@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
@@ -18,7 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,7 +34,10 @@ import com.google.firebase.auth.FirebaseAuth
 import np.com.bimalkafle.firebaseauthdemoapp.components.EmptyState
 import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 import np.com.bimalkafle.firebaseauthdemoapp.model.Notification
+import np.com.bimalkafle.firebaseauthdemoapp.notification.NotificationRouter
 import np.com.bimalkafle.firebaseauthdemoapp.viewmodel.NotificationViewModel
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -47,6 +53,7 @@ fun NotificationPage(
     val notifications by notificationViewModel.notifications.observeAsState(emptyList())
     val isLoading by notificationViewModel.loading.observeAsState(false)
     val unreadCount by notificationViewModel.unreadCount.observeAsState(0)
+    val coroutineScope = rememberCoroutineScope()
 
     val sortedNotifications = remember(notifications) {
         notifications.sortedWith(
@@ -54,6 +61,8 @@ fun NotificationPage(
                 .thenByDescending { it.createdAt }
         )
     }
+
+    var showClearAllDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val currentUser = FirebaseAuth.getInstance().currentUser
@@ -97,6 +106,11 @@ fun NotificationPage(
                             Icon(Icons.Default.DoneAll, contentDescription = "Mark all as read", tint = themeColor)
                         }
                     }
+                    if (notifications.isNotEmpty()) {
+                        IconButton(onClick = { showClearAllDialog = true }) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = "Clear all", tint = Color(0xFFFF5252))
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
@@ -128,9 +142,14 @@ fun NotificationPage(
                             notification = notification,
                             onClick = {
                                 FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-                                    result.token?.let { token ->
-                                        if (!notification.isRead) {
-                                            notificationViewModel.markAsRead(token, notification.id)
+                                    val token = result.token
+                                    if (!notification.isRead && token != null) {
+                                        notificationViewModel.markAsRead(token, notification.id)
+                                    }
+                                    coroutineScope.launch {
+                                        val route = routeForNotification(notification, token)
+                                        if (route != null) {
+                                            navController.navigate(route)
                                         }
                                     }
                                 }
@@ -140,6 +159,31 @@ fun NotificationPage(
                 }
             }
         }
+    }
+
+    if (showClearAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearAllDialog = false },
+            title = { Text("Clear all notifications?") },
+            text = { Text("This will permanently delete all your notifications. This action cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClearAllDialog = false
+                    FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                        result.token?.let { token ->
+                            notificationViewModel.clearAllNotifications(token)
+                        }
+                    }
+                }) {
+                    Text("Clear all", color = Color(0xFFFF5252))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearAllDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -217,6 +261,22 @@ fun NotificationItem(
                 )
             }
         }
+    }
+}
+
+// notification.data is the JSON-stringified `data` payload the backend attaches to each
+// push notification (see connect-backend's notificationService.js) — { type, collaborationId?,
+// campaignId?, ... }. Parse it back out and hand it to the same router MainActivity uses for
+// FCM taps, so an in-app click lands on the same page a push-notification tap would.
+suspend fun routeForNotification(notification: Notification, token: String?): String? {
+    val raw = notification.data ?: return "notifications"
+    return try {
+        val json = JSONObject(raw)
+        val data = mutableMapOf<String, String?>()
+        json.keys().forEach { key -> data[key] = json.opt(key)?.toString() }
+        NotificationRouter.resolveRoute(data["type"], data, token)
+    } catch (e: Exception) {
+        "notifications"
     }
 }
 

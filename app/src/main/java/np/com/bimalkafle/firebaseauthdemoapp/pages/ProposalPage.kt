@@ -2,6 +2,8 @@
 
 package np.com.bimalkafle.firebaseauthdemoapp.pages
 
+import android.content.Context
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -58,7 +60,6 @@ import np.com.bimalkafle.firebaseauthdemoapp.components.LoadingState
 enum class ProposalStatus(val displayName: String, val color: Color, val icon: ImageVector) {
     PENDING("Pending", Color(0xFFFFC107), Icons.Default.HourglassEmpty),
     NEGOTIATION("Negotiation", Color(0xFFFF9800), Icons.Default.ChatBubbleOutline),
-    ACCEPTED("Accepted", Color(0xFF4CAF50), Icons.Default.CheckCircle),
     REJECTED("Rejected", Color(0xFFF44336), Icons.Default.HighlightOff),
     REVOKED("Revoked", Color(0xFF9E9E9E), Icons.Default.Undo),
     IN_PROGRESS("In Progress", Color(0xFF2196F3), Icons.Default.PlayArrow),
@@ -89,6 +90,12 @@ data class Proposal(
     val selectedInstagramProfileId: String? = null
 )
 
+fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 fun Collaboration.toProposal(isBrand: Boolean): Proposal {
     val pricingList = this.pricing ?: emptyList()
     val pricing = pricingList.firstOrNull()
@@ -102,6 +109,20 @@ fun Collaboration.toProposal(isBrand: Boolean): Proposal {
     // Calculate total from pricing list if totalAmount is null
     val totalSum = this.totalAmount ?: pricingList.sumOf { it.price.toDouble() }
 
+    val proposalStatus = when (this.status.uppercase()) {
+        "PENDING" -> ProposalStatus.PENDING
+        "NEGOTIATION" -> ProposalStatus.NEGOTIATION
+        // Map all work-in-progress statuses to IN_PROGRESS. 
+        // WAITING_FOR_PAYMENT is distinct as it follows script confirmation.
+        "ACCEPTED", "BRIEF_SENT", "BRIEF_FINALIZED", "SCRIPT_SENT", "SCRIPT_FINALIZED", 
+        "EVENT_SENT", "IN_PROGRESS", "INPROGRESS" -> ProposalStatus.IN_PROGRESS
+        "REJECTED" -> ProposalStatus.REJECTED
+        "REVOKED" -> ProposalStatus.REVOKED
+        "WAITING_FOR_PAYMENT", "WAIT_PAYMENT" -> ProposalStatus.WAITING_FOR_PAYMENT
+        "COMPLETED" -> ProposalStatus.COMPLETED
+        else -> ProposalStatus.PENDING
+    }
+
     return Proposal(
         id = this.id,
         otherPartyName = if (isBrand) this.influencer.name else this.brand?.name ?: "Unknown Brand",
@@ -111,11 +132,7 @@ fun Collaboration.toProposal(isBrand: Boolean): Proposal {
         budget = if (pricing != null) "${pricing.currency} ${pricing.price}" else "N/A",
         deliverable = pricing?.deliverable ?: "N/A",
         platform = pricing?.platform ?: "N/A",
-        status = try {
-            ProposalStatus.valueOf(this.status.uppercase())
-        } catch (e: Exception) {
-            ProposalStatus.PENDING
-        },
+        status = proposalStatus,
         type = proposalType,
         logoUrl = if (isBrand) this.influencer.logoUrl else this.brand?.logoUrl,
         date = this.createdAt.take(10),
@@ -140,15 +157,10 @@ fun ProposalPage(
     val authState = authViewModel.authState.observeAsState()
     var isBrand by remember { mutableStateOf(false) }
 
-    // History must read from whichever ViewModel actually holds this user's
-    // collaborations — previously this always read brandViewModel, so influencers
-    // saw a permanently empty History tab regardless of their real data.
     val brandCollaborations by brandViewModel.collaborations.observeAsState(initial = emptyList())
     val influencerCollaborations by influencerViewModel.filteredCollaborations.observeAsState(initial = emptyList())
     val collaborations = if (isBrand) brandCollaborations else influencerCollaborations
 
-    // Unfiltered by active Instagram profile — an earnings report should cover
-    // everything ever received, not just the currently selected profile's view.
     val allInfluencerCollaborations by influencerViewModel.collaborations.observeAsState(initial = emptyList())
 
     val brandLoading by brandViewModel.loading.observeAsState(initial = false)
@@ -167,11 +179,6 @@ fun ProposalPage(
              FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
                  val firebaseToken = result.token
                  if (firebaseToken != null) {
-                     // force = true: this screen exists specifically to show
-                     // current status, so skipping the network call in favor of
-                     // the FetchThrottle's cached copy (the force=false default)
-                     // can show a status that changed elsewhere — e.g. an admin
-                     // resolving a cancellation request — as stale indefinitely.
                      if (isBrand) brandViewModel.fetchCollaborations(firebaseToken, force = true)
                      else influencerViewModel.fetchCollaborations(firebaseToken, force = true)
                  }
@@ -179,8 +186,6 @@ fun ProposalPage(
         }
     }
 
-    // Real-time: WebSocket subscription anyCollaborationUpdated fires whenever any
-    // collaboration for this user is updated by the other party.
     DisposableEffect(authState.value) {
         if (authState.value !is np.com.bimalkafle.firebaseauthdemoapp.AuthState.Authenticated) {
             return@DisposableEffect onDispose {}
@@ -200,7 +205,6 @@ fun ProposalPage(
         var wsClient: np.com.bimalkafle.firebaseauthdemoapp.network.CollaborationWebSocketClient? = null
         FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.addOnSuccessListener { r ->
             r.token?.let { token ->
-                // collaborationId = null → subscribes to anyCollaborationUpdated (all collabs)
                 wsClient = np.com.bimalkafle.firebaseauthdemoapp.network.CollaborationWebSocketClient(
                     token = token,
                     collaborationId = null,
@@ -350,7 +354,8 @@ fun ProposalPage(
                     AppPullToRefreshBox(
                         isRefreshing = isLoading,
                         onRefresh = {
-                            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                            val user = FirebaseAuth.getInstance().currentUser
+                            user?.getIdToken(true)?.addOnSuccessListener { result ->
                                 result.token?.let { token ->
                                     if (isBrand) brandViewModel.fetchCollaborations(token, force = true)
                                     else influencerViewModel.fetchCollaborations(token, force = true)
@@ -392,16 +397,25 @@ fun ProposalPage(
                                                 navController.navigate("chat/${Uri.encode(otherUserId)}/${Uri.encode(otherUserName)}?collaborationId=${Uri.encode(proposal.id)}")
                                             }
                                         },
-                                        onAction = { status ->
-                                            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-                                                val token = result.token
-                                                if (token != null) {
-                                                    if (isBrand) {
-                                                        brandViewModel.updateCollaborationStatus(token, proposal.id, status) { }
+                                        onAction = { status, onComplete ->
+                                            val user = FirebaseAuth.getInstance().currentUser
+                                            if (user != null) {
+                                                user.getIdToken(true).addOnSuccessListener { result ->
+                                                    val token = result.token
+                                                    if (token != null) {
+                                                        if (isBrand) {
+                                                            brandViewModel.updateCollaborationStatus(token, proposal.id, status) { success -> onComplete(success) }
+                                                        } else {
+                                                            influencerViewModel.updateCollaborationStatus(token, proposal.id, status) { success -> onComplete(success) }
+                                                        }
                                                     } else {
-                                                        influencerViewModel.updateCollaborationStatus(token, proposal.id, status) { }
+                                                        onComplete(false)
                                                     }
+                                                }.addOnFailureListener {
+                                                    onComplete(false)
                                                 }
+                                            } else {
+                                                onComplete(false)
                                             }
                                         }
                                     )
@@ -488,17 +502,19 @@ fun PremiumProposalCard(
     brandViewModel: BrandViewModel,
     onClick: () -> Unit,
     onChat: () -> Unit,
-    onAction: (String) -> Unit,
+    onAction: (String, (Boolean) -> Unit) -> Unit,
     influencerViewModel: InfluencerViewModel? = null
 ) {
     val context = LocalContext.current
-    val activity = context as? Activity
+    val activity = remember(context) { context.findActivity() }
 
     val igProfileUsername = remember(proposal.selectedInstagramProfileId) {
         if (proposal.selectedInstagramProfileId == null) null
         else influencerViewModel?.influencerProfile?.value?.instagramProfiles
             ?.find { it.id == proposal.selectedInstagramProfileId }?.username
     }
+
+    var localLoading by remember { mutableStateOf(false) }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -606,53 +622,94 @@ fun PremiumProposalCard(
                     Text("Chat", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
 
-                if (proposal.type == ProposalType.RECEIVED && proposal.status == ProposalStatus.PENDING) {
+                if (proposal.type == ProposalType.RECEIVED && (proposal.status == ProposalStatus.PENDING || proposal.status == ProposalStatus.NEGOTIATION)) {
                     Button(
-                        onClick = { onAction("ACCEPTED") },
+                        onClick = { 
+                            localLoading = true
+                            onAction("ACCEPTED") { localLoading = false }
+                        },
+                        enabled = !localLoading,
                         modifier = Modifier.weight(1f).height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(0.dp)
                     ) {
-                        Text("Accept", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        if (localLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Text("Accept", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 } else if (proposal.type == ProposalType.SENT && proposal.status == ProposalStatus.PENDING) {
                     Button(
-                        onClick = { onAction("REVOKED") },
+                        onClick = { 
+                            localLoading = true
+                            onAction("REVOKED") { localLoading = false }
+                        },
+                        enabled = !localLoading,
                         modifier = Modifier.weight(1f).height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D1D1F)),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(0.dp)
                     ) {
-                        Text("Revoke", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        if (localLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Text("Revoke", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
-                } else if (isBrand && (proposal.status == ProposalStatus.ACCEPTED || proposal.status == ProposalStatus.WAITING_FOR_PAYMENT)) {
+                } else if (isBrand && proposal.status == ProposalStatus.WAITING_FOR_PAYMENT) {
                     Button(
                         onClick = {
-                            FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
-                                val token = result.token
-                                if (token != null) {
-                                    brandViewModel.createCollaborationPaymentOrder(token, proposal.id, "FULL") { orderData ->
-                                        if (orderData != null && activity != null) {
-                                            RazorpayService.startPayment(
-                                                activity = activity,
-                                                orderData = orderData,
-                                                userEmail = FirebaseAuth.getInstance().currentUser?.email,
-                                                userContact = null
-                                            )
+                            if (localLoading) return@Button
+                            val user = FirebaseAuth.getInstance().currentUser
+                            if (user == null) {
+                                Toast.makeText(context, "Please sign in again", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            
+                            localLoading = true
+                            user.getIdToken(true)
+                                .addOnSuccessListener { result ->
+                                    val token = result.token
+                                    if (token != null) {
+                                        brandViewModel.createCollaborationPaymentOrder(token, proposal.id, "FULL") { orderData ->
+                                            localLoading = false
+                                            if (orderData != null && activity != null) {
+                                                RazorpayService.startPayment(
+                                                    activity = activity,
+                                                    orderData = orderData,
+                                                    userEmail = user.email,
+                                                    userContact = null
+                                                )
+                                            } else {
+                                                val msg = if (orderData == null) "Failed to create payment order" else "Activity not found"
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            }
                                         }
+                                    } else {
+                                        localLoading = false
+                                        Toast.makeText(context, "Failed to get auth token", Toast.LENGTH_SHORT).show()
                                     }
                                 }
-                            }
+                                .addOnFailureListener {
+                                    localLoading = false
+                                    Toast.makeText(context, "Authentication failed: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
                         },
+                        enabled = !localLoading,
                         modifier = Modifier.weight(1f).height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(0.dp)
                     ) {
-                        Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Pay Now", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        if (localLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Pay Now", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
             }

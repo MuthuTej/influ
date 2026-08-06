@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
 import kotlinx.coroutines.flow.collectLatest
 import np.com.bimalkafle.firebaseauthdemoapp.network.SessionManager
+import np.com.bimalkafle.firebaseauthdemoapp.notification.NotificationNavigationEvent
 import np.com.bimalkafle.firebaseauthdemoapp.pages.*
 import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.AiChatScreen
 import np.com.bimalkafle.firebaseauthdemoapp.ui.chat.ChatListScreen
@@ -48,6 +49,15 @@ fun MyAppNavigation(
             navController.navigate("login") {
                 popUpTo(0) { inclusive = true }
             }
+        }
+    }
+
+    // A push-notification tap or an in-app notification click resolves to a route via
+    // NotificationRouter and lands here (see MainActivity.handleNotificationTap /
+    // NotificationPage's onClick).
+    LaunchedEffect(Unit) {
+        NotificationNavigationEvent.route.collectLatest { route ->
+            navController.navigate(route)
         }
     }
 

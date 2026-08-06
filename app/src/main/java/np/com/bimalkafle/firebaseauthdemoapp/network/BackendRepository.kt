@@ -558,6 +558,50 @@ object BackendRepository {
         }
     }
 
+    suspend fun deleteAllNotifications(token: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                mutation {
+                    deleteAllNotifications
+                }
+            """.trimIndent()
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    Result.success(jsonResponse.getJSONObject("data").getBoolean("deleteAllNotifications"))
+                }
+            } else {
+                Result.failure(Exception("Server error ${connection.responseCode}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun requestPasswordReset(email: String): Result<String> = withContext(Dispatchers.IO) {
         try {
             val url = URL(BACKEND_URL)
@@ -1398,6 +1442,25 @@ object BackendRepository {
             Log.e("BackendRepository", "getChatList: ${e.message}", e)
             Result.failure(e)
         }
+    }
+
+    // Used to resolve a notification's collaborationId into the chat partner's id/name
+    // (see notification/NotificationRouter.kt) — getCollaborationById already authorizes
+    // either participant (brand or influencer) on the collaboration.
+    suspend fun getCollaborationById(collaborationId: String, token: String): Result<JSONObject> {
+        val query = """
+            query GetCollaborationById(${'$'}id: ID!) {
+                getCollaborationById(id: ${'$'}id) {
+                    id
+                    brandId
+                    influencerId
+                    brand { name }
+                    influencer { name }
+                }
+            }
+        """.trimIndent()
+        val result = GraphQLClient.query(query, mapOf("id" to collaborationId), token)
+        return result.mapCatching { it.getJSONObject("data").getJSONObject("getCollaborationById") }
     }
 
     suspend fun sendChatMessage(
