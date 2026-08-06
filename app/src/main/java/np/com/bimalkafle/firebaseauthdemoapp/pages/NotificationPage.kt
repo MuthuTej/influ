@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
@@ -18,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -60,6 +62,8 @@ fun NotificationPage(
         )
     }
 
+    var showClearAllDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         val currentUser = FirebaseAuth.getInstance().currentUser
         currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
@@ -100,6 +104,11 @@ fun NotificationPage(
                             }
                         }) {
                             Icon(Icons.Default.DoneAll, contentDescription = "Mark all as read", tint = themeColor)
+                        }
+                    }
+                    if (notifications.isNotEmpty()) {
+                        IconButton(onClick = { showClearAllDialog = true }) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = "Clear all", tint = Color(0xFFFF5252))
                         }
                     }
                 },
@@ -150,6 +159,31 @@ fun NotificationPage(
                 }
             }
         }
+    }
+
+    if (showClearAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearAllDialog = false },
+            title = { Text("Clear all notifications?") },
+            text = { Text("This will permanently delete all your notifications. This action cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClearAllDialog = false
+                    FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+                        result.token?.let { token ->
+                            notificationViewModel.clearAllNotifications(token)
+                        }
+                    }
+                }) {
+                    Text("Clear all", color = Color(0xFFFF5252))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearAllDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

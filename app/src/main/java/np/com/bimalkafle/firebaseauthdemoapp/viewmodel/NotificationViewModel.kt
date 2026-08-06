@@ -105,6 +105,21 @@ class NotificationViewModel : ViewModel() {
         }
     }
 
+    fun clearAllNotifications(token: String) {
+        viewModelScope.launch {
+            val result = BackendRepository.deleteAllNotifications(token)
+            result.onSuccess { success ->
+                if (success) {
+                    _notifications.postValue(emptyList())
+                    _unreadCount.postValue(0)
+                    Log.d("NotificationViewModel", "Cleared all notifications")
+                }
+            }.onFailure {
+                Log.e("NotificationViewModel", "Clear all notifications error", it)
+            }
+        }
+    }
+
     private fun parseNotification(obj: JSONObject): Notification {
         return Notification(
             id = obj.getString("id"),

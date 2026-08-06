@@ -556,6 +556,50 @@ object BackendRepository {
         }
     }
 
+    suspend fun deleteAllNotifications(token: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(BACKEND_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.doOutput = true
+
+            val query = """
+                mutation {
+                    deleteAllNotifications
+                }
+            """.trimIndent()
+
+            val requestBody = JSONObject().apply {
+                put("query", query)
+            }.toString()
+
+            connection.outputStream.use { it.write(requestBody.toByteArray()) }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                SessionManager.notifySessionExpired()
+                return@withContext Result.failure(UnauthorizedException())
+            }
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                if (jsonResponse.has("errors")) {
+                    val errors = jsonResponse.getJSONArray("errors")
+                    val message = errors.getJSONObject(0).getString("message")
+                    Result.failure(Exception(message))
+                } else {
+                    Result.success(jsonResponse.getJSONObject("data").getBoolean("deleteAllNotifications"))
+                }
+            } else {
+                Result.failure(Exception("Server error ${connection.responseCode}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun requestPasswordReset(email: String): Result<String> = withContext(Dispatchers.IO) {
         try {
             val url = URL(BACKEND_URL)
